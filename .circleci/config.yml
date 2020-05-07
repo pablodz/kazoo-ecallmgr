@@ -1,3 +1,4 @@
+## This is for per-application building
 version: 2
 
 workflows:
@@ -245,7 +246,12 @@ jobs:
             - deps-v1-{{ checksum "~/2600hz/kazoo/make/deps.mk" }}-{{ checksum "/usr/local/lib/erlang/releases/RELEASES" }}
       - run:
           name: Compiling Kazoo core for unit test environment
-          command: ERLC_OPTS='-DPROPER' make -C ${KAZOO_ROOT}/core compile-test
+          command: ERLC_OPTS='-DPROPER' make -C ${KAZOO_ROOT} compile-test-core
+      - run:
+          name: Add Crossbar to the mix for schemas and such
+          command: |
+            DEPS=crossbar make -C $KAZOO_ROOT fetch-apps
+            make -C $KAZOO_ROOT/applications/crossbar
       - run:
           name: Running Eunit tests
           command: make -C "$KAZOO_ROOT/$APP_PATH" eunit
@@ -253,7 +259,7 @@ jobs:
           name: Save test results
           command: |
             mkdir -p ~/test-results/junit/
-            find . -type f -name "TEST-*.xml" -exec cp {} ~/test-results/junit/ ;
+            find $KAZOO_ROOT/$APP_PATH -type f -name "TEST-*.xml" -exec cp '{}' ~/test-results/junit/ \;
           when: always
       - store_test_results:
           path: ~/test-results

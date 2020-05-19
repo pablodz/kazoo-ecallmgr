@@ -517,6 +517,12 @@ get_fs_app(Node, UUID, JObj, <<"event_actions">>) ->
         'true' -> event_actions(Node, UUID, JObj)
     end;
 
+get_fs_app(Node, UUID, JObj, <<"detect_speech">>) ->
+    case kapi_dialplan:detect_speech_v(JObj) of
+        'false' -> {'error', <<"detect speech failed to execute as JObj did not validate">>};
+        'true' -> detect_speech_app(Node, UUID, JObj)
+    end;
+
 get_fs_app(_Node, _UUID, _JObj, _App) ->
     lager:debug("unknown application ~s", [_App]),
     {'error', <<"application unknown">>}.
@@ -1526,3 +1532,28 @@ normalize_event_action_char(C) when is_integer(C), $A =< C, C =< $Z -> C + 32;
 normalize_event_action_char(C) when is_integer(C), 16#C0 =< C, C =< 16#D6 -> C + 32; % from string:to_lower
 normalize_event_action_char(C) when is_integer(C), 16#D8 =< C, C =< 16#DE -> C + 32; % so we only loop once
 normalize_event_action_char(C) -> C.
+
+-spec detect_speech_app(atom(), kz_term:ne_binary(), kz_json:object()) -> fs_app().
+detect_speech_app(_Node, _UUID, JObj) ->
+    Action = kz_json:get_ne_binary_value(<<"Action">>, JObj),
+    detect_speech_app(Action, JObj).
+
+-spec detect_speech_app(kz_term:ne_binary(), kz_json:object()) -> fs_app().
+detect_speech_app(<<"stop">>, _JObj) ->
+    {<<"detect_speech">>, <<"stop">>};
+detect_speech_app(<<"start">>, JObj) ->
+    ScopeVars = detect_speech_vars(JObj),
+    Engine = kz_json:get_ne_binary_value(<<"ASR-Engine">>, JObj, <<"kazoo">>),
+    Args = list_to_binary([ScopeVars, Engine, " default default default"]),
+    {<<"detect_speech">>, Args}.
+
+-spec detect_speech_vars(kz_json:object()) -> binary().
+detect_speech_vars(JObj) ->
+    Speech = kz_json:get_json_value(<<"ASR-Engine-Settings">>, JObj, kz_json:new()),
+    case kz_json:foldl(fun add_detect_speech_var/3, [], Speech) of
+        [] -> <<>>;
+        Exports -> list_to_binary(["%^[", kz_binary:join(Exports, <<"^">>), "]"])
+    end.
+
+add_detect_speech_var(K, V, Vars) ->
+    [list_to_binary([K, "=", V]) | Vars].

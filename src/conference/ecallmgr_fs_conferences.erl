@@ -217,17 +217,18 @@ handle_search_conference(JObj, _Props, Name) ->
         ] ->
             lager:debug("sending affirmative search response for conference ~s", [Name]),
             Participants = participants(Name),
-            Resp = [{<<"Msg-ID">>, kz_api:msg_id(JObj)}
-                   ,{<<"Conference-ID">>, Name}
-                   ,{<<"UUID">>, UUID}
-                   ,{<<"Run-Time">>, kz_time:now_s() - StartTime}
-                   ,{<<"Start-Time">>, StartTime}
+            Resp = [{<<"Conference-ID">>, Name}
                    ,{<<"Locked">>, Locked}
-                   ,{<<"Switch-Hostname">>, Hostname}
-                   ,{<<"Switch-URL">>, SwitchURL}
-                   ,{<<"Switch-External-IP">>, ExternalIP}
+                   ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
                    ,{<<"Participant-Count">>, length(Participants)}
                    ,{<<"Participants">>, participants_to_json(Participants)}
+                   ,{<<"Run-Time">>, kz_time:now_s() - StartTime}
+                   ,{<<"Start-Time">>, StartTime}
+                   ,{<<"Switch-External-IP">>, ExternalIP}
+                   ,{<<"Switch-Hostname">>, Hostname}
+                   ,{<<"Switch-URL">>, SwitchURL}
+                   ,{<<"UUID">>, UUID}
+                   ,{<<"Zone">>, kz_config:zone('binary')}
                     | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
                    ],
             kapi_conference:publish_search_resp(kz_api:server_id(JObj), Resp);

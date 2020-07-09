@@ -367,7 +367,7 @@ handle_info(_Msg, State) ->
 %%------------------------------------------------------------------------------
 -spec handle_call_control(kz_json:object(), state()) -> gen_server:handle_event_return().
 handle_call_control(JObj, _State) ->
-    case kz_util:get_event_type(JObj) of
+    case kz_api:event_type(JObj) of
         {<<"call">>, <<"command">>} -> handle_call_command(JObj);
         {<<"conference">>, <<"command">>} -> handle_conference_command(JObj);
         {_Category, _Event} -> lager:debug_unsafe("event ~s : ~s not handled : ~s", [_Category, _Event, kz_json:encode(JObj, ['pretty'])])
@@ -1120,9 +1120,9 @@ query_state(Node, CallId) ->
                          ,"\\${regex(\\${Channel-State}|CS_(.*)|%1)}"
                          ]),
     case freeswitch:api(Node, 'eval', API) of
-        {ok, <<"|">>} ->
+        {'ok', <<"|">>} ->
             {<<"DOWN">>, <<"DOWN">>};
-        {ok, Reply} ->
+        {'ok', Reply} ->
             list_to_tuple(binary:split(Reply, <<"|">>));
         _ ->
             {<<"DOWN">>, <<"DOWN">>}

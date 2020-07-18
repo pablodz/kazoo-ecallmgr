@@ -1556,4 +1556,4 @@ detect_speech_vars(JObj) ->
     end.
 
 add_detect_speech_var(K, V, Vars) ->
-    [list_to_binary([K, "=", V]) | Vars].
+    [list_to_binary([K, "=", kz_term:to_binary(V)]) | Vars].

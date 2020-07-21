@@ -235,9 +235,18 @@ conference_profile_xml(Name, Params, []) ->
     ParamEls = [param_el(K, V) || {K, V} <- kz_json:to_proplist(Params)],
     profile_el(Name, ParamEls);
 conference_profile_xml(Name, Params, Props) ->
-    ParamEls = [param_el(K, V) || {K, V} <- kz_json:to_proplist(Params)],
+    ParamEls = lists:foldl(fun conference_profile_param/2, [], kz_json:to_proplist(Params)),
     VariablesEls = variables_el([variable_el(K, V) || {K, V} <- Props]),
     profile_el(Name, ParamEls ++ [VariablesEls]).
+
+conference_profile_param({<<"extra-settings">>, JObj}, Acc) ->
+    lists:foldl(fun conference_profile_elem/2, Acc, kz_json:to_proplist(JObj));
+conference_profile_param({K, V}, Acc) ->
+    [param_el(K, kz_term:to_binary(V)) | Acc].
+
+conference_profile_elem({K, JObj}, Acc) ->
+    Children = lists:foldl(fun conference_profile_param/2, [], kz_json:to_proplist(JObj)),
+    [named_el(kz_term:to_atom(K, true), Children) | Acc].
 
 -spec route_resp_xml(atom(), kz_term:api_terms(), dialplan_context()) -> {'ok', iolist()}.
 route_resp_xml(Section, [_|_]=RespProp, DialplanContext) ->
@@ -1214,6 +1223,12 @@ context_el(Name, Children) ->
                ,content=Children
                }.
 
+-spec named_el(atom(), kz_types:xml_els()) -> kz_types:xml_el().
+named_el(Name, Children) ->
+    #xmlElement{name=Name
+               ,content=Children
+               }.
+
 -spec extension_el(kz_types:xml_els()) -> kz_types:xml_el().
 extension_el(Children) ->
     #xmlElement{name='extension'
@@ -1584,7 +1599,7 @@ directory_resp_device_xml(Endpoint, JObj) ->
     Vars = get_channel_params(Props),
 
     ProfileParams = get_profile_params(Endpoint),
-    ChannelParams = get_channel_params(Endpoint),
+    ChannelParams = get_channel_params(Endpoint) ++ get_codecs(Endpoint),
     SIPHeaders = get_custom_sip_headers(Endpoint),
 
     VariableEls = [variable_el(K, V) || {K, V} <- ChannelParams],
@@ -1602,6 +1617,8 @@ directory_resp_device_xml(Endpoint, JObj) ->
              ,{<<"endpoint-dial-string">>, dial_string(ProxyPath, Endpoint, Id)}
              ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}
              ,{<<"endpoint-separator">>, ?SEPARATOR_ENTERPRISE}
+             ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
+             ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
              ],
     ParamsEl = params_el([param_el(K,V) || {K,V} <- Params]),
     UserEl = user_el(UserProps, [VariablesEl, ProfileVariablesEl, ParamsEl, callfwd_el(Endpoint)]),
@@ -1630,6 +1647,8 @@ directory_resp_user_xml(Endpoint, JObj) ->
              ,{<<"endpoint-dial-string">>,  DialEndpoints}
              ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}
              ,{<<"endpoint-separator">>, ?SEPARATOR_ENTERPRISE}
+             ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
+             ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
              ],
     ParamsEl = params_el([param_el(K,V) || {K,V} <- Params]),
 
@@ -1707,3 +1726,12 @@ callfwd_properties(Endpoint) ->
 
 filter_call_fwd_props(Props) ->
     lists:filter(fun({K,_V}) -> lists:member(K, ?CALLFWD_FILTER) end, Props).
+
+get_codecs(Endpoint) ->
+    case kz_json:get_list_value(<<"Codecs">>, Endpoint, []) of
+        [] -> [];
+        Cs ->
+            Codecs = [kz_term:to_list(codec_mappings(C)) || C <- Cs, not kz_term:is_empty(C)],
+            CodecStr = string:join(Codecs, ":"),
+            [{<<"absolute_codec_string">> , list_to_binary(["^^:", CodecStr])}]
+	end.

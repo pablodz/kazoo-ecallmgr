@@ -787,12 +787,19 @@ conference_from_jobj(JObj, Node, Conference) ->
                          ,profile_name=kz_conference_event:profile(JObj)
                          ,start_time = kz_time:current_tstamp()
                          ,switch_hostname=kz_conference_event:switch_hostname(JObj)
-                         ,switch_url=kz_conference_event:switch_url(JObj)
+                         ,switch_url=switch_url(Node, JObj)
                          ,account_id = kz_conference_event:account_id(JObj)
                          ,handling_locally = CtrlNode =:= kz_term:to_binary(node())
                          ,origin_node = CtrlNode
                          ,control_node = CtrlNode
                          }.
+
+-spec switch_url(atom(), kz_json:object()) -> kz_term:ne_binary().
+switch_url(Node, JObj) ->
+    case kz_conference_event:switch_url(JObj) of
+        undefined -> ecallmgr_fs_nodes:sip_url(Node);
+        SwitchURL -> SwitchURL
+    end.
 
 -spec participant_from_jobj(kz_json:object(), atom()) -> participant().
 participant_from_jobj(JObj, Node) ->

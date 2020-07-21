@@ -258,6 +258,7 @@
 
                               ,{<<"Continue-On-Fail">>, <<"continue_on_fail">>}
                               ,{<<"Default-Language">>, <<"default_language">>}
+                              ,{<<"Channel-Language">>, <<"channel_language">>}
                               ,{<<"Diversions">>, <<"sip_h_Diversion">>}
                               ,{<<"Eavesdrop-Group">>, <<"eavesdrop_group">>}
                               ,{<<"Eavesdrop-Group-ID">>, <<"eavesdrop_group">>}

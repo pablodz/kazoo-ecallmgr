@@ -253,7 +253,7 @@ handle_cast({'originate_ready'}, #state{node=_Node}=State) ->
                      ,server_id=ServerId
                      ,queue=Q
                      }=State1} ->
-            CtrlQ = gen_listener:queue_name(Pid),
+            CtrlQ = ecallmgr_call_control:queue_name(Pid),
             _ = publish_originate_ready(CtrlQ, UUID, JObj, Q, ServerId),
             {'noreply', State1#state{tref=start_abandon_timer()}};
         {'error', _E} ->
@@ -743,7 +743,7 @@ publish_originate_uuid(ServerId, UUID, JObj, CtrlQueue) ->
 maybe_send_originate_uuid({_, UUID}, Pid, #state{server_id=ServerId
                                                 ,originate_req=JObj
                                                 }) ->
-    CtlQ = gen_listener:queue_name(Pid),
+    CtlQ = ecallmgr_call_control:queue_name(Pid),
     publish_originate_uuid(ServerId, UUID, JObj, CtlQ).
 
 -spec find_originate_timeout(kz_json:object()) -> pos_integer().

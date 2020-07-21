@@ -83,15 +83,15 @@ call_id(#{call_id := _CallId}=Map) -> Map;
 call_id(#{payload := JObj}=Map) ->
     Map#{call_id => kzd_fetch:call_id(JObj)}.
 
--spec add_time_marker(atom(), dialplan_context()) -> dialplan_context().
-add_time_marker(Name, Map) ->
-    add_time_marker(Name, kz_time:now_us(), Map).
+-spec add_time_marker(dialplan_context(), atom()) -> dialplan_context().
+add_time_marker(Map, Name) ->
+    add_time_marker(Map, Name, kz_time:now_us()).
 
--spec add_time_marker(atom(), pos_integer(), dialplan_context()) -> dialplan_context().
-add_time_marker(Name, Value, #{timer := Timer}= Map) ->
+-spec add_time_marker(dialplan_context(), atom(), pos_integer()) -> dialplan_context().
+add_time_marker(#{timer := Timer}= Map, Name, Value) ->
     Map#{timer => Timer#{Name => Value}};
-add_time_marker(Name, Value, #{}= Map) ->
-    add_time_marker(Name, Value, Map#{timer => #{}}).
+add_time_marker(#{}= Map, Name, Value) ->
+    add_time_marker(Map#{timer => #{}}, Name, Value).
 
 -spec maybe_authz(dialplan_context()) -> dialplan_context().
 maybe_authz(#{blocked := 'true'}=Map) -> Map;
@@ -116,7 +116,7 @@ maybe_blocked(#{blocked := 'true'}=Map) ->
     send_reply(Map);
 maybe_blocked(#{request := Request}=Map) ->
     kapi_route:publish_req(Request),
-    wait_for_route_resp(add_time_marker('request_sent', Map)).
+    wait_for_route_resp(add_time_marker(Map, 'request_sent')).
 
 -spec wait_for_route_resp(dialplan_context()) -> {'ok', dialplan_context()}.
 wait_for_route_resp(#{timeout := TimeoutMs}=Map) ->

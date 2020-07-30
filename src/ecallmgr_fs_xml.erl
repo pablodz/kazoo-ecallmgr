@@ -1626,6 +1626,12 @@ directory_resp_device_xml(Endpoint, JObj) ->
     SectionEl = section_el(<<"directory">>, DomainEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
 
+-spec user_dial_string(kz_term:ne_binaries(), kz_term:ne_binary()) -> kz_term:ne_binary().
+user_dial_string([], _AccountId) ->
+    <<"error/no_endpoints">>;
+user_dial_string(Ids, AccountId) ->
+    kz_binary:join([list_to_binary(["kz/", M, "@", AccountId]) || M <- Ids], ?SEPARATOR_ENTERPRISE).
+
 -spec directory_resp_user_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
 directory_resp_user_xml(Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
@@ -1642,7 +1648,8 @@ directory_resp_user_xml(Endpoint, JObj) ->
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
     UserProps = props:filter_undefined(user_el_props('undefined', UserId)),
     Members = kz_json:get_list_value(<<"Members">>, Endpoint, []),
-    DialEndpoints = kz_binary:join([list_to_binary(["kz/", M, "@", DomainName]) || M <- Members], ?SEPARATOR_ENTERPRISE),
+    DialEndpoints = user_dial_string(Members, DomainName),
+    kz_binary:join([list_to_binary(["kz/", M, "@", DomainName]) || M <- Members], ?SEPARATOR_ENTERPRISE),
     Params = [{<<"group-dial-string">>, <<"kz/", Id/binary>>}
              ,{<<"endpoint-dial-string">>,  DialEndpoints}
              ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}

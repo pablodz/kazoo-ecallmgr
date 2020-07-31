@@ -298,31 +298,23 @@ is_number_blacklisted(Blacklist, JObj) ->
              'true'
     end.
 
--spec get_blacklists(kz_term:ne_binary()) ->
-          {'ok', kz_term:ne_binaries()} |
-          {'error', any()}.
+-spec get_blacklists(kz_term:ne_binary()) -> kz_term:ne_binaries().
 get_blacklists(AccountId) ->
     case kzd_accounts:fetch(AccountId) of
-        {'error', _R}=E ->
+        {'error', _R} ->
             lager:error("could not open account doc ~s : ~p", [AccountId, _R]),
-            E;
+            [];
         {'ok', Doc} ->
-            case kz_json:get_value(<<"blacklists">>, Doc, []) of
-                [] -> {'error', 'undefined'};
-                [_|_]=Blacklists-> {'ok', Blacklists};
-                _ -> {'error', 'miss_configured'}
-            end
+            kz_json:get_list_value(<<"blacklists">>, Doc, [])
     end.
 
 -spec get_blacklist(kz_json:object()) -> kz_json:object().
 get_blacklist(JObj) ->
     AccountId = kzd_fetch:account_id(JObj),
-    case get_blacklists(AccountId) of
-        {'error', _R} -> kz_json:new();
-        {'ok', Blacklists} -> get_blacklist(AccountId, Blacklists)
-    end.
+    get_blacklist(AccountId, get_blacklists(AccountId)).
 
 -spec get_blacklist(kz_term:ne_binary(), kz_term:ne_binaries()) -> kz_json:object().
+get_blacklist(_AccountId, []) -> kz_json:new();
 get_blacklist(AccountId, Blacklists) ->
     AccountDb = kzs_util:format_account_db(AccountId),
     lists:foldl(fun(BlacklistId, Acc) ->

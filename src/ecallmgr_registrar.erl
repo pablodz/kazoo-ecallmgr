@@ -145,11 +145,11 @@ start_link() ->
                            ,[]
                            ).
 
--spec handle_reg_success(kz_json:object(), kz_term:proplist()) -> 'ok'.
-handle_reg_success(JObj, _Props) ->
-    'true' = kapi_registration:success_v(JObj),
-    _ = kz_log:put_callid(JObj),
-    Registration = create_registration(JObj),
+-spec handle_reg_success(kapi_registration:success(), kz_term:proplist()) -> 'ok'.
+handle_reg_success(RegSuccess, _Props) ->
+    'true' = kapi_registration:success_v(RegSuccess),
+    _ = kz_log:put_callid(RegSuccess),
+    Registration = create_registration(RegSuccess),
     insert_registration(Registration).
 
 -spec handle_reg_query(kapi_registration:query_req(), kz_term:proplist()) -> 'ok'.
@@ -831,61 +831,62 @@ filter_field(Field, {Acc, RegistrationJObj}) ->
 registration_id(Username, Realm) ->
     {kz_term:to_lower_binary(Username), kz_term:to_lower_binary(Realm)}.
 
--spec create_registration(kz_json:object()) -> registration().
-create_registration(JObj) ->
-    Username = kz_json:get_value(<<"Username">>, JObj),
-    Realm = get_realm(JObj),
+-spec create_registration(kapi_registration:success()) -> registration().
+create_registration(RegSuccess) ->
+    Username = kz_json:get_value(<<"Username">>, RegSuccess),
+    Realm = get_realm(RegSuccess),
     Reg = existing_or_new_registration(Username, Realm),
-    Proxy = kz_json:get_value(<<"Proxy-Path">>, JObj, Reg#registration.proxy),
-    ProxyIP = kz_json:get_value(<<"Proxy-IP">>, JObj, Reg#registration.proxy_ip),
-    ProxyPort = kz_json:get_integer_value(<<"Proxy-Port">>, JObj, Reg#registration.proxy_port),
-    ProxyProto = kz_json:get_value(<<"Proxy-Protocol">>, JObj, Reg#registration.proxy_proto),
+
+    Proxy = kz_json:get_value(<<"Proxy-Path">>, RegSuccess, Reg#registration.proxy),
+    ProxyIP = kz_json:get_value(<<"Proxy-IP">>, RegSuccess, Reg#registration.proxy_ip),
+    ProxyPort = kz_json:get_integer_value(<<"Proxy-Port">>, RegSuccess, Reg#registration.proxy_port),
+    ProxyProto = kz_json:get_value(<<"Proxy-Protocol">>, RegSuccess, Reg#registration.proxy_proto),
     OriginalContact =
         kz_json:get_first_defined([<<"Original-Contact">>
                                   ,<<"Contact">>
                                   ]
-                                 ,JObj
+                                 ,RegSuccess
                                  ,Reg#registration.original_contact
                                  ),
     Expires =
         ecallmgr_util:maybe_add_expires_deviation(
-          kz_json:get_integer_value(<<"Expires">>, JObj, Reg#registration.expires)
+          kz_json:get_integer_value(<<"Expires">>, RegSuccess, Reg#registration.expires)
          ),
     RegistrarNode =
         kz_json:get_first_defined([<<"Registrar-Node">>
                                   ,<<"FreeSWITCH-Nodename">>
                                   ,<<"Node">>
                                   ]
-                                 ,JObj
+                                 ,RegSuccess
                                  ,Reg#registration.registrar_node
                                  ),
     RegistrarHostname =
         kz_json:get_first_defined([<<"Hostname">>
                                   ,<<"Registrar-Hostname">>
                                   ]
-                                 ,JObj
+                                 ,RegSuccess
                                  ,Reg#registration.registrar_hostname
                                  ),
     RegistrarZone =
         kz_term:to_atom(kz_json:get_ne_binary_value(<<"AMQP-Broker-Zone">>
-                                                   ,JObj
+                                                   ,RegSuccess
                                                    ,kz_nodes:local_zone()
                                                    )
                        ,'true'
                        ),
     augment_registration(Reg#registration{bridge_uri=bridge_uri(OriginalContact, Proxy, Username, Realm)
-                                         ,call_id=kz_api:call_id(JObj, Reg#registration.call_id)
+                                         ,call_id=kz_api:call_id(RegSuccess, Reg#registration.call_id)
                                          ,contact=fix_contact(OriginalContact)
                                          ,expires=Expires
-                                         ,from_host=get_realm(<<"From-Host">>, JObj)
-                                         ,from_user=kz_json:get_value(<<"From-User">>, JObj, Reg#registration.from_user)
-                                         ,initial=kz_json:is_true(<<"First-Registration">>, JObj, Reg#registration.initial)
-                                         ,initial_registration=kz_json:get_integer_value(<<"Initial-Registration">>, JObj, Reg#registration.initial_registration)
-                                         ,last_registration=kz_json:get_integer_value(<<"Last-Registration">>, JObj, Reg#registration.last_registration)
-                                         ,network_ip=kz_json:get_value(<<"Network-IP">>, JObj, Reg#registration.network_ip)
-                                         ,network_port=kz_json:get_value(<<"Network-Port">>, JObj, Reg#registration.network_port)
+                                         ,from_host=get_realm(<<"From-Host">>, RegSuccess)
+                                         ,from_user=kz_json:get_value(<<"From-User">>, RegSuccess, Reg#registration.from_user)
+                                         ,initial=kz_json:is_true(<<"First-Registration">>, RegSuccess, Reg#registration.initial)
+                                         ,initial_registration=kz_json:get_integer_value(<<"Initial-Registration">>, RegSuccess, Reg#registration.initial_registration)
+                                         ,last_registration=kz_json:get_integer_value(<<"Last-Registration">>, RegSuccess, Reg#registration.last_registration)
+                                         ,network_ip=kz_json:get_value(<<"Network-IP">>, RegSuccess, Reg#registration.network_ip)
+                                         ,network_port=kz_json:get_value(<<"Network-Port">>, RegSuccess, Reg#registration.network_port)
                                          ,original_contact=OriginalContact
-                                         ,previous_contact=kz_json:get_value(<<"Previous-Contact">>, JObj, Reg#registration.previous_contact)
+                                         ,previous_contact=kz_json:get_value(<<"Previous-Contact">>, RegSuccess, Reg#registration.previous_contact)
                                          ,proxy=Proxy
                                          ,proxy_ip=ProxyIP
                                          ,proxy_port=ProxyPort
@@ -894,14 +895,14 @@ create_registration(JObj) ->
                                          ,registrar_hostname=RegistrarHostname
                                          ,registrar_node=RegistrarNode
                                          ,registrar_zone=RegistrarZone
-                                         ,source_ip=kz_json:get_value(<<"Source-IP">>, JObj)
-                                         ,source_port=kz_json:get_value(<<"Source-Port">>, JObj)
-                                         ,to_host=get_realm(<<"To-Host">>, JObj)
-                                         ,to_user=kz_json:get_value(<<"To-User">>, JObj, Reg#registration.to_user)
-                                         ,user_agent=kz_json:get_value(<<"User-Agent">>, JObj, Reg#registration.user_agent)
+                                         ,source_ip=kz_json:get_value(<<"Source-IP">>, RegSuccess)
+                                         ,source_port=kz_json:get_value(<<"Source-Port">>, RegSuccess)
+                                         ,to_host=get_realm(<<"To-Host">>, RegSuccess)
+                                         ,to_user=kz_json:get_value(<<"To-User">>, RegSuccess, Reg#registration.to_user)
+                                         ,user_agent=kz_json:get_value(<<"User-Agent">>, RegSuccess, Reg#registration.user_agent)
                                          ,username=Username
                                          }
-                        ,JObj
+                        ,RegSuccess
                         ).
 
 -spec get_realm(kz_json:key(), kz_json:object()) -> kz_term:ne_binary().
@@ -915,55 +916,33 @@ get_realm(Key, JObj) ->
 augment_registration(Reg, JObj) ->
     CCVs = kz_json:get_json_value(<<"Custom-Channel-Vars">>, JObj, kz_json:new()),
     EndpointInfo = kz_json:get_json_value(<<"Endpoint-Info">>, CCVs, kz_json:new()),
-    AccountId = kz_json:find(<<"Account-ID">>
-                            ,[JObj, CCVs]
-                            ,Reg#registration.account_id
-                            ),
+
+    FindFun = fun(Key, Default) -> kz_json:find(Key, [JObj, CCVs], Default) end,
+
+    AccountId = FindFun(<<"Account-ID">>, Reg#registration.account_id),
+
     SuppressUnregister =
         kz_term:is_true(
-          case kz_json:find(<<"Suppress-Unregister-Notifications">>, [JObj, CCVs]) of
+          case FindFun(<<"Suppress-Unregister-Notifications">>, 'undefined') of
               'undefined' ->
-                  kz_json:find(<<"Suppress-Unregister-Notify">>
-                              ,[JObj, CCVs]
-                              ,Reg#registration.suppress_unregister
-                              );
+                  FindFun(<<"Suppress-Unregister-Notify">>, Reg#registration.suppress_unregister);
               Else -> Else
           end
          ),
+
     OverwriteNotify =
         kz_term:is_true(
-          kz_json:find(<<"Register-Overwrite-Notify">>
-                      ,[JObj, CCVs]
-                      ,Reg#registration.register_overwrite_notify
-                      )
+          FindFun(<<"Register-Overwrite-Notify">>, Reg#registration.register_overwrite_notify)
          ),
-    AccountDb = kzs_util:format_account_db(AccountId),
-    Reg#registration{account_db=AccountDb
+
+    Reg#registration{account_db=kzs_util:format_account_db(AccountId)
                     ,account_id=AccountId
-                    ,account_name=kz_json:find(<<"Account-Name">>
-                                              ,[JObj, CCVs]
-                                              ,Reg#registration.account_name
-                                              )
-                    ,account_realm=kz_json:find(<<"Account-Realm">>
-                                               ,[JObj, CCVs]
-                                               ,Reg#registration.account_realm
-                                               )
-                    ,authorizing_id=kz_json:find(<<"Authorizing-ID">>
-                                                ,[JObj, CCVs]
-                                                ,Reg#registration.authorizing_id
-                                                )
-                    ,authorizing_type=kz_json:find(<<"Authorizing-Type">>
-                                                  ,[JObj, CCVs]
-                                                  ,Reg#registration.authorizing_type
-                                                  )
-                    ,owner_id=kz_json:find(<<"Owner-ID">>
-                                          ,[JObj, CCVs]
-                                          ,Reg#registration.owner_id
-                                          )
-                    ,presence_id=kz_json:find(<<"Presence-ID">>
-                                             ,[JObj, CCVs]
-                                             ,Reg#registration.presence_id
-                                             )
+                    ,account_name=FindFun(<<"Account-Name">>, Reg#registration.account_name)
+                    ,account_realm=FindFun(<<"Account-Realm">>, Reg#registration.account_realm)
+                    ,authorizing_id=FindFun(<<"Authorizing-ID">>, Reg#registration.authorizing_id)
+                    ,authorizing_type=FindFun(<<"Authorizing-Type">>, Reg#registration.authorizing_type)
+                    ,owner_id=FindFun(<<"Owner-ID">>, Reg#registration.owner_id)
+                    ,presence_id=FindFun(<<"Presence-ID">>, Reg#registration.presence_id)
                     ,register_overwrite_notify=OverwriteNotify
                     ,suppress_unregister=SuppressUnregister
                     ,endpoint_info=EndpointInfo

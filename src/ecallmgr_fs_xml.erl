@@ -1663,7 +1663,7 @@ directory_resp_user_xml(Endpoint, JObj) ->
     UserProps = props:filter_undefined(user_el_props('undefined', UserId)),
     Members = kz_json:get_list_value(<<"Members">>, Endpoint, []),
     DialEndpoints = user_dial_string(Members, DomainName),
-    kz_binary:join([list_to_binary(["kz/", M, "@", DomainName]) || M <- Members], ?SEPARATOR_ENTERPRISE),
+
     Params = [{<<"group-dial-string">>, <<"kz/", Id/binary>>}
              ,{<<"endpoint-dial-string">>,  DialEndpoints}
              ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}

@@ -238,8 +238,8 @@ media_discovery(Node, CurrentACLs) ->
     Discovered = media_nodes(),
     Diff = kz_json:diff(Discovered, Current),
     case kz_json:is_empty(Diff) of
-        true -> ok;
-        false ->
+        'true' -> 'ok';
+        'false' ->
             Keys = kz_json:get_keys(Diff),
             Updated = kz_json:filter(fun({K, _V}) -> lists:member(K, Keys) end, Discovered),
             NewAcls = kz_json:set_values(kz_json:to_proplist(Updated), CurrentACLs),
@@ -253,8 +253,14 @@ is_media_acl({_K, JObj}) ->
 
 -spec media_nodes() -> kz_json:object().
 media_nodes() ->
-    Nodes = [media_node(Node) || #kz_node{media_servers = MediaList} <- kz_nodes:nodes(), MediaList =/= [], Node <- MediaList],
-    kz_json:from_list(lists:map(fun media_node_acl/1, lists:foldl(fun media_node_unique/2, [], Nodes))).
+    Nodes = [media_node(Node)
+             || #kz_node{media_servers = MediaList} <- kz_nodes:nodes(),
+                MediaList =/= [],
+                Node <- MediaList
+            ],
+    UniqueNodes = lists:foldl(fun media_node_unique/2, [], Nodes),
+    MediaNodes = [media_node_acl(Unique) || Unique <- UniqueNodes],
+    kz_json:from_list(MediaNodes).
 
 media_node({Node, Data}) ->
     {Node, media_node_ips(Data)}.
@@ -265,7 +271,7 @@ media_node_ips(Data) ->
 
 media_node_ip(_InterfaceName, SIPInterface, Acc) ->
     case media_node_interface(SIPInterface) of
-        {_, undefined} -> Acc;
+        {_, 'undefined'} -> Acc;
         {[], _} -> Acc;
         IPPort -> media_node_ip(IPPort, Acc)
     end.
@@ -275,11 +281,14 @@ media_node_interface(SIPInterface) ->
 
 media_node_interface_ips(SIPInterface) ->
     Fields = [<<"sip-ip">>, <<"ext-sip-ip">>],
-    lists:usort(props:filter_undefined([ kz_json:get_ne_binary_value([<<"info">>, Field], SIPInterface) || Field <- Fields])).
+    InterfaceIPs = [kz_json:get_ne_binary_value([<<"info">>, Field], SIPInterface)
+                    || Field <- Fields
+                   ],
+    lists:usort(props:filter_undefined(InterfaceIPs)).
 
 media_node_interface_port(SIPInterface) ->
     case kz_json:get_ne_binary_value([<<"info">>, <<"url">>], SIPInterface) of
-        undefined -> undefined;
+        'undefined' -> 'undefined';
         URI -> kzsip_uri:port(kzsip_uri:parse(URI))
     end.
 
@@ -288,13 +297,14 @@ media_node_ip({IPList, Port}, {IPs, Ports}) ->
 
 media_node_unique({NodeName, {IPs, Ports}} = Node, Acc) ->
     case props:get_value(NodeName, Acc) of
-        undefined -> [Node | Acc];
+        'undefined' -> [Node | Acc];
         {ExistingIPs, ExistingPorts} ->
             Info = {lists:usort(ExistingIPs ++ IPs), lists:usort(ExistingPorts ++ Ports)},
             props:set_value({NodeName, Info}, Acc)
     end.
 
--spec media_node_acl(tuple()) -> kz_json:object().
+-spec media_node_acl({kz_term:ne_binary(), {kz_term:ne_binaries(), [inet:port_number()]}}) ->
+          {kz_term:ne_binary(), kz_json:object()}.
 media_node_acl({Node, {IPs, Ports}}) ->
     CIDRs = [<<IP/binary, "/32">> || IP <- IPs],
     ACL = kz_json:from_list([{<<"type">>, <<"allow">>}

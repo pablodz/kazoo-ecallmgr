@@ -19,4 +19,5 @@
 	<field name="Privacy" type="reference" />
 	<field name="Custom-AUTH-Headers" type="reference" />
 	<field name="debug-call" type="reference" />
+	<field name="proxy-origin"  type="reference" />
 </definition>

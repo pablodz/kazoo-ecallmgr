@@ -22,6 +22,7 @@
         ,lookup_original_contact/2
         ,lookup_registration/2
         ,lookup_proxy_path/2
+        ,lookup_endpoint/2
         ,get_registration/2
         ]).
 -export([summary/0, summary/1
@@ -117,6 +118,7 @@
                       ,to_user = <<"nouser">> :: kz_term:ne_binary() | '_'
                       ,user_agent :: kz_term:api_ne_binary() | '_'
                       ,username :: kz_term:api_ne_binary() | '_'
+                      ,endpoint_info :: kz_term:api_object() | '_'
                       }).
 
 -type registration() :: #registration{}.
@@ -192,6 +194,24 @@ collect_reg_success_props(Key, {FSJObj, Acc}) ->
     case kz_json:get_first_defined([kz_term:to_lower_binary(Key), Key], FSJObj) of
         'undefined' -> {FSJObj, Acc};
         Value -> {FSJObj, [{Key, Value} | Acc]}
+    end.
+
+-spec lookup_endpoint(binary(), binary()) ->
+          {'ok', kz_term:proplist()} |
+          {'error', 'not_found'}.
+lookup_endpoint(<<>>, _AccountId) -> {'error', 'not_found'};
+lookup_endpoint(_EndpointId, <<>>) -> {'error', 'not_found'};
+lookup_endpoint(<<EndpointId/binary>>, <<AccountId/binary>>) ->
+    MatchSpec = #registration{account_id = AccountId
+                             ,authorizing_id = EndpointId
+                             ,_ = '_'
+                             },
+
+    case ets:match_object(?MODULE, MatchSpec) of
+        [] ->
+            {'error', 'not_found'};
+        [#registration{}=Reg] ->
+            {'ok', to_endpoint(Reg)}
     end.
 
 -spec lookup_proxy_path(kz_term:ne_binary(), kz_term:ne_binary()) ->
@@ -894,6 +914,7 @@ get_realm(Key, JObj) ->
 -spec augment_registration(registration(), kz_json:object()) -> registration().
 augment_registration(Reg, JObj) ->
     CCVs = kz_json:get_json_value(<<"Custom-Channel-Vars">>, JObj, kz_json:new()),
+    EndpointInfo = kz_json:get_json_value(<<"Endpoint-Info">>, CCVs, kz_json:new()),
     AccountId = kz_json:find(<<"Account-ID">>
                             ,[JObj, CCVs]
                             ,Reg#registration.account_id
@@ -945,6 +966,7 @@ augment_registration(Reg, JObj) ->
                                              )
                     ,register_overwrite_notify=OverwriteNotify
                     ,suppress_unregister=SuppressUnregister
+                    ,endpoint_info=EndpointInfo
                     }.
 
 -spec fix_contact(kz_term:api_binary()) -> kz_term:api_binary().
@@ -1214,6 +1236,19 @@ registration_notify(#registration{contact=Contact
                | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
               ]),
     kapi_presence:publish_register_overwrite(Props).
+
+-spec to_endpoint(registration()) -> kz_term:proplist().
+to_endpoint(Reg) ->
+    props:filter_undefined(
+      [{<<"pvt_account_id">>, Reg#registration.account_id}
+      ,{<<"id">>, Reg#registration.authorizing_id}
+      ,{<<"pvt_type">>, Reg#registration.authorizing_type}
+      ,{<<"owner_id">>, Reg#registration.owner_id}
+      ,{<<"presence_id">>, Reg#registration.presence_id}
+      ,{<<"sip">>, kz_json:from_list([{<<"username">>, Reg#registration.username}])}
+       | kz_json:to_proplist(kz_json:normalize(Reg#registration.endpoint_info))
+      ]
+     ).
 
 -spec to_props(registration()) -> kz_term:proplist().
 to_props(Reg) ->

@@ -1559,6 +1559,14 @@ dial_string(_Proxy, undefined, Id, SIPInterface) ->
 dial_string(_Proxy, Uri, _Id, SIPInterface) ->
     list_to_binary(["sofia/", SIPInterface, "/", Uri]).
 
+-spec originating_route_uri(kz_json:object()) -> kz_term:api_ne_binary().
+originating_route_uri(JObj) ->
+    kz_json:get_ne_binary_value(<<"Originating-Proxy">>, JObj).
+
+-spec route_uri(kz_json:object(), kz_json:object()) -> kz_term:api_ne_binary().
+route_uri(undefined, JObj) -> originating_route_uri(JObj);
+route_uri(ProxyUri, _JObj) -> ProxyUri.
+
 -spec directory_resp_endpoint_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
 directory_resp_endpoint_xml(Endpoint, JObj) ->
     Type = kz_json:get_ne_binary_value(<<"Endpoint-Type">>, Endpoint, <<"device">>),
@@ -1610,12 +1618,11 @@ directory_resp_device_xml(Endpoint, JObj) ->
     ChannelParams = get_channel_params(Endpoint) ++ get_codecs(Endpoint),
     SIPHeaders = get_custom_sip_headers(Endpoint),
 
-    OriginatingProxy = kz_json:get_ne_binary_value(<<"Originating-Proxy">>, JObj),
-
     VariableEls = [variable_el(K, V) || {K, V} <- ChannelParams],
     HeaderEls = [variable_el(<<"sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
     ProxyEls = [variable_el(K, V) || {K, V} <- Vars],
-    ProxyPathEls = [variable_el(<<"sip_route_uri">>, Proxy) || Proxy <- [ProxyPath, OriginatingProxy], Proxy =/= 'undefined'],
+    Proxies = [route_uri(ProxyPath, JObj)],
+    ProxyPathEls = [variable_el(<<"sip_route_uri">>, Proxy) || Proxy <- Proxies, Proxy =/= 'undefined'],
     VariablesEl = variables_el(VariableEls ++ HeaderEls ++ ProxyEls ++ ProxyPathEls),
 
     Number = kz_json:get_value([<<"Custom-SIP-Headers">>,<<"P-Kazoo-Primary-Number">>],Endpoint),

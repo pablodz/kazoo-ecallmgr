@@ -1572,6 +1572,8 @@ directory_resp_endpoint_xml(<<"group">>, Endpoint, JObj) ->
 directory_resp_endpoint_xml(<<"user">>, Endpoint, JObj) ->
     directory_resp_user_xml(Endpoint, JObj);
 directory_resp_endpoint_xml(<<"device">>, Endpoint, JObj) ->
+    directory_resp_device_xml(Endpoint, JObj);
+directory_resp_endpoint_xml(<<"sys_info">>, Endpoint, JObj) ->
     directory_resp_device_xml(Endpoint, JObj).
 
 -spec directory_resp_resource_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.

@@ -51,6 +51,8 @@
         ,acl_summary/1
         ]).
 -export([reload_acls/0]).
+-export([reload_media_acls/0]).
+-export([publish_reload_acls/0]).
 -export([flush_acls/0]).
 
 -export([node_summary/0]).
@@ -341,15 +343,25 @@ has_acl(Name, Action, ACLs) ->
         _ACL when Action =:= 'remove' -> 'false'
     end.
 
--spec reload_acls() -> 'no_return'.
-reload_acls() ->
+-spec reload_media_acls() -> 'no_return'.
+reload_media_acls() ->
     _ = [begin
              print_and_log("issued reload ACLs to ~s", [Node]),
              freeswitch:bgapi(Node, 'reloadacl', "")
          end
          || Node <- ecallmgr_fs_nodes:connected()
         ],
+    'no_return'.
+
+-spec reload_acls() -> 'no_return'.
+reload_acls() ->
+    _ = reload_media_acls(),
     _ = kz_amqp_worker:cast(kz_api:default_headers(?APP_NAME, ?APP_VERSION), fun kapi_trusted:publish_reload/1),
+    'no_return'.
+
+-spec publish_reload_acls() -> 'no_return'.
+publish_reload_acls() ->
+    _ = kz_amqp_worker:cast([], fun(_) -> kapi_switch:publish_reload_acls() end),
     'no_return'.
 
 -spec test_ip_against_acl(kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binary()) -> 'ok'.

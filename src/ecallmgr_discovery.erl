@@ -71,7 +71,7 @@ handle_call(_Request, _From, Startup) ->
 -spec handle_cast(any(), state()) -> kz_types:handle_cast_ret_state(state()).
 handle_cast('discovery', Startup) ->
     lager:warning("starting discovery"),
-    _ = sbc_discovery(),
+    _ = discovery(),
     {'noreply', Startup, next_timeout(kz_time:elapsed_s(Startup))};
 handle_cast(_Msg, Startup) ->
     lager:debug("unhandled cast: ~p", [_Msg]),
@@ -84,7 +84,7 @@ handle_cast(_Msg, Startup) ->
 %%------------------------------------------------------------------------------
 -spec handle_info(any(), state()) -> kz_types:handle_info_ret_state(state()).
 handle_info('timeout', Startup) ->
-    _ = sbc_discovery(),
+    _ = discovery(),
     {'noreply', Startup, next_timeout(kz_time:elapsed_s(Startup))};
 handle_info({'bgok', _Id, _Result}, Startup) ->
     lager:info("background job ~s: ~s", [_Id, _Result]),
@@ -221,6 +221,84 @@ sbc_discovery(ConfigNode, CurrentACLs) ->
             ecallmgr_maintenance:reload_acls()
     end.
 
+-spec media_discovery() -> any().
+media_discovery() ->
+    media_discovery(<<"default">>).
+
+-spec media_discovery(kz_term:ne_binary()) -> any().
+media_discovery(Node) ->
+    case ecallmgr_fs_acls:system(Node) of
+        {'error', Error} -> lager:warning("error fetching current acls - ~p", [Error]);
+        CurrentACLs -> media_discovery(Node, CurrentACLs)
+    end.
+
+-spec media_discovery(kz_term:ne_binary(), kz_json:object()) -> any().
+media_discovery(Node, CurrentACLs) ->
+    Current = kz_json:filter(fun is_media_acl/1, filter_acls(CurrentACLs)),
+    Discovered = media_nodes(),
+    Diff = kz_json:diff(Discovered, Current),
+    case kz_json:is_empty(Diff) of
+        true -> ok;
+        false ->
+            Keys = kz_json:get_keys(Diff),
+            Updated = kz_json:filter(fun({K, _V}) -> lists:member(K, Keys) end, Discovered),
+            NewAcls = kz_json:set_values(kz_json:to_proplist(Updated), CurrentACLs),
+            _ = kapps_config:set_node(?APP_NAME, <<"acls">>, NewAcls, Node),
+            ecallmgr_maintenance:publish_reload_acls()
+    end.
+
+-spec is_media_acl(tuple()) -> boolean().
+is_media_acl({_K, JObj}) ->
+    kz_json:get_ne_binary_value(<<"network-list-name">>, JObj) =:= <<"freeswitch">>.
+
+-spec media_nodes() -> kz_json:object().
+media_nodes() ->
+    Nodes = [media_node(Node) || #kz_node{media_servers = MediaList} <- kz_nodes:nodes(), MediaList =/= [], Node <- MediaList],
+    kz_json:from_list(lists:map(fun media_node_acl/1, lists:foldl(fun media_node_unique/2, [], Nodes))).
+
+media_node({Node, Data}) ->
+    {Node, media_node_ips(Data)}.
+
+media_node_ips(Data) ->
+    Interfaces = kz_json:get_json_value(<<"Interfaces">>, Data),
+    kz_json:foldl(fun media_node_ip/3 , {[], []}, Interfaces).
+
+media_node_ip(_InterfaceName, SIPInterface, Acc) ->
+    case kz_json:get_ne_binary_value([<<"info">>, <<"url">>], SIPInterface) of
+        undefined -> Acc;
+        URI -> media_node_ip(kzsip_uri:parse(URI), Acc)
+    end.
+
+media_node_ip(URI, {IPs, Ports}) ->
+    Host = kzsip_uri:host(URI),
+    Port = kzsip_uri:port(URI),
+    {lists:usort([Host | IPs]), lists:usort([Port | Ports])}.
+
+media_node_unique({NodeName, {IPs, Ports}} = Node, Acc) ->
+    case props:get_value(NodeName, Acc) of
+        undefined -> [Node | Acc];
+        {ExistingIPs, ExistingPorts} ->
+            Info = {lists:usort(ExistingIPs ++ IPs), lists:usort(ExistingPorts ++ Ports)},
+            props:set_value({NodeName, Info}, Acc)
+    end.
+
+-spec media_node_acl(tuple()) -> kz_json:object().
+media_node_acl({Node, {IPs, Ports}}) ->
+    CIDRs = [<<IP/binary, "/32">> || IP <- IPs],
+    ACL = kz_json:from_list([{<<"type">>, <<"allow">>}
+                            ,{<<"network-list-name">>, <<"freeswitch">>}
+                            ,{<<"cidr">>, CIDRs}
+                            ,{<<"ports">>, Ports}
+                            ]),
+    {Node, ACL}.
+
 -spec discover() -> 'ok'.
 discover() ->
     gen_server:cast(?MODULE, 'discovery').
+
+-spec discovery() -> any().
+discovery() ->
+    Routines = [fun sbc_discovery/0
+               ,fun media_discovery/0
+               ],
+    lists:foreach(fun(F) -> F() end, Routines).

@@ -15,6 +15,7 @@
         ,system_config_acls/1
         ,trusted_acls/0, trusted_acls/1
         ,media_acls/0, media_acls/1
+        ,authoritative_acls/0, authoritative_acls/1
         ]).
 
 -compile({'no_auto_import', [get/1]}).
@@ -57,7 +58,7 @@ get(Node) ->
     Routines = [fun offnet_resources/1
                ,fun local_resources/1
                ,fun sip_auth_ips/1
-               ,fun media_nodes_ips/1
+               ,fun collect_media_acls/1
                ],
     PidRefs = [kz_process:spawn_monitor(fun erlang:apply/2, [F, [self()]]) || F <- Routines],
     lager:debug("collecting ACLs in ~p", [PidRefs]),
@@ -65,16 +66,26 @@ get(Node) ->
 
 -spec media_acls() -> acls().
 media_acls() ->
-    Node = kz_term:to_binary(node()),
-    media_acls(Node).
+    media_acls(<<"default">>).
 
 -spec media_acls(atom() | kz_term:ne_binary()) -> acls().
 media_acls(Node) ->
-    Routines = [fun media_nodes_ips/1
-               ],
-    PidRefs = [kz_process:spawn_monitor(fun erlang:apply/2, [F, [self()]]) || F <- Routines],
-    lager:debug("collecting ACLs in ~p", [PidRefs]),
-    collect(authoritative_acls(Node), PidRefs).
+    case kapps_config:fetch_current(?APP_NAME, <<"acls">>, kz_json:new(), Node) of
+        {'error', Error} ->
+            lager:warning("error getting system acls : ~p", [Error]),
+            kz_json:new();
+        JObj -> kz_json:filter(fun is_media_acl/1, JObj)
+    end.
+
+-spec is_media_acl(tuple()) -> boolean().
+is_media_acl({_K, JObj}) ->
+    kz_json:get_ne_binary_value(<<"network-list-name">>, JObj) =:= <<"freeswitch">>.
+
+-spec collect_media_acls(pid()) -> 'ok'.
+collect_media_acls(Collector) ->
+    ACLs = media_acls(),
+    Collector ! ?ACL_RESULT(<<"freeswitch">>, ACLs),
+    ok.
 
 -spec edge() -> acls().
 edge() ->
@@ -177,6 +188,10 @@ resolve_cidr(CIDR) ->
 -spec is_cidr(kz_term:text()) -> boolean().
 is_cidr(Address) ->
     kz_network_utils:is_cidr(Address, true).
+
+-spec authoritative_acls() -> acls().
+authoritative_acls() ->
+    authoritative_acls(<<"default">>).
 
 -spec authoritative_acls(atom() | kz_term:ne_binary()) -> acls().
 authoritative_acls(Node) ->
@@ -384,27 +399,6 @@ add_trusted_objects(Collector, AccountId, AuthorizingId, AuthorizingType, [IP|IP
              ]),
     Collector ! ?ACL_RESULT(IP, JObj),
     add_trusted_objects(Collector, AccountId, AuthorizingId, AuthorizingType, IPs).
-
--spec media_nodes_ips(pid()) -> 'ok'.
-media_nodes_ips(Collector) ->
-    J = media_nodes_ips(),
-    Collector ! ?ACL_RESULT(<<"freeswitch">>, J),
-    'ok'.
-
--spec media_nodes_ips() -> kz_json:object().
-media_nodes_ips() ->
-    URIS = [  {kz_network_utils:to_cidr(kzsip_uri:host(PURI)),kzsip_uri:port(PURI)}
-              || Node <- gen_server:call(ecallmgr_fs_nodes, {'connected_nodes', false}),
-                 I <- [ecallmgr_fs_node:interfaces(Node)],
-                 K <- kz_json:get_keys(I),
-                 URI <- [kz_json:get_ne_binary_value([K, <<"info">>, <<"url">>], I)],
-                 PURI <- [kzsip_uri:parse(URI)]
-           ],
-    kz_json:from_list([{<<"type">>, <<"allow">>}
-                      ,{<<"network-list-name">>, <<"freeswitch">>}
-                      ,{<<"cidr">>, lists:usort(props:get_keys(URIS))}
-                      ,{<<"ports">>, lists:usort(props:get_values(URIS))}
-                      ]).
 
 -spec cidrs(kz_json:object()) -> kz_json:object().
 cidrs(JObj) ->

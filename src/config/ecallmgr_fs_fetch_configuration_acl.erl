@@ -38,7 +38,9 @@ init() ->
 -spec acl(map()) -> fs_sendmsg_ret().
 acl(#{node := Node, fetch_id := Id}=Ctx) ->
     kz_log:put_callid(Id),
-    ACLs = ecallmgr_fs_acls:media_acls(),
+    MediaACLs = ecallmgr_fs_acls:media_acls(),
+    AuthoritativeACLs = ecallmgr_fs_acls:authoritative_acls(),
+    ACLs = kz_json:merge(AuthoritativeACLs, MediaACLs),
     ConfigXML = generate_acl_xml(ACLs),
     lager:debug_unsafe("sending acl XML to ~s: ~s", [Node, ConfigXML]),
     freeswitch:fetch_reply(Ctx#{reply => ConfigXML}).

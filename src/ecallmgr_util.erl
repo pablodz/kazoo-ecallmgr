@@ -70,7 +70,7 @@
 -include_lib("kazoo_stdlib/include/kz_databases.hrl").
 -include_lib("kazoo_sip/include/kzsip_uri.hrl").
 
--define(FS_MULTI_VAR_SEP, kapps_config:get_ne_binary(?APP_NAME, <<"multivar_separator">>, <<"~">>)).
+-define(FS_MULTI_VAR_SEP, kapps_config:get_ne_binary(?APP_NAME, <<"multivar_separator">>, <<"\~">>)).
 -define(FS_MULTI_VAR_SEP_PREFIX, "^^").
 -define(SANITIZE_FS_VALUE_REGEX
        ,kapps_config:get_ne_binary(?APP_NAME, <<"sanitize_fs_value_regex">>, <<"[^0-9\\w\\s-]">>)

@@ -22,6 +22,7 @@
         ,sip_channel_xml/1
         ,conference_resp_xml/1, conference_resp_xml/2
         ,event_filters_resp_xml/1
+        ,directory_resp_location_xml/3
         ]).
 
 -export([build_leg_vars/1
@@ -1077,10 +1078,6 @@ user_el_props(Number, Username) ->
 -spec user_el_props(kz_term:api_ne_binary(), kz_term:ne_binary(), kz_term:api_integer()) -> kz_term:proplist().
 user_el_props(Number, Username, 'undefined') ->
     [{'number-alias', Number}
-    ,{'cacheable', kapps_config:get_integer(?APP_NAME, <<"user_cache_time_in_ms">>
-                                           ,?DEFAULT_USER_CACHE_TIME_IN_MS
-                                           )
-     }
      | user_el_default_props(Username)
     ];
 user_el_props(Number, Username, Expires) when Expires < 1 ->
@@ -1547,25 +1544,30 @@ call_forward_dial_string(Endpoint) ->
             list_to_binary(["[^^!", kz_binary:join(Vars, <<"!">>), "]loopback/", URI])
     end.
 
-dial_string(Proxy, Endpoint, Id) ->
+dial_string(Endpoint, Id) ->
     Uri = kz_json:get_ne_binary_value(<<"SIP-Invite-Route-URI">>, Endpoint),
     SIPInterface = kz_json:get_ne_binary_value(<<"SIP-Interface">>, Endpoint, ?DEFAULT_FS_PROFILE),
-    dial_string(Proxy, Uri, Id, SIPInterface).
+    dial_string(Uri, Id, SIPInterface).
 
-dial_string(undefined, undefined, _Id, _SIPInterface) ->
-    <<"error/subscriber_absent">>;
-dial_string(_Proxy, undefined, Id, SIPInterface) ->
-    list_to_binary(["sofia/", SIPInterface, "/", Id]);
-dial_string(_Proxy, Uri, _Id, SIPInterface) ->
+dial_string(undefined, Id, _SIPInterface) ->
+    list_to_binary(["${kz_contact(", Id, ")}"]);
+dial_string(Uri, _Id, SIPInterface) ->
     list_to_binary(["sofia/", SIPInterface, "/", Uri]).
 
--spec originating_route_uri(kz_json:object()) -> kz_term:api_ne_binary().
-originating_route_uri(JObj) ->
-    kz_json:get_ne_binary_value(<<"Originating-Proxy">>, JObj).
+route_uri(Endpoint) ->
+    kz_json:get_ne_binary_value(<<"SIP-Proxy-Route-URI">>, Endpoint).
 
--spec route_uri(kz_json:object(), kz_json:object()) -> kz_term:api_ne_binary().
-route_uri(undefined, JObj) -> originating_route_uri(JObj);
-route_uri(ProxyUri, _JObj) -> ProxyUri.
+route_uri_el(Endpoint) ->
+    case route_uri(Endpoint) of
+        undefined -> undefined;
+        Route -> variable_el(<<"sip_route_uri">>, Route)
+    end.
+
+route_uri_els(Endpoint) ->
+    case route_uri_el(Endpoint) of
+        undefined -> [];
+        RouteEl -> [RouteEl]
+    end.
 
 -spec directory_resp_endpoint_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
 directory_resp_endpoint_xml(Endpoint, JObj) ->
@@ -1607,12 +1609,7 @@ directory_resp_resource_xml(Endpoint, JObj) ->
 directory_resp_device_xml(Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
-    Realm = kz_json:get_ne_binary_value(<<"Domain-Name">>, Endpoint),
-    Username = kz_json:get_ne_binary_value(<<"User-ID">>, Endpoint),
     Id = <<UserId/binary, "@", DomainName/binary>>,
-
-    {'ok', ProxyPath, Props} = ecallmgr_registrar:lookup_proxy_path(Realm, Username),
-    Vars = get_channel_params(Props),
 
     ProfileParams = get_profile_params(Endpoint),
     ChannelParams = get_channel_params(Endpoint) ++ get_codecs(Endpoint),
@@ -1620,17 +1617,18 @@ directory_resp_device_xml(Endpoint, JObj) ->
 
     VariableEls = [variable_el(K, V) || {K, V} <- ChannelParams],
     HeaderEls = [variable_el(<<"sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
-    ProxyEls = [variable_el(K, V) || {K, V} <- Vars],
-    Proxies = [route_uri(ProxyPath, JObj)],
-    ProxyPathEls = [variable_el(<<"sip_route_uri">>, Proxy) || Proxy <- Proxies, Proxy =/= 'undefined'],
-    VariablesEl = variables_el(VariableEls ++ HeaderEls ++ ProxyEls ++ ProxyPathEls),
+    ProxyPathEls = route_uri_els(Endpoint),
 
-    Number = kz_json:get_value([<<"Custom-SIP-Headers">>,<<"P-Kazoo-Primary-Number">>],Endpoint),
+    VariablesEl = variables_el(VariableEls ++ HeaderEls ++ ProxyPathEls),
+
+    Number = kz_json:get_value([<<"Custom-SIP-Headers">>,<<"P-Kazoo-Primary-Number">>], Endpoint),
+    Expires = kz_json:get_integer_value(<<"Expires">>, Endpoint),
+    UserProps = user_el_props(Number, UserId, Expires),
+
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
-    UserProps = props:filter_undefined(user_el_props(Number, UserId)),
 
-    Params = [{<<"endpoint-dial-string">>, dial_string(ProxyPath, Endpoint, Id)}
+    Params = [{<<"endpoint-dial-string">>, dial_string(Endpoint, Id)}
              ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}
              ,{<<"endpoint-separator">>, ?SEPARATOR_ENTERPRISE}
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
@@ -1758,3 +1756,23 @@ get_codecs(Endpoint) ->
             CodecStr = string:join(Codecs, ":"),
             [{<<"absolute_codec_string">> , list_to_binary(["^^:", CodecStr])}]
     end.
+
+-spec location_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value()) -> kz_types:xml_el().
+location_el(Id, Value) ->
+    #xmlElement{name='location'
+               ,attributes=[xml_attrib('id', Id)
+                           ,xml_attrib('value', Value)
+                           ]
+               }.
+
+-spec directory_resp_location_xml(kz_term:ne_binary(), kz_term:proplist(), kz_json:object()) -> {'ok', iolist()}.
+directory_resp_location_xml(ProxyPath, Props, JObj) ->
+    %% TODO
+    %% sipinterface_1 => compute from Proxy-IP / Proxy-Port & networks
+    SIPInterface = ?DEFAULT_FS_PROFILE,
+    Id = kzd_fetch:fetch_key_value(JObj),
+    Vars = [list_to_binary([K, "=", V]) || {K, V} <- [{<<"sip_route_uri">>, ProxyPath} | get_channel_params(Props)]],
+    Location = list_to_binary(["[^^!", kz_binary:join(Vars, <<"!">>), "]", "sofia", "/", SIPInterface, "/", Id]),
+    LocationEl = location_el(Id, Location),
+    SectionEl = section_el(<<"directory">>,  LocationEl),
+    {'ok', xmerl:export([SectionEl], 'fs_xml')}.

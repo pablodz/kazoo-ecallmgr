@@ -28,7 +28,7 @@
 %%------------------------------------------------------------------------------
 -spec init() -> 'ok'.
 init() ->
-    _ = kazoo_bindings:bind(<<"fetch.directory.#">>, ?MODULE, 'fetch_directory'),
+    _ = kazoo_bindings:bind(<<"fetch.directory.domain.#">>, ?MODULE, 'fetch_directory'),
     'ok'.
 
 %%%=============================================================================
@@ -42,8 +42,8 @@ init() ->
 -spec fetch_directory(map()) -> fs_handlecall_ret().
 fetch_directory(#{node := Node, fetch_id := FetchId, payload := JObj}=Ctx) ->
     kz_log:put_callid(FetchId),
-    lager:debug("received directory ~s fetch request from ~s", [kzd_fetch:fetch_action(JObj, <<"sip_auth">>), Node]),
-    case kzd_fetch:fetch_action(JObj, <<"sip_auth">>) of
+    lager:debug("received directory ~s fetch request from ~s", [kzd_fetch:fetch_action(JObj), Node]),
+    case kzd_fetch:fetch_action(JObj) of
         <<"sip_auth">> -> lookup_registrar(Ctx);
         <<"jsonrpc-authenticate">> -> validate_token(Ctx);
         <<"user_call">> -> lookup_registrar(Ctx);
@@ -108,6 +108,13 @@ lookup_registrar(#{payload := JObj}=Ctx) ->
         {ok, Endpoint} -> fetch_directory(EndpointId, AccountId, Ctx, [{endpoint, kz_json:from_list(Endpoint)}])
     end.
 
+-spec fetch_direction(kz_json:object()) -> binary().
+fetch_direction(JObj) ->
+    case kzd_fetch:fetch_action(JObj) of
+        <<"user_call">> -> <<"outbound">>;
+        _ -> <<"inbound">>
+    end.
+
 -spec fetch_options(map()) -> kz_term:proplist().
 fetch_options(#{payload := JObj}) ->
     [{fetch_type, kzd_fetch:fetch_action(JObj, <<"sip_auth">>)}
@@ -115,6 +122,7 @@ fetch_options(#{payload := JObj}) ->
     ,{cshs, kzd_fetch:cshs(JObj)}
     ,{ccvs, kzd_fetch:ccvs(JObj)}
     ,{cauth, kzd_fetch:cauth(JObj)}
+    ,{direction, fetch_direction(JObj)}
     ].
 
 fetch_directory(EndpointId, AccountId, Ctx) ->

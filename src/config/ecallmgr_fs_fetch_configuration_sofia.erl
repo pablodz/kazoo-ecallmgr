@@ -32,7 +32,7 @@
 %%------------------------------------------------------------------------------
 -spec init() -> 'ok'.
 init() ->
-    _ = kazoo_bindings:bind(<<"fetch.configuration.*.*.sofia.conf">>, ?MODULE, 'sofia'),
+    _ = kazoo_bindings:bind(<<"fetch.configuration.configuration.*.*.sofia.conf">>, ?MODULE, 'sofia'),
     'ok'.
 
 -spec sofia(map()) -> fs_sendmsg_ret().

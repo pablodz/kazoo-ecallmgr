@@ -32,7 +32,7 @@
 %%------------------------------------------------------------------------------
 -spec init() -> 'ok'.
 init() ->
-    _ = kazoo_bindings:bind(<<"fetch.configuration.*.*.acl.conf">>, ?MODULE, 'acl'),
+    _ = kazoo_bindings:bind(<<"fetch.configuration.configuration.*.*.acl.conf">>, ?MODULE, 'acl'),
     'ok'.
 
 -spec acl(map()) -> fs_sendmsg_ret().

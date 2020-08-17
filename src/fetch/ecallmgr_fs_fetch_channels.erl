@@ -35,11 +35,13 @@ init() ->
 
 
 -spec channel_req(map()) -> 'ok'.
-channel_req(#{payload := JObj} = Ctx) ->
+channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Ctx) ->
+    kz_log:put_callid(FetchId),
     ToUser = kz_json:get_value(<<"refer-to-user">>, JObj),
     TargetUUID = kz_json:get_ne_binary_value(<<"replaces-call-id">>, JObj),
     UUID = kz_json:get_ne_binary_value(<<"refer-from-channel-id">>, JObj),
     ForUUID = kz_json:get_ne_binary_value(<<"refer-for-channel-id">>, JObj),
+    lager:info("received channels request from ~s for ~s", [Node, TargetUUID]),
     {'ok', ForChannel} = ecallmgr_fs_channel:fetch(ForUUID, 'proplist'),
     TargetChannel = ecallmgr_fs_channel:fetch_channel(TargetUUID),
     Channel = ecallmgr_fs_channel:fetch_channel(UUID),

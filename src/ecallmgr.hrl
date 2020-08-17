@@ -477,6 +477,7 @@
                              ,'ecallmgr_fs_fetch_dialplan'
                              ,'ecallmgr_fs_fetch_channels'
                              ,'ecallmgr_fs_fetch_directory'
+                             ,'ecallmgr_fs_fetch_location'
                              ]).
 
 -define(FS_DEFAULT_HDRS, [<<"Event-Name">>, <<"Core-UUID">>, <<"FreeSWITCH-Hostname">>, <<"FreeSWITCH-Switchname">>

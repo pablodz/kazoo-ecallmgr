@@ -36,10 +36,11 @@
         ,add_capability/2
         ,get_capability/2, get_capabilities/1, get_capabilities/2
         ,remove_capabilities/1, remove_capability/2
-        ,flush/0, flush/2
+        ,flush/0, flush/1
         ]).
 
--export([handle_fs_xml_flush/2]).
+-export([handle_directory_cache_clear/2]).
+-export([handle_directory_cache_flush/2]).
 
 -export([init/1
         ,handle_call/3
@@ -54,14 +55,14 @@
 
 -define(SERVER, ?MODULE).
 
--define(RESPONDERS, [{{?MODULE, 'handle_fs_xml_flush'}
-                     ,[{<<"switch_event">>, <<"fs_xml_flush">>}]
+-define(RESPONDERS, [{{?MODULE, 'handle_directory_cache_clear'}
+                     ,[{<<"cache">>, <<"clear">>}]
+                     }
+                    ,{{?MODULE, 'handle_directory_cache_flush'}
+                     ,[{<<"cache">>, <<"flush">>}]
                      }
                     ]).
--define(BINDINGS, [{'switch', [{'restrict_to', ['fs_xml_flush']}
-                              ,'federate'
-                              ]}
-                  ]).
+-define(BINDINGS, [{'directory', [{'restrict_to', ['cache']}]}]).
 -define(QUEUE_NAME, <<"fs_nodes_shared_listener">>).
 -define(QUEUE_OPTIONS, [{'exclusive', 'false'}]).
 -define(CONSUME_OPTIONS, [{'exclusive', 'false'}]).
@@ -163,18 +164,26 @@ connected(Verbose) ->
 -spec flush() -> 'ok'.
 flush() -> do_flush(<<>>).
 
--spec flush(kz_term:ne_binary(), kz_term:ne_binary()) -> 'ok'.
-flush(User, Realm) ->
-    Args = list_to_binary(["id ", User, " ", Realm]),
+-spec flush(kz_term:ne_binary()) -> 'ok'.
+flush(Key) ->
+    [EndpointId, AccountId] = binary:split(Key, <<"@">>),
+    Args = list_to_binary(["id ", EndpointId, " ", AccountId]),
     do_flush(Args).
 
 -spec do_flush(binary()) -> 'ok'.
 do_flush(Args) ->
     lager:debug("flushing xml cache ~s from all FreeSWITCH servers", [Args]),
     _ = [freeswitch:api(Node, 'xml_flush_cache', Args)
-         || Node <- connected()
+         || Node <- connected(), filter_release(Node)
         ],
     'ok'.
+
+-spec filter_release(atom()) -> boolean().
+filter_release(Node) ->
+    case freeswitch:release(Node) of
+        {_, _, <<"community">>} -> true;
+        _ -> false
+    end.
 
 -spec is_node_up(atom()) -> boolean().
 is_node_up(Node) when is_atom(Node) ->
@@ -347,12 +356,15 @@ capability_to_json(#capability{node=Node
                       ,{<<"is_loaded">>, IsLoaded}
                       ]).
 
--spec handle_fs_xml_flush(kz_json:object(), kz_term:proplist()) -> 'ok'.
-handle_fs_xml_flush(JObj, _Props) ->
-    'true' = kapi_switch:fs_xml_flush_v(JObj),
-    Username = kz_json:get_value(<<"Username">>, JObj),
-    Realm = kz_json:get_value(<<"Realm">>, JObj, <<>>),
-    flush(Username, Realm).
+-spec handle_directory_cache_flush(kz_json:object(), kz_term:proplist()) -> 'ok'.
+handle_directory_cache_flush(JObj, _Props) ->
+    'true' = kapi_directory:cache_flush_v(JObj),
+    flush().
+
+-spec handle_directory_cache_clear(kz_json:object(), kz_term:proplist()) -> 'ok'.
+handle_directory_cache_clear(JObj, _Props) ->
+    'true' = kapi_directory:cache_clear_v(JObj),
+    lists:foreach(fun flush/1, kz_json:get_ne_binaries(<<"Keys">>, JObj, [])).
 
 %%%=============================================================================
 %%% gen_server callbacks

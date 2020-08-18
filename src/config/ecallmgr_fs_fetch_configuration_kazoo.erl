@@ -54,7 +54,6 @@ fs_mod_kazoo_config(<<"COMMAND">>, #{payload := _JObj} = Ctx) ->
     lager:debug_unsafe("kazoo conf request : ~s", [kz_json:encode(_JObj, ['pretty'])]),
     kazoo_req_not_handled(Ctx);
 fs_mod_kazoo_config(<<"REQUEST_PARAMS">>, #{payload := JObj} = Ctx) ->
-    lager:debug_unsafe("kazoo conf request params: ~s", [kz_json:encode(JObj, ['pretty'])]),
     Action = kz_json:get_ne_binary_value(<<"Action">>, JObj),
     fs_mod_kazoo_config_action(Action, Ctx);
 fs_mod_kazoo_config(Event, #{node := Node} = Ctx) ->

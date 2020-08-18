@@ -18,6 +18,7 @@
 
 -export([kazoo/1]).
 
+-export([build_kazoo_config/0]).
 -export([kazoo_config/0]).
 
 -import(ecallmgr_fs_xml
@@ -63,7 +64,7 @@ fs_mod_kazoo_config(Event, #{node := Node} = Ctx) ->
 -spec fs_mod_kazoo_config_action(kz_term:api_ne_binary(), map()) -> fs_sendmsg_ret().
 fs_mod_kazoo_config_action(<<"request-handlers">>, Ctx) ->
     try kazoo_config() of
-        {'ok', Xml} -> freeswitch:fetch_reply(Ctx#{reply => iolist_to_binary(Xml)})
+        {'ok', Xml} -> freeswitch:fetch_reply(Ctx#{reply => Xml})
     catch
         _Ex:_Er:ST ->
             kz_log:log_stacktrace(ST),
@@ -81,8 +82,12 @@ kazoo_req_not_handled(#{node := Node, fetch_id := Id} = Ctx) ->
     lager:debug("ignoring kazoo conf ~s: ~s", [Node, Id]),
     freeswitch:fetch_reply(Ctx#{reply => iolist_to_binary(NotHandled)}).
 
--spec kazoo_config() -> {'ok', iolist()}.
+-spec kazoo_config() -> {'ok', binary()}.
 kazoo_config() ->
+    {ok, persistent_term:get(mod_kazoo_xml_config, <<>>)}.
+
+-spec build_kazoo_config() -> {'ok', binary()}.
+build_kazoo_config() ->
     EventFiles = filelib:wildcard(code:priv_dir(?APP) ++ "/mod_kazoo/events/*.xml"),
     {DefFiles0, Events} = lists:foldr(fun fs_handler/2, {[], []}, EventFiles),
 
@@ -101,7 +106,10 @@ kazoo_config() ->
                                 ]
                                ),
     SectionEl = section_el(<<"configuration">>, ConfigurationEl),
-    {'ok', xmerl:export([SectionEl], 'fs_xml')}.
+    Xml = xmerl:export([SectionEl], 'fs_xml'),
+    Config = iolist_to_binary(Xml),
+    persistent_term:put(mod_kazoo_xml_config, Config),
+    {ok, Config}.
 
 fs_handler(EventFile, {DefFiles, EventXmls}) ->
     EventXml = fs_xml(EventFile),

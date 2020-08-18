@@ -30,6 +30,7 @@ start(_StartType, _StartArgs) ->
     _ = event_stream_bind(),
     _ = fetch_handlers_bind(),
     _ = freeswitch_nodesup_bind(),
+    ok = build_mod_kazoo_config(),
     ecallmgr_sup:start_link().
 
 -spec request(kz_nodes:request_acc()) -> kz_nodes:request_acc().
@@ -128,3 +129,12 @@ fetch_handlers_bind() ->
 fetch_handlers_unbind() ->
     _ = [kazoo_bindings:flush_mod(Mod) || Mod <- ?FETCH_HANDLERS_MODS],
     'ok'.
+
+build_mod_kazoo_config() ->
+    try ecallmgr_fs_fetch_configuration_kazoo:build_kazoo_config() of
+        {'ok', _Xml} -> lager:info("kazoo xml configuration built")
+    catch
+        Exception:Error:ST ->
+            kz_log:log_stacktrace(ST),
+            {Exception, Error}
+    end.

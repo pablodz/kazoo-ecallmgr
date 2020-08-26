@@ -353,6 +353,7 @@ handle_channel_status(JObj, _Props) ->
                            [_, Host] -> Host;
                            Other -> Other
                        end,
+            Profile = kz_json:get_binary_value(<<"profile">>, Channel),
             lager:debug("channel is on ~s", [Hostname]),
             Resp =
                 props:filter_undefined(
@@ -360,7 +361,7 @@ handle_channel_status(JObj, _Props) ->
                   ,{<<"Status">>, <<"active">>}
                   ,{<<"Switch-Hostname">>, Hostname}
                   ,{<<"Switch-Nodename">>, kz_term:to_binary(Node)}
-                  ,{<<"Switch-URL">>, ecallmgr_fs_nodes:sip_url(Node)}
+                  ,{<<"Switch-URL">>, kz_json:get_ne_binary_value(<<"switch_url">>, Channel, ecallmgr_fs_nodes:sip_url(Node, Profile))}
                   ,{<<"Other-Leg-Call-ID">>, kz_json:get_value(<<"other_leg">>, Channel)}
                   ,{<<"Realm">>, kz_json:get_value(<<"realm">>, Channel)}
                   ,{<<"Username">>, kz_json:get_value(<<"username">>, Channel)}

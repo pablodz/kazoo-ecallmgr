@@ -221,7 +221,7 @@ to_props(Channel) ->
       ,{<<"reseller_id">>, Channel#channel.reseller_id}
       ,{<<"resource_id">>, Channel#channel.resource_id}
       ,{<<"switch_nodename">>, Channel#channel.node}
-      ,{<<"switch_url">>, ecallmgr_fs_nodes:sip_url(Channel#channel.node)}
+      ,{<<"switch_url">>, Channel#channel.switch_url}
       ,{<<"timestamp">>, Channel#channel.timestamp}
       ,{<<"to_tag">>, Channel#channel.to_tag}
       ,{<<"username">>, Channel#channel.username}
@@ -272,7 +272,7 @@ to_api_props(#channel{}=Channel) ->
       ,{<<"Reseller-Billing">>, Channel#channel.reseller_billing}
       ,{<<"Reseller-ID">>, Channel#channel.reseller_id}
       ,{<<"Resource-ID">>, Channel#channel.resource_id}
-      ,{<<"Switch-URL">>, ecallmgr_fs_nodes:sip_url(Channel#channel.node)}
+      ,{<<"Switch-URL">>, Channel#channel.switch_url}
       ,{<<"Timestamp">>, Channel#channel.timestamp}
       ,{<<"To">>, Channel#channel.to}
       ,{<<"To-Tag">>, Channel#channel.to_tag}
@@ -373,6 +373,7 @@ jobj_to_record(Node, UUID, JObj) ->
     CCVs = kz_json:get_json_value(<<"Custom-Channel-Vars">>, JObj, kz_json:new()),
     CAVs = kz_json:get_json_value(<<"Custom-Application-Vars">>, JObj, kz_json:new()),
     OtherLeg = kz_json:get_ne_binary_value(<<"Other-Leg-Call-ID">>, JObj),
+    Profile = kz_json:get_ne_binary_value(<<"Caller-Profile">>, JObj, ?DEFAULT_FS_PROFILE),
     #channel{uuid=UUID
             ,destination=kz_json:get_ne_binary_value(<<"Caller-Destination-Number">>, JObj)
             ,direction=kz_json:get_ne_binary_value(<<"Call-Direction">>, JObj)
@@ -398,7 +399,7 @@ jobj_to_record(Node, UUID, JObj) ->
             ,node=Node
             ,timestamp=kz_time:current_tstamp()
 
-            ,profile=kz_json:get_ne_binary_value(<<"Caller-Profile">>, JObj, ?DEFAULT_FS_PROFILE)
+            ,profile=Profile
             ,context=kz_json:get_ne_binary_value(<<"Caller-Context">>, JObj, ?DEFAULT_FREESWITCH_CONTEXT)
             ,dialplan=kz_json:get_ne_binary_value(<<"Caller-Dialplan">>, JObj, ?DEFAULT_FS_DIALPLAN)
 
@@ -419,6 +420,7 @@ jobj_to_record(Node, UUID, JObj) ->
             ,ccvs=CCVs
             ,from=kz_json:get_ne_binary_value(<<"From">>, JObj)
             ,to=kz_json:get_ne_binary_value(<<"To">>, JObj)
+            ,switch_url = kz_json:get_ne_binary_value(<<"Switch-URL">>, JObj, ecallmgr_fs_nodes:sip_url(Node, Profile))
             }.
 
 -spec handling_locally(kz_term:api_binary(), kz_term:api_binary()) -> boolean().

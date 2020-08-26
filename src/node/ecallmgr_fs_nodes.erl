@@ -24,8 +24,8 @@
 -export([remove/1]).
 -export([nodeup/1, nodeup/2, nodedown/1]).
 -export([is_node/1, is_node_up/1, is_node_down/1]).
--export([sip_url/1]).
--export([sip_external_ip/1]).
+-export([sip_url/1, sip_url/2]).
+-export([sip_external_ip/1, sip_external_ip/2]).
 -export([summary/0]).
 -export([details/0
         ,details/1
@@ -201,7 +201,13 @@ is_node(Node) when is_atom(Node) ->
 sip_url(Node) when not is_atom(Node) ->
     sip_url(kz_term:to_atom(Node, 'true'));
 sip_url(Node) when is_atom(Node) ->
-    case [ecallmgr_fs_node:sip_url(Srv)
+    sip_url(Node, <<?DEFAULT_FS_PROFILE>>).
+
+-spec sip_url(atom() | kz_term:text(), kz_term:ne_binary()) -> kz_term:api_binary().
+sip_url(Node, Profile) when not is_atom(Node) ->
+    sip_url(kz_term:to_atom(Node, 'true'), Profile);
+sip_url(Node, Profile) when is_atom(Node) ->
+    case [ecallmgr_fs_node:sip_url(Srv, Profile)
           || Srv <- gproc:lookup_pids({'p', 'l', 'fs_node'}),
              ecallmgr_fs_node:fs_node(Srv) =:= Node
          ]
@@ -214,7 +220,13 @@ sip_url(Node) when is_atom(Node) ->
 sip_external_ip(Node) when not is_atom(Node) ->
     sip_external_ip(kz_term:to_atom(Node, 'true'));
 sip_external_ip(Node) when is_atom(Node) ->
-    case [ecallmgr_fs_node:sip_external_ip(Srv)
+    sip_external_ip(Node, <<?DEFAULT_FS_PROFILE>>).
+
+-spec sip_external_ip(atom() | kz_term:text(), kz_term:ne_binary()) -> kz_term:api_binary().
+sip_external_ip(Node, Profile) when not is_atom(Node) ->
+    sip_external_ip(kz_term:to_atom(Node, 'true'), Profile);
+sip_external_ip(Node, Profile) when is_atom(Node) ->
+    case [ecallmgr_fs_node:sip_external_ip(Srv, Profile)
           || Srv <- gproc:lookup_pids({'p', 'l', 'fs_node'})
                  ,ecallmgr_fs_node:fs_node(Srv) =:= Node
          ]

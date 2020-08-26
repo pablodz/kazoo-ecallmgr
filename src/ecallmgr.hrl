@@ -107,6 +107,7 @@
                  ,ccvs :: kz_term:api_object() | '_'
                  ,from :: kz_term:api_binary() | '_'
                  ,to :: kz_term:api_binary() | '_'
+                 ,switch_url :: kz_term:api_binary() | '_'
                  }).
 
 -type channel() :: #channel{}.

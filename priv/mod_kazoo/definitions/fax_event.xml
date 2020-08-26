@@ -6,7 +6,7 @@
 			<field name="fax_data" type="reference" />
 		</fields>
 	</field>
-	<field name="user-agent" as="reference" />
+	<field name="user-agent" type="reference" />
 	<field name="Custom-Channel-Vars" type="reference" />
 	<field name="Custom-Application-Vars" type="reference" />
 </definition>

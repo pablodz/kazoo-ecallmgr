@@ -51,6 +51,7 @@
 | `node_details/0` |  | |
 | `node_details/1` | `(NodeName)` | |
 | `node_summary/0` |  | |
+| `publish_reload_acls/0` |  | |
 | `registrar_details/0` |  | |
 | `registrar_details/1` | `(Realm)` | |
 | `registrar_details/2` | `(Username,Realm)` | |
@@ -58,6 +59,7 @@
 | `registrar_summary/1` | `(Realm)` | |
 | `registrar_sync/0` |  | |
 | `reload_acls/0` |  | |
+| `reload_media_acls/0` |  | |
 | `remove_acl/1` | `(Name)` | |
 | `remove_acl/2` | `(Name,false) | (Name,true) | (Name,AsDefault)` | |
 | `remove_fs_node/1` | `(FSNode)` | |

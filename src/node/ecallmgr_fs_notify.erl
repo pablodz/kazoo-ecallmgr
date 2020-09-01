@@ -115,7 +115,7 @@ resp_to_probe(State, User, Realm) ->
                      ,{<<"To-Realm">>, Realm}
                      ,{<<"State">>, State}
                      ,{<<"Call-ID">>, kz_term:to_hex_binary(crypto:hash(md5, PresenceId))}
-                      | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+                     | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
                      ],
     lager:debug("sending probe reply '~s' for ~s", [State, PresenceId]),
     kapi_presence:publish_update(PresenceUpdate).

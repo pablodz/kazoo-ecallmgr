@@ -451,7 +451,7 @@ route_resp_ringback(JObj) ->
 route_resp_ccvs(JObj) ->
     CCVs = [{<<"Application-Name">>, kz_json:get_value(<<"App-Name">>, JObj)}
            ,{<<"Application-Node">>, kz_json:get_value(<<"Node">>, JObj)}
-            | kz_json:to_proplist(<<"Custom-Channel-Vars">>, JObj)
+           | kz_json:to_proplist(<<"Custom-Channel-Vars">>, JObj)
            ],
     action_el(<<"kz_multiset_encoded">>, route_ccvs_list(CCVs)).
 
@@ -604,7 +604,7 @@ build_asserted_identity(AssertedIdentity, Props, Results) ->
     {Props
     ,[<<"sip_cid_type=none">>
      ,<<"sip_h_P-Asserted-Identity='", AssertedIdentity/binary, "'">>
-          | Results
+     | Results
      ] ++ maybe_endpoint_privacy_header(Props)
     }.
 
@@ -642,17 +642,17 @@ kazoo_var_to_fs_var({<<"To-User">>, Username}, Vars) ->
     [list_to_binary([?CHANNEL_VAR_PREFIX, "Username"
                     ,"='", kz_term:to_list(Username), "'"
                     ])
-     | Vars
+    | Vars
     ];
 kazoo_var_to_fs_var({<<"To-Realm">>, Realm}, Vars) ->
     [list_to_binary([?CHANNEL_VAR_PREFIX, "Realm"
                     ,"='", kz_term:to_list(Realm), "'"
                     ])
-     | Vars
+    | Vars
     ];
 kazoo_var_to_fs_var({<<"To-URI">>, ToURI}, Vars) ->
     [<<"sip_invite_to_uri=<", ToURI/binary, ">">>
-         | Vars
+    | Vars
     ];
 
 kazoo_var_to_fs_var({<<"Caller-ID-Type">>, <<"from">>}, Vars) ->
@@ -668,7 +668,7 @@ kazoo_var_to_fs_var({<<"origination_uuid">> = K, UUID}, Vars) ->
 kazoo_var_to_fs_var({<<"Hold-Media">>, Media}, Vars) ->
     MediaPath = ecallmgr_util:moh_media_path(Media, 'extant', get('callid'), kz_json:new()),
     [list_to_binary(["hold_music=", MediaPath])
-     | Vars];
+    | Vars];
 
 kazoo_var_to_fs_var({<<"Codecs">>, []}, Vars) ->
     Vars;
@@ -679,7 +679,7 @@ kazoo_var_to_fs_var({<<"Codecs">>, Cs}, Vars) ->
              ],
     CodecStr = string:join(Codecs, ":"),
     [list_to_binary(["absolute_codec_string='^^:", CodecStr, "'"])
-     |Vars
+    |Vars
     ];
 
 %% SPECIAL CASE: Timeout must be larger than zero
@@ -688,7 +688,7 @@ kazoo_var_to_fs_var({<<"Timeout">>, V}, Vars) ->
         TO when TO > 0 ->
             [<<"call_timeout=", (kz_term:to_binary(TO))/binary>>
             ,<<"originate_timeout=", (kz_term:to_binary(TO))/binary>>
-                 | Vars
+            | Vars
             ];
         _Else -> Vars
     end;
@@ -715,12 +715,12 @@ kazoo_var_to_fs_var({<<"Participant-Flags">>, [_|_]=Flags}, Vars) ->
     [list_to_binary(["conference_member_flags="
                     ,"'^^!", participant_flags_to_var(Flags), "'"
                     ])
-     | Vars
+    | Vars
     ];
 
 kazoo_var_to_fs_var({<<"Call-Context">>, JObj}, Vars) ->
     [list_to_binary(["kz-endpoint-runtime-context='", kz_json:encode(JObj), "'"])
-     | Vars
+    | Vars
     ];
 
 kazoo_var_to_fs_var({AMQPHeader, V}, Vars) ->
@@ -802,7 +802,7 @@ kazoo_var_to_fs_var_fold(K, V, Acc) ->
                             ,kz_term:to_list(ecallmgr_util:media_path(V, 'extant', get('callid'), kz_json:new()))
                             ,"'"
                             ])
-             | Acc
+            | Acc
             ];
         {_, Prefix} ->
             Val = ecallmgr_util:maybe_sanitize_fs_value(K, V),
@@ -813,7 +813,7 @@ kazoo_var_to_fs_var_fold(K, V, Acc) ->
 kazoo_cavs_to_fs_vars_fold(K, V, Acc) ->
     {Prefix, V1} = kazoo_cav_prefix_and_value(V),
     [list_to_binary([Prefix, kz_term:to_list(K), "='", V1, "'"])
-     | Acc
+    | Acc
     ].
 
 -spec kazoo_cav_prefix_and_value(kz_json:json_term()) -> {string(), string()}.
@@ -869,7 +869,7 @@ get_profile_vars_fold(K, V, Acc) ->
         'false' ->
             [list_to_binary([kz_term:to_list(K)
                             ,"='", kz_term:to_list(V), "'"])
-             | Acc];
+            | Acc];
         {_, Prefix} ->
             Val = ecallmgr_util:maybe_sanitize_fs_value(K, V),
             [encode_fs_val(Prefix, Val) | Acc]
@@ -1078,16 +1078,16 @@ user_el_props(Number, Username) ->
 -spec user_el_props(kz_term:api_ne_binary(), kz_term:ne_binary(), kz_term:api_integer()) -> kz_term:proplist().
 user_el_props(Number, Username, 'undefined') ->
     [{'number-alias', Number}
-     | user_el_default_props(Username)
+    | user_el_default_props(Username)
     ];
 user_el_props(Number, Username, Expires) when Expires < 1 ->
     [{'number-alias', Number}
-     | user_el_default_props(Username)
+    | user_el_default_props(Username)
     ];
 user_el_props(Number, Username, Expires) ->
     [{'number-alias', Number}
     ,{'cacheable', Expires}
-     | user_el_default_props(Username)
+    | user_el_default_props(Username)
     ].
 
 -spec user_el_default_props(kz_types:xml_attrib_value()) -> kz_term:proplist().
@@ -1343,7 +1343,7 @@ sofia_profiles_el(JObj) ->
                                               ,attributes=[xml_attrib('name', Key)]
                                               ,content=sofia_profile_el(Profile)
                                               }
-                                   | Xml
+                                  | Xml
                                   ]
                           end, [], kz_json:get_keys(JObj)),
     #xmlElement{name='profiles', content=Content}.
@@ -1368,7 +1368,7 @@ sofia_settings_el(JObj) ->
                                                 ,xml_attrib('value', Value)
                                                 ]
                                     }
-                         | Xml
+                        | Xml
                         ]
                 end, [], kz_json:get_keys(JObj)).
 
@@ -1379,7 +1379,7 @@ sofia_gateways_el(JObj) ->
                                     ,attributes=[xml_attrib('name', Key)]
                                     ,content=sofia_gateway_el(Gateway)
                                     }
-                         | Xml
+                        | Xml
                         ]
                 end, [], kz_json:get_keys(JObj)).
 
@@ -1389,7 +1389,7 @@ sofia_gateway_el(JObj) ->
                         [#xmlElement{name='variables'
                                     ,content=sofia_gateway_vars_el(Variables)
                                     }
-                         | Xml
+                        | Xml
                         ];
                    (Key, Xml) ->
                         Value = kz_json:get_value(Key, JObj),
@@ -1399,7 +1399,7 @@ sofia_gateway_el(JObj) ->
                                                 ,xml_attrib('value', Value)
                                                 ]
                                     }
-                         | Xml
+                        | Xml
                         ]
                 end, [], kz_json:get_keys(JObj)).
 
@@ -1412,7 +1412,7 @@ sofia_gateway_vars_el(JObj) ->
                                                 ,xml_attrib('direction', "inbound")
                                                 ]
                                     }
-                         | Xml
+                        | Xml
                         ]
                 end, [], kz_json:get_keys(JObj)).
 

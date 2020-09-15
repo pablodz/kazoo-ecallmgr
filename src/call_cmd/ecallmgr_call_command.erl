@@ -100,6 +100,13 @@ get_fs_app(_Node, _UUID, JObj, <<"noop">>) ->
         'true' -> {<<"noop">>, kz_api:msg_id(JObj)}
     end;
 
+get_fs_app(Node, UUID, JObj, <<"deflect">>) ->
+    case kapi_dialplan:deflect_v(JObj) of
+        'false' -> {'error', <<"deflect failed to execute as JObj didn't validate">>};
+        'true' ->
+            deflect(Node, UUID, JObj)
+    end;
+
 get_fs_app(Node, UUID, JObj, <<"tts">>) ->
     case kapi_dialplan:tts_v(JObj) of
         'false' -> {'error', <<"tts failed to execute as JObj didn't validate">>};
@@ -1153,6 +1160,11 @@ maybe_set_park_timeout(Node, UUID, JObj) ->
     end.
 
 -define(RECORD_MAX_TIME, 10000).
+
+-spec deflect(atom(), kz_term:ne_binary(), kz_json:object()) -> {kz_term:ne_binary(), iodata()}.
+deflect(_Node, _UUID, JObj) ->
+    Target = kz_json:get_ne_binary_value(<<"Target-URI">>, JObj),
+    {<<"deflect">>, Target}.
 
 -spec record_call(atom(), kz_term:ne_binary(), kz_json:object()) -> fs_app().
 record_call(Node, UUID, JObj) ->

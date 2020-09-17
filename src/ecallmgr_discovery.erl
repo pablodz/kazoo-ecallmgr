@@ -264,15 +264,27 @@ media_node_ips(Data) ->
     kz_json:foldl(fun media_node_ip/3 , {[], []}, Interfaces).
 
 media_node_ip(_InterfaceName, SIPInterface, Acc) ->
-    case kz_json:get_ne_binary_value([<<"info">>, <<"url">>], SIPInterface) of
-        undefined -> Acc;
-        URI -> media_node_ip(kzsip_uri:parse(URI), Acc)
+    case media_node_interface(SIPInterface) of
+        {_, undefined} -> Acc;
+        {[], _} -> Acc;
+        IPPort -> media_node_ip(IPPort, Acc)
     end.
 
-media_node_ip(URI, {IPs, Ports}) ->
-    Host = kzsip_uri:host(URI),
-    Port = kzsip_uri:port(URI),
-    {lists:usort([Host | IPs]), lists:usort([Port | Ports])}.
+media_node_interface(SIPInterface) ->
+    {media_node_interface_ips(SIPInterface), media_node_interface_port(SIPInterface)}.
+
+media_node_interface_ips(SIPInterface) ->
+    Fields = [<<"sip-ip">>, <<"ext-sip-ip">>],
+    lists:usort(props:filter_undefined([ kz_json:get_ne_binary_value([<<"info">>, Field], SIPInterface) || Field <- Fields])).
+
+media_node_interface_port(SIPInterface) ->
+    case kz_json:get_ne_binary_value([<<"info">>, <<"url">>], SIPInterface) of
+        undefined -> undefined;
+        URI -> kzsip_uri:port(kzsip_uri:parse(URI))
+    end.
+
+media_node_ip({IPList, Port}, {IPs, Ports}) ->
+    {lists:usort(IPList ++ IPs), lists:usort([Port | Ports])}.
 
 media_node_unique({NodeName, {IPs, Ports}} = Node, Acc) ->
     case props:get_value(NodeName, Acc) of

@@ -38,6 +38,7 @@
 -define(ACL_RESULT(IP, ACL), {'acl', IP, ACL}).
 
 -type acls() :: kz_json:object().
+-type acl_builder_fun() :: fun((pid(), kzd_resources:doc(), kz_term:ne_binaries()) -> 'ok').
 
 %%------------------------------------------------------------------------------
 %% @doc Fetches the ACLs
@@ -79,13 +80,15 @@ media_acls(Node) ->
 
 -spec is_media_acl(tuple()) -> boolean().
 is_media_acl({_K, JObj}) ->
-    kz_json:get_ne_binary_value(<<"network-list-name">>, JObj) =:= <<"freeswitch">>.
+    <<"freeswitch">> =:= kzd_acls:network_list_name(JObj).
 
 -spec collect_media_acls(pid()) -> 'ok'.
 collect_media_acls(Collector) ->
-    ACLs = media_acls(),
-    Collector ! ?ACL_RESULT(<<"freeswitch">>, ACLs),
-    ok.
+    kz_json:foreach(fun({Host, ACL}) ->
+                            Collector ! ?ACL_RESULT(Host, ACL)
+                    end
+                   ,media_acls()
+                   ).
 
 -spec edge() -> acls().
 edge() ->
@@ -129,20 +132,23 @@ collect(ACLs, [], _Timeout) ->
     lager:debug("acls built with ~p ms to spare", [_Timeout]),
     ACLs;
 collect(ACLs, _PidRefs, Timeout) when Timeout < 0 ->
-    lager:debug("timed out waiting for ACLs, returning what we got"),
+    lager:info("timed out waiting for ACLs, returning what we got"),
     ACLs;
 collect(ACLs, PidRefs, Timeout) ->
     Start = kz_time:start_time(),
 
     receive
         ?ACL_RESULT(IP, ACL) ->
-            lager:info("adding acl for '~s' to ~s", [IP, kz_json:get_value(<<"network-list-name">>, ACL)]),
+            lager:info("adding acl for '~s' to network list ~s"
+                      ,[IP, kzd_acls:network_list_name(ACL)]
+                      ),
             collect(kz_json:set_value(IP, ACL, ACLs), PidRefs, kz_time:decr_timeout(Timeout, Start));
         {'DOWN', Ref, 'process', Pid, _Reason} ->
             case lists:keytake(Pid, 1, PidRefs) of
                 'false' ->
                     collect(ACLs, PidRefs, kz_time:decr_timeout(Timeout, Start));
                 {'value', {Pid, Ref}, NewPidRefs} ->
+                    lager:info("down ~p ~p", [Pid, _Reason]),
                     collect(ACLs, NewPidRefs, kz_time:decr_timeout(Timeout, Start))
             end
     after Timeout ->
@@ -163,12 +169,9 @@ resolve(JObj) ->
     kz_json:map(fun resolve/2, JObj).
 
 resolve(K, JObj) ->
-    CIDR = kz_json:get_value(<<"cidr">>, JObj),
-    {K, kz_json:set_value(<<"cidr">>, maybe_resolve_cidr(CIDR), JObj)}.
+    CIDR = kzd_acls:cidr(JObj),
+    {K, kzd_acls:set_cidr(JObj, maybe_resolve_cidr(CIDR))}.
 
-maybe_resolve_cidr(CIDRS)
-  when is_list(CIDRS) ->
-    [maybe_resolve_cidr(CIDR) || CIDR <- CIDRS];
 maybe_resolve_cidr(CIDR)
   when is_binary(CIDR) ->
     case is_cidr(CIDR) of
@@ -178,16 +181,16 @@ maybe_resolve_cidr(CIDR)
 
 resolve_cidr(CIDR) ->
     case kz_network_utils:is_ipv4(CIDR) of
-        true ->
+        'true' ->
             kz_network_utils:to_cidr(CIDR);
-        false ->
+        'false' ->
             IPs = kz_network_utils:resolve(CIDR),
             [kz_network_utils:to_cidr(IP) || IP <- IPs]
     end.
 
 -spec is_cidr(kz_term:text()) -> boolean().
 is_cidr(Address) ->
-    kz_network_utils:is_cidr(Address, true).
+    kz_network_utils:is_cidr(Address, 'true').
 
 -spec authoritative_acls() -> acls().
 authoritative_acls() ->
@@ -204,7 +207,7 @@ authoritative_acls(Node) ->
 
 -spec is_authoritative_acl(tuple()) -> boolean().
 is_authoritative_acl({_K, JObj}) ->
-    kz_json:get_ne_binary_value(<<"network-list-name">>, JObj) =:= <<"authoritative">>.
+    kzd_acls:network_list_name(JObj) =:= <<"authoritative">>.
 
 -spec trusted_acls() -> acls().
 trusted_acls() ->
@@ -225,7 +228,7 @@ trusted_acl(K, V) ->
     case filter_trusted_acl({K,V}) of
         'false' -> 'false';
         'true' ->
-            {ok, Master} = kapps_util:get_master_account_id(),
+            {'ok', Master} = kapps_util:get_master_account_id(),
             KVs = [{<<"account_id">>, Master}
                   ,{<<"authorizing_id">>, kz_binary:rand_hex(16)}
                   ],
@@ -240,11 +243,11 @@ filter_trusted_acl(ACL) ->
 
 -spec is_trusted_acl(tuple()) -> boolean().
 is_trusted_acl({_K, JObj}) ->
-    kz_json:get_ne_binary_value(<<"network-list-name">>, JObj) =:= <<"trusted">>.
+    kzd_acls:network_list_name(JObj) =:= <<"trusted">>.
 
 -spec is_allowed(tuple()) -> boolean().
 is_allowed({_K, JObj}) ->
-    kz_json:get_ne_binary_value(<<"type">>, JObj) =:= <<"allow">>.
+    kzd_acls:type(JObj, 'undefined') =:= <<"allow">>.
 
 -spec sip_auth_ips(pid()) -> 'ok'.
 sip_auth_ips(Collector) ->
@@ -254,16 +257,28 @@ sip_auth_ips(Collector) ->
             lager:info("unable to get view results for auth-by-ip devices: ~p", [_R]);
         {'ok', JObjs} ->
             {RawIPs, RawHosts} = lists:foldl(fun needs_resolving/2, {[], []}, JObjs),
-            _ = [handle_sip_auth_result(Collector, JObj, IPs) || {IPs, JObj} <- RawIPs],
-            PidRefs = [kz_process:spawn_monitor(fun resolve_hostname/4 ,[Collector
-                                                                        ,Host
-                                                                        ,JObj
-                                                                        ,fun handle_sip_auth_result/3
-                                                                        ])
-                       || {Host, JObj} <- RawHosts
-                      ],
-            wait_for_pid_refs(PidRefs)
+
+            _ = report_sip_auth_ips(Collector, RawIPs),
+
+            _ = report_sip_auth_hosts(Collector, RawHosts)
     end.
+
+report_sip_auth_ips(Collector, RawIPs) ->
+    _ = [handle_sip_auth_result(Collector, JObj, IPs)
+         || {IPs, JObj} <- RawIPs
+        ].
+
+report_sip_auth_hosts(Collector, RawHosts) ->
+    PidRefs = [kz_process:spawn_monitor(fun resolve_hostname/4
+                                       ,[Collector
+                                        ,Host
+                                        ,JObj
+                                        ,fun handle_sip_auth_result/3
+                                        ]
+                                       )
+               || {Host, JObj} <- RawHosts
+              ],
+    wait_for_pid_refs(PidRefs).
 
 -spec needs_resolving(kz_json:object(), {list(), list()}) -> {list(), list()}.
 needs_resolving(JObj, {IPs, ToResolve}) ->
@@ -276,6 +291,8 @@ needs_resolving(JObj, {IPs, ToResolve}) ->
 -spec wait_for_pid_refs(kz_term:pid_refs()) -> 'ok'.
 wait_for_pid_refs(PidRefs) ->
     wait_for_pid_refs(PidRefs, ?REQUEST_TIMEOUT).
+
+-spec wait_for_pid_refs(kz_term:pid_refs(), timeout()) -> 'ok'.
 wait_for_pid_refs([], _Timeout) -> 'ok';
 wait_for_pid_refs(_PidRefs, Timeout) when Timeout < 0 -> 'ok';
 wait_for_pid_refs(PidRefs, Timeout) ->
@@ -288,31 +305,33 @@ wait_for_pid_refs(PidRefs, Timeout) ->
                     wait_for_pid_refs(NewPidRefs, kz_time:decr_timeout(Timeout, Start))
             end
     after Timeout ->
-            lager:debug("timed out waiting for pid refs: ~p", [PidRefs])
+            lager:info("timed out waiting for pid refs: ~p", [PidRefs])
     end.
 
--spec resolve_hostname(pid(), kz_term:ne_binary(), kz_json:object(), fun()) -> 'ok'.
-resolve_hostname(Collector, ResolveMe, JObj, ACLBuilderFun) ->
+-spec resolve_hostname(pid(), kz_term:ne_binary(), kzd_resources:doc(), acl_builder_fun()) -> 'ok'.
+resolve_hostname(Collector, ResolveMe, Resource, ACLBuilderFun) ->
     lager:debug("attempting to resolve '~s'", [ResolveMe]),
     StrippedHost = hd(binary:split(ResolveMe, <<";">>)),
     case (not kz_network_utils:is_ipv4(StrippedHost))
         andalso kz_network_utils:resolve(StrippedHost)
     of
         'false' ->
-            maybe_capture_ip(Collector, ResolveMe, JObj, ACLBuilderFun);
+            maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun);
         [] ->
             lager:debug("no IPs returned, checking for raw IP"),
-            maybe_capture_ip(Collector, ResolveMe, JObj, ACLBuilderFun);
+            maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun);
         IPs ->
-            ACLBuilderFun(Collector, JObj, IPs),
-            lager:debug("resolved '~s' (~s) for ~p: '~s'", [StrippedHost, ResolveMe, Collector, kz_binary:join(IPs, <<"','">>)])
+            ACLBuilderFun(Collector, Resource, IPs),
+            lager:debug("resolved '~s' (~s) for ~p: '~s'"
+                       ,[StrippedHost, ResolveMe, Collector, kz_binary:join(IPs, <<"','">>)]
+                       )
     end.
 
--spec maybe_capture_ip(pid(), kz_term:ne_binary(), kz_json:object(), fun()) -> 'ok'.
-maybe_capture_ip(Collector, CaptureMe, JObj, ACLBuilderFun) ->
+-spec maybe_capture_ip(pid(), kz_term:ne_binary(), kzd_resources:doc(), acl_builder_fun()) -> 'ok'.
+maybe_capture_ip(Collector, CaptureMe, Resource, ACLBuilderFun) ->
     case re:run(CaptureMe, ?IP_REGEX, [{'capture', 'all', 'binary'}]) of
         {'match', [_All, IP]} ->
-            ACLBuilderFun(Collector, JObj, [IP]),
+            ACLBuilderFun(Collector, Resource, [IP]),
             lager:debug("captured '~s' from ~s", [IP, CaptureMe]);
         'nomatch' ->
             lager:debug("failed to find IP at start of '~s'", [CaptureMe])
@@ -341,47 +360,47 @@ offnet_resources(Collector) ->
     case kz_datamgr:get_results(?KZ_OFFNET_DB, <<"resources/listing_active_by_weight">>, ViewOptions) of
         {'error', _R} ->
             lager:debug("unable to get view results for offnet active resources: ~p", [_R]);
-        {'ok', JObjs} ->
-            handle_resource_results(Collector, JObjs)
+        {'ok', ViewResources} ->
+            handle_resource_results(Collector, ViewResources)
     end.
 
 -spec handle_resource_results(pid(), kz_json:objects()) -> 'ok'.
-handle_resource_results(Collector, JObjs) ->
-    _ = [handle_resource_result(Collector, JObj) || JObj <- JObjs],
+handle_resource_results(Collector, ViewResources) ->
+    _ = [handle_resource_result(Collector, ViewResource) || ViewResource <- ViewResources],
     'ok'.
 
 -spec handle_resource_result(pid(), kz_json:object()) -> 'ok'.
-handle_resource_result(Collector, JObj) ->
-    Doc = kz_json:get_json_value(<<"doc">>, JObj),
-    InboundPidRefs = resource_inbound_ips(Collector, Doc),
-    ServerPidRefs = resource_server_ips(Collector, Doc),
+handle_resource_result(Collector, ViewResource) ->
+    Resource = kz_json:get_json_value(<<"doc">>, ViewResource),
+    InboundPidRefs = resource_inbound_ips(Collector, Resource),
+    ServerPidRefs = resource_server_ips(Collector, Resource),
     wait_for_pid_refs(InboundPidRefs ++ ServerPidRefs).
 
--spec handle_resource_result(pid(), kz_json:object(), kz_term:ne_binaries()) -> 'ok'.
-handle_resource_result(Collector, JObj, IPs) ->
-    AuthorizingId = kz_doc:id(JObj),
-    {ok, Master} = kapps_util:get_master_account_id(),
-    AccountId = kz_doc:account_id(JObj, Master),
+-spec handle_resource_result(pid(), kzd_resources:doc(), kz_term:ne_binaries()) -> 'ok'.
+handle_resource_result(Collector, Resource, IPs) ->
+    AuthorizingId = kz_doc:id(Resource),
+    {'ok', Master} = kapps_util:get_master_account_id(),
+    AccountId = kz_doc:account_id(Resource, Master),
     add_trusted_objects(Collector, AccountId, AuthorizingId, <<"resource">>, IPs).
 
--spec resource_inbound_ips(pid(), kz_json:object()) -> kz_term:pid_refs().
-resource_inbound_ips(Collector, JObj) ->
+-spec resource_inbound_ips(pid(), kzd_resources:doc()) -> kz_term:pid_refs().
+resource_inbound_ips(Collector, Resource) ->
     [kz_process:spawn_monitor(fun resolve_hostname/4, [Collector
                                                       ,IP
-                                                      ,JObj
+                                                      ,Resource
                                                       ,fun handle_resource_result/3
                                                       ])
-     || IP <- kz_json:get_value(<<"inbound_ips">>, JObj, [])
+     || IP <- kz_json:get_list_value(<<"inbound_ips">>, Resource, [])
     ].
 
--spec resource_server_ips(pid(), kz_json:object()) -> kz_term:pid_refs().
-resource_server_ips(Collector, JObj) ->
+-spec resource_server_ips(pid(), kzd_resources:doc()) -> kz_term:pid_refs().
+resource_server_ips(Collector, Resource) ->
     [kz_process:spawn_monitor(fun resolve_hostname/4, [Collector
-                                                      ,kz_json:get_value(<<"server">>, Gateway)
-                                                      ,JObj
+                                                      ,kz_json:get_ne_binary_value(<<"server">>, Gateway)
+                                                      ,Resource
                                                       ,fun handle_resource_result/3
                                                       ])
-     || Gateway <- kz_json:get_value(<<"gateways">>, JObj, []),
+     || Gateway <- kzd_resources:gateways(Resource, []),
         kz_json:get_ne_binary_value(<<"endpoint_type">>, Gateway) =:= <<"sip">>,
         kz_json:is_true(<<"enabled">>, Gateway, 'false')
     ].
@@ -411,9 +430,9 @@ cidrs(K, V) ->
                 List -> List
             end,
     KVs = [{<<"cidrs">>, CIDRs}
-          ,{<<"cidr">>, null}
-          ,{<<"network-list-name">>, null}
-          ,{<<"type">>, null}
+          ,{<<"cidr">>, 'null'}
+          ,{<<"network-list-name">>, 'null'}
+          ,{<<"type">>, 'null'}
           ],
     {K, kz_json:set_values(KVs, V)}.
 
@@ -424,15 +443,15 @@ token(JObj) ->
 
 -spec token(kz_term:ne_binary(), kz_json:object()) -> boolean() | {'true', kz_json:object()}.
 token(K, V) ->
-    KVs = [{<<"network-list-name">>, null}
-          ,{<<"type">>, null}
+    KVs = [{<<"network-list-name">>, 'null'}
+          ,{<<"type">>, 'null'}
           ,{<<"token">>, list_to_binary([kz_json:get_ne_binary_value(<<"authorizing_id">>, V)
                                         ,"@"
                                         ,kz_json:get_ne_binary_value(<<"account_id">>, V)
                                         ])
            }
-          ,{<<"authorizing_id">>, null}
-          ,{<<"authorizing_type">>, null}
-          ,{<<"account_id">>, null}
+          ,{<<"authorizing_id">>, 'null'}
+          ,{<<"authorizing_type">>, 'null'}
+          ,{<<"account_id">>, 'null'}
           ],
     {K, kz_json:set_values(KVs, V)}.

@@ -18,6 +18,8 @@
 -export([list_fs_nodes/0]).
 -export([get_fs_nodes/0]).
 
+%% ACL management
+%%% Carrier ACLs
 -export([carrier_acls/0
         ,carrier_acls/1
         ,test_carrier_ip/1, test_carrier_ip/2
@@ -31,6 +33,7 @@
         ,deny_carrier/3
         ]).
 
+%%% SBC ACLs (these are managed in Kamailio these days)
 -export([sbc_acls/0
         ,sbc_acls/1
         ,test_sbc_ip/1, test_sbc_ip/2
@@ -44,12 +47,14 @@
         ,deny_sbc/3
         ]).
 
+%%% General ACL management
 -export([remove_acl/1
         ,remove_acl/2
         ]).
 -export([acl_summary/0
         ,acl_summary/1
         ]).
+
 -export([reload_acls/0]).
 -export([reload_media_acls/0]).
 -export([publish_reload_acls/0]).
@@ -574,7 +579,7 @@ get_fs_nodes(Node) ->
 
 -spec modify_acls(kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object(), acl_fun(), config_fun()) ->
           'no_return'.
-modify_acls(Name, IP0, ACLS, ACLFun, ConfigFun) ->
+modify_acls(Name, IP0, ACLS, BuildACLFun, ConfigFun) ->
     case kz_network_utils:resolve(IP0) of
         [] ->
             Identities = [{'cidr', kz_network_utils:is_cidr(IP0)}
@@ -584,14 +589,14 @@ modify_acls(Name, IP0, ACLS, ACLFun, ConfigFun) ->
             [io:format("  is ~s: ~s~n", [Type, Bool]) || {Type, Bool} <- Identities],
             'no_return';
         [IP | _] ->
-            ACL = ACLFun(IP),
+            ACLJObj = BuildACLFun(IP),
             print_and_log("updating ~s ACLs ~s(~s) to ~s traffic"
-                         ,[kz_json:get_value(<<"network-list-name">>, ACL)
+                         ,[kz_json:get_value(<<"network-list-name">>, ACLJObj)
                           ,Name
-                          ,kz_json:get_value(<<"cidr">>, ACL)
-                          ,kz_json:get_value(<<"type">>, ACL)
+                          ,kz_json:get_value(<<"cidr">>, ACLJObj)
+                          ,kz_json:get_value(<<"type">>, ACLJObj)
                           ]),
-            _ = run_config_fun(ConfigFun, <<"acls">>, kz_json:set_value(Name, ACL, filter_acls(ACLS))),
+            _ = run_config_fun(ConfigFun, <<"acls">>, kz_json:set_value(Name, ACLJObj, filter_acls(ACLS))),
             maybe_reload_acls(Name, 'modify', 4)
     end.
 

@@ -365,12 +365,15 @@ handle_info(_Msg, State) ->
 %% @doc Allows listener to pass options to handlers.
 %% @end
 %%------------------------------------------------------------------------------
--spec handle_call_control(kz_json:object(), state()) -> gen_server:handle_event_return().
+-spec handle_call_control(kz_json:object(), state()) -> 'ok'.
 handle_call_control(JObj, _State) ->
     case kz_api:event_type(JObj) of
         {<<"call">>, <<"command">>} -> handle_call_command(JObj);
         {<<"conference">>, <<"command">>} -> handle_conference_command(JObj);
-        {_Category, _Event} -> lager:debug_unsafe("event ~s : ~s not handled : ~s", [_Category, _Event, kz_json:encode(JObj, ['pretty'])])
+        {_Category, _Event} ->
+            lager:debug_unsafe("event ~s : ~s not handled : ~s"
+                              ,[_Category, _Event, kz_json:encode(JObj, ['pretty'])]
+                              )
     end.
 
 -spec handle_call_command(kz_json:object()) -> 'ok'.

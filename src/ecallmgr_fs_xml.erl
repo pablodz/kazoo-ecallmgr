@@ -410,6 +410,10 @@ route_resp_bridge_id() ->
     Action = action_el(<<"export">>, [?SET_CCV(<<"Bridge-ID">>, <<"${UUID}">>)], 'true'),
     condition_el(Action, <<"${", (?CCV(<<"Bridge-ID">>))/binary, "}">>, <<"^$">>).
 
+-spec route_resp_set_originating_proxy(dialplan_context()) -> kz_types:xml_el().
+route_resp_set_originating_proxy(#{payload := Payload}) ->
+    action_el(<<"set">>, list_to_binary([<<"originating_proxy=">>, kz_json:get_ne_binary_value(<<"Originating-Proxy">>, Payload)])).
+
 -spec unset_custom_sip_headers() -> kz_types:xml_el().
 unset_custom_sip_headers() ->
     action_el(<<"kz_prefix_unset">>, <<"sip_h_X-">>).
@@ -1489,6 +1493,7 @@ route_resp_park_xml(JObj, DialplanContext) ->
             ,route_resp_ccvs(JObj)
             ,route_resp_cavs(JObj)
             ,unset_custom_sip_headers()
+            ,route_resp_set_originating_proxy(DialplanContext)
             ,route_resp_set_control_info(DialplanContext)
             ,route_resp_fire_route_win(JObj, DialplanContext)
             ,route_resp_park()

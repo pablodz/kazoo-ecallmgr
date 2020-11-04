@@ -172,6 +172,9 @@ resolve(K, JObj) ->
     CIDR = kzd_acls:cidr(JObj),
     {K, kzd_acls:set_cidr(JObj, maybe_resolve_cidr(CIDR))}.
 
+maybe_resolve_cidr(CIDRS)
+  when is_list(CIDRS) ->
+    [maybe_resolve_cidr(CIDR) || CIDR <- CIDRS];
 maybe_resolve_cidr(CIDR)
   when is_binary(CIDR) ->
     case is_cidr(CIDR) of

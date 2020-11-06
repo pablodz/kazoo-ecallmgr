@@ -85,7 +85,7 @@ start_link(Node, JObj) ->
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec handle_call_events(kz_call_event:doc(), kz_term:proplist()) -> 'ok'.
+-spec handle_call_events(kz_call_event:payload(), kz_term:proplist()) -> 'ok'.
 handle_call_events(JObj, Props) ->
     Srv = props:get_value('server', Props),
     case props:get_value('uuid', Props) =:= kz_api:call_id(JObj)

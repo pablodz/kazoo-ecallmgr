@@ -350,10 +350,9 @@ create_routing(Name, #{category := undefined} = Ctx) ->
 create_routing(Name, #{category := Category, event := Event}) ->
     <<"event_stream.", Name/binary, ".", Category/binary, ".", Event/binary>>.
 
--spec run_publish_options() -> kazoo_bindings:rt_options().
+-spec run_publish_options() -> kazoo_bindings:kz_rt_options().
 run_publish_options() ->
-    [{'candidates', fun run_publish_candidates/1}
-    ].
+    [{'candidates', fun run_publish_candidates/1}].
 
 -spec run_publish_candidates(kz_term:ne_binary()) -> kazoo_bindings:kz_bindings().
 run_publish_candidates(Routing) ->

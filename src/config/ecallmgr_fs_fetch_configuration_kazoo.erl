@@ -138,32 +138,32 @@ one_def(File, Acc) ->
         'false' -> Acc ++ [File]
     end.
 
--spec definitions_el(kz_types:xml_els()) -> kz_type:xml_el().
+-spec definitions_el(kz_types:xml_els()) -> kz_types:xml_el().
 definitions_el(Content) ->
     #xmlElement{name='definitions'
                ,content=Content
                }.
 
--spec events_el(kz_types:xml_els()) -> kz_type:xml_el().
+-spec events_el(kz_types:xml_els()) -> kz_types:xml_el().
 events_el(Content) ->
     #xmlElement{name='events'
                ,content=Content
                }.
 
--spec event_profile_el(string(), kz_types:xml_el()) -> kz_type:xml_el().
+-spec event_profile_el(string(), kz_types:xml_el()) -> kz_types:xml_el().
 event_profile_el(Name, Content) ->
     #xmlElement{name='profile'
                ,attributes=[xml_attrib('name', Name)]
                ,content=[Content]
                }.
 
--spec event_handlers_el(kz_types:xml_els()) -> kz_type:xml_el().
+-spec event_handlers_el(kz_types:xml_els()) -> kz_types:xml_el().
 event_handlers_el(Content) ->
     #xmlElement{name='event-handlers'
                ,content=Content
                }.
 
--spec fetch_handlers_el(kz_types:xml_els()) -> kz_type:xml_el().
+-spec fetch_handlers_el(kz_types:xml_els()) -> kz_types:xml_el().
 fetch_handlers_el(Content) ->
     #xmlElement{name='fetch-handlers'
                ,content=Content

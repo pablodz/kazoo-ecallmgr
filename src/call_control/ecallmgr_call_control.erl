@@ -1007,7 +1007,7 @@ handle_replaced(JObj, #state{fetch_id=FetchId
             {'noreply', State}
     end.
 
--spec handle_direct(kz_call_event:doc(), state()) ->
+-spec handle_direct(kz_call_event:payload(), state()) ->
           {'noreply', state()}.
 handle_direct(JObj, #state{fetch_id=FetchId
                           ,node=_Node
@@ -1068,7 +1068,7 @@ handle_transferor(JObj, #state{fetch_id=FetchId
             {'noreply', State}
     end.
 
--spec handle_event_info(kz_term:ne_binary(), kz_evt_freeswitch:data(), state()) ->
+-spec handle_event_info(kz_term:ne_binary(), kz_evt_freeswitch:payload(), state()) ->
           {'noreply', state()} |
           {'stop', any(), state()}.
 handle_event_info(CallId, JObj, #state{call_id=CallId}=State) ->

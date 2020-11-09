@@ -263,12 +263,12 @@ get_conf_command(Cmd, _Focus, _ConferenceId, _JObj) ->
 -spec dial(atom(), kz_term:ne_binary(), kz_json:object(), kz_json:object() | kz_json:objects()) ->
           api_response().
 dial(Node, ConferenceId, JObj, [_|_]=Endpoints) ->
-    DialCmd = list_to_binary([ecallmgr_fs_xml:get_channel_vars(kz_json:set_value(<<"Outbound-Context">>, <<"context_2">>, JObj))
-                             ,ecallmgr_fs_bridge:try_create_bridge_string(Endpoints, JObj)
-                             ,caller_id(kz_json:get_ne_binary_value(<<"Caller-ID-Number">>, JObj)
-                                       ,kz_json:get_ne_binary_value(<<"Caller-ID-Name">>, JObj)
-                                       )
-                             ]),
+    ChannelVars = ecallmgr_fs_xml:get_channel_vars(kz_json:set_value(<<"Outbound-Context">>, <<"context_2">>, JObj)),
+    BridgeString = ecallmgr_fs_bridge:try_create_bridge_string(Endpoints, JObj),
+    CallerIdNumber = kz_json:get_ne_binary_value(<<"Caller-ID-Number">>, JObj),
+    CallerIdName = kz_json:get_ne_binary_value(<<"Caller-ID-Name">>, JObj),
+    CallerId = caller_id(CallerIdNumber, CallerIdName),
+    DialCmd = list_to_binary([ChannelVars, BridgeString, CallerId]),
     api(Node, ConferenceId, {<<"bgdial">>, DialCmd});
 dial(Node, ConferenceId, JObj, Endpoint) ->
     dial(Node, ConferenceId, JObj, [Endpoint]).

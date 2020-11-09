@@ -165,9 +165,8 @@ handle_responses(JObj, N, Responses) ->
         {'result', Response} -> handle_responses(JObj, N - 1, [Response | Responses])
     end.
 
-update_endpoint(Endpoint, EndpointCallId) ->
-    Updates = [{fun kz_json:insert_value/3, <<"Outbound-Call-ID">>, EndpointCallId}
-              ,{fun kz_json:set_value/3, [<<"Custom-Channel-Vars">>, <<"Ecallmgr-Node">>], node()}
+update_endpoint(Endpoint) ->
+    Updates = [{fun kz_json:set_value/3, [<<"Custom-Channel-Vars">>, <<"Ecallmgr-Node">>], node()}
               ,{fun kz_json:set_value/3, [<<"Custom-Channel-Vars">>, <<"Ignore-Early-Media">>], 'true'}
               ],
     lists:foldl(fun({F, K, V}, JObj) -> F(K, V, JObj) end, Endpoint, Updates).
@@ -182,12 +181,12 @@ endpoint_id(JObj) ->
 -spec exec_endpoint(pid(), atom(), kz_term:ne_binary(), kapi_conference:doc(), kz_json:object()) -> any().
 exec_endpoint(Parent, ConferenceNode, ConferenceId, JObj, EP) ->
     EndpointCallId = kz_json:find(<<"Outbound-Call-ID">>, [EP, JObj], kz_binary:rand_hex(16)),
-    Endpoint = update_endpoint(EP, EndpointCallId),
+    Endpoint = update_endpoint(EP),
     EndpointId = endpoint_id(Endpoint),
     lager:debug("endpoint ~s(~s)", [EndpointId, EndpointCallId]),
     _ = (catch gproc:reg({'p', 'l', ?FS_CONFERENCE_EVENT_REG_MSG(ConferenceNode, ConferenceId, <<"add-member">>)})),
     _ = (catch gproc:reg({'p', 'l', ?FS_CONFERENCE_EVENT_REG_MSG(ConferenceNode, ConferenceId, <<"bgdial-result">>)})),
-    _ = (catch gproc:reg({'p', 'l', ?FS_CALL_EVENT_MSG(ConferenceNode, <<"CHANNEL_REPLACED">>, EndpointCallId)})),
+    _ = (catch gproc:reg({'p', 'l', ?FS_EVENT_REG_MSG_UUID(ConferenceNode, <<"CHANNEL_REPLACED">>)})),
 
     try ecallmgr_conference_command:dial(ConferenceNode
                                         ,ConferenceId
@@ -221,31 +220,25 @@ wait_for_dial_result(Parent, EndpointId, JobId, EndpointCallId, Timeout) ->
             lager:debug("bdial-result call-id ~s replaced by ~s", [EndpointCallId, UUID]),
             _ = (catch gproc:reg({'p', 'l', ?FS_CALL_EVENT_MSG(Node, <<"CHANNEL_DESTROY">>, UUID)})),
             wait_for_dial_result(Parent, EndpointId, JobId, UUID, Timeout);
+        {'event', <<"CHANNEL_REPLACED">>, _OtherUUID, _JObj} ->
+            lager:debug("received replaced for another uuid ~s", [_OtherUUID]),
+            wait_for_dial_result(Parent, EndpointId, JobId, EndpointCallId, Timeout);
         ?FS_CONFERENCE_EVENT_MSG(_ConferenceId, <<"bgdial-result">>, JObj) ->
-            lager:debug("BGDIAL-RESULT ~s", [kz_json:encode(JObj, ['pretty'])]),
             case kz_json:get_ne_binary_value([<<"Dial-Result">>, <<"Job-UUID">>], JObj) of
                 JobId ->
                     case kz_json:get_ne_binary_value([<<"Dial-Result">>, <<"Result">>], JObj) of
                         <<"SUCCESS">> ->
-                            case kz_json:get_ne_binary_value([<<"Dial-Result">>, <<"Peer-UUID">>], JObj) of
-                                EndpointCallId ->
-                                    lager:debug("bdial-result call-id ~s received", [EndpointCallId]),
-                                    wait_for_dial_result(Parent, EndpointId, JobId, EndpointCallId, Timeout);
-                                UUID ->
-                                    lager:debug("bdial-result with call-id ~s instead of ~s", [UUID, EndpointCallId]),
-                                    wait_for_dial_result(Parent, EndpointId, JobId, EndpointCallId, Timeout)
-                            end;
+                            UUID = kz_json:get_ne_binary_value([<<"Dial-Result">>, <<"Peer-UUID">>], JObj),
+                            wait_for_dial_result(Parent, EndpointId, JobId, UUID, Timeout);
                         Error ->
                             Parent ! {'result', error_resp(EndpointId, Error)}
                     end;
                 _Other ->
+                    lager:debug("received bgdial-result for another jobid ~s", [_Other]),
                     wait_for_dial_result(Parent, EndpointId, JobId, EndpointCallId, Timeout)
             end;
-        ?FS_CONFERENCE_EVENT_MSG(_ConferenceId, <<"add-member">>, JObj) ->
-            case kz_conference_event:call_id(JObj) of
-                EndpointCallId -> Parent ! {'result', success_resp(EndpointId, EndpointCallId)};
-                _CallId -> wait_for_dial_result(Parent, EndpointId, JobId, EndpointCallId, Timeout)
-            end
+        ?FS_CONFERENCE_EVENT_MSG(_ConferenceId, <<"add-member">>, _JObj) ->
+            Parent ! {'result', success_resp(EndpointId, EndpointCallId)}
     after Timeout ->
             lager:info("timed out waiting for ~s/~s", [JobId, EndpointCallId]),
             Parent ! {'result', error_resp(EndpointId, <<"timeout">>)}

@@ -849,8 +849,8 @@ fix_hold_media(Endpoint) ->
 
 -spec should_update_uuid(kz_term:api_binary(), kzd_freeswitch:data()) -> boolean().
 should_update_uuid(OldUUID, FSJObj) ->
-    case kzd_freeswitch:event_subclass(FSJObj, kzd_freeswitch:event_name(FSJObj)) of
-        <<"loopback::bowout">> ->
+    case kzd_freeswitch:event_name(FSJObj) of
+        <<"CHANNEL_REPLACED">> ->
             lager:debug("bowout detected with ~s, old uuid is ~s"
                        ,[kzd_freeswitch:resigning_id(FSJObj), OldUUID]
                        ),

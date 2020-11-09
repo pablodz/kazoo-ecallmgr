@@ -426,6 +426,7 @@ start_cleanup_ref() ->
 %%------------------------------------------------------------------------------
 -spec handle_call(any(), kz_term:pid_ref(), state()) -> kz_types:handle_call_ret_state(state()).
 handle_call({'new_channel', #channel{uuid=UUID}=Channel}, _, State) ->
+    kz_log:put_callid(UUID),
     case ets:insert_new(?CHANNELS_TBL, Channel) of
         'true'->
             lager:debug("channel ~s added", [UUID]),
@@ -435,6 +436,7 @@ handle_call({'new_channel', #channel{uuid=UUID}=Channel}, _, State) ->
             {'reply', {'error', 'channel_exists'}, State}
     end;
 handle_call({'update_channel', UUID, Channel}, _, State) ->
+    kz_log:put_callid(UUID),
     lager:debug("updating channel ~s", [UUID]),
     ets:insert(?CHANNELS_TBL, Channel),
     {'reply', 'ok', State};

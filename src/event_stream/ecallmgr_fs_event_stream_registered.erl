@@ -39,6 +39,7 @@ init() ->
 notify_call_event(#{node := Node, call_id := UUID, event := Event, payload := JObj}) ->
     kz_log:put_callid(JObj),
     gproc:send({'p', 'l', ?FS_EVENT_REG_MSG(Node, Event)}, {'event', UUID, JObj}),
+    gproc:send({'p', 'l', ?FS_EVENT_REG_MSG_UUID(Node, Event)}, {'event', Event, UUID, JObj}),
     maybe_send_call_event(UUID, Event, JObj, Node).
 
 -spec maybe_send_call_event(kz_term:api_binary(), kz_term:ne_binary(), kz_json:object(), atom()) -> any().

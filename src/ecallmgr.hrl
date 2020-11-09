@@ -552,6 +552,7 @@
 -define(LOOPBACK_BOWOUT_REG(CallId), {'loopback_bowout', CallId}).
 -define(LOOPBACK_BOWOUT_MSG(Node, Props), {Node, Props}).
 
+-define(FS_EVENT_REG_MSG_UUID(Node, EvtName), {'event', uuid, Node, EvtName}).
 -define(FS_EVENT_REG_MSG(Node, EvtName), {'event', Node, EvtName}).
 -define(FS_CALL_EVENT_REG_MSG(Node, EvtName), {'call_event', Node, EvtName}).
 -define(FS_CALL_EVENT_MSG(Node, EvtName, CallId), {'call_event', Node, EvtName, CallId}).

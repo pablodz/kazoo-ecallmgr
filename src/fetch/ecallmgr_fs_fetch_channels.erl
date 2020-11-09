@@ -33,11 +33,9 @@ init() ->
     _ = kazoo_bindings:bind(<<"fetch.channels.*.query">>, ?MODULE, 'channel_req'),
     'ok'.
 
-
 -spec channel_req(map()) -> 'ok'.
 channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Ctx) ->
     kz_log:put_callid(FetchId),
-    ToUser = kz_json:get_value(<<"refer-to-user">>, JObj),
     TargetUUID = kz_json:get_ne_binary_value(<<"replaces-call-id">>, JObj),
     UUID = kz_json:get_ne_binary_value(<<"refer-from-channel-id">>, JObj),
     ForUUID = kz_json:get_ne_binary_value(<<"refer-for-channel-id">>, JObj),
@@ -48,18 +46,44 @@ channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Ctx) ->
     case Channel =/= 'undefined'
         andalso TargetChannel =/= 'undefined'
     of
-        'false' -> channel_not_found(Ctx);
+        'false' ->
+            channel_not_found(Ctx);
         'true' ->
-            [Uri] = kzsip_uri:uris(props:get_value(<<"switch_url">>, TargetChannel)),
-            URL = kzsip_uri:ruri(
-                    #uri{user=ToUser
-                        ,domain=props:get_value(<<"realm">>, Channel)
-                        ,opts=[{<<"fs_path">>, kzsip_uri:ruri(Uri#uri{user= <<>>})}]
-                        }),
-            CCVs = ecallmgr_fs_channel:channel_ccvs(Channel),
-            ForChannelCCVs = ecallmgr_fs_channel:channel_ccvs(ForChannel),
-            DialPrefix = channel_resp_dialprefix(JObj, Channel, CCVs, ForChannelCCVs),
-            build_channel_resp(Ctx#{url => URL, dial_prefix => DialPrefix})
+            SwitchURL = props:get_ne_binary_value(<<"switch_url">>, TargetChannel),
+            ToUser = kz_json:get_ne_binary_value(<<"refer-to-user">>, JObj),
+            ToRealm = props:get_ne_binary_value(<<"realm">>, Channel),
+            case build_sip_url(SwitchURL, ToUser, ToRealm) of
+                'undefined' ->
+                    lager:notice_unsafe("ctx => ~p", [Ctx]),
+                    lager:notice_unsafe("channel => ~p", [Channel]),
+                    lager:notice_unsafe("target channel => ~p", [TargetChannel]),
+                    channel_not_found(Ctx);
+                URL ->
+                    CCVs = ecallmgr_fs_channel:channel_ccvs(Channel),
+                    ForChannelCCVs = ecallmgr_fs_channel:channel_ccvs(ForChannel),
+                    DialPrefix = channel_resp_dialprefix(JObj, Channel, CCVs, ForChannelCCVs),
+                    build_channel_resp(Ctx#{url => URL, dial_prefix => DialPrefix})
+            end
+    end.
+
+-spec build_sip_url(kz_term:api_ne_binary(), kz_term:api_ne_binary(), kz_term:api_ne_binary()) -> kz_term:api_ne_binary().
+build_sip_url('undefined', _ToUser, _ToRealm) -> 'undefined';
+build_sip_url(_SwitchURL, 'undefined', _ToRealm) -> 'undefined';
+build_sip_url(_SwitchURL, _ToUser, 'undefined') -> 'undefined';
+build_sip_url(SwitchURL, ToUser, ToRealm) ->
+    try kzsip_uri:uris(SwitchURL) of
+        [URI] ->
+            NewURI = #uri{user=ToUser
+                         ,domain=ToRealm
+                         ,opts=[{<<"fs_path">>, kzsip_uri:ruri(URI#uri{user= <<>>})}]
+                         },
+            kzsip_uri:ruri(NewURI);
+        _ -> 'undefined'
+    catch
+        _E:_R:_ST ->
+            lager:error("error building sip url => ~p / ~p", [_E, _R]),
+            kz_log:log_stacktrace(_ST),
+            'undefined'
     end.
 
 -spec build_channel_resp(map()) -> 'ok'.

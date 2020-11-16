@@ -1408,26 +1408,28 @@ maybe_cache_media_response(MediaName, MediaResp) ->
     end.
 
 -spec media_url_cache_props(kz_term:ne_binary()) -> kz_cache:store_options().
-media_url_cache_props(<<"/", _/binary>> = MediaName) ->
-    case binary:split(MediaName, <<"/">>, ['global']) of
-        [<<>>, AccountId, MediaId] ->
-            AccountDb = kzs_util:format_account_db(AccountId),
-            [{'origin', {'db', AccountDb, MediaId}}];
-        _Parts -> []
-    end;
+media_url_cache_props(<<>>) -> [];
+media_url_cache_props(<<"/", MediaName/binary>>) ->
+    media_url_cache_props(MediaName);
 media_url_cache_props(<<"prompt://", Prompt/binary>>) ->
-    case binary:split(Prompt, <<"/">>) of
-        [?KZ_MEDIA_DB, _MediaId] ->
-            [{'origin', {'db', ?KZ_MEDIA_DB, <<"media">>}}];
-        [AccountId, _MediaId] ->
-            AccountDb = kzs_util:format_account_db(AccountId),
-            [{'origin', {'db', AccountDb, <<"media">>}}];
-        _ -> []
-    end;
+    media_url_cache_props(Prompt);
 media_url_cache_props(<<"tts://", Text/binary>>) ->
     Id = kz_binary:md5(Text),
     [{'origin', {'db', <<"tts">>, Id}}];
-media_url_cache_props(_MediaName) -> [].
+media_url_cache_props(MediaName) ->
+    case binary:split(MediaName, <<"/">>, ['global']) of
+        [<<(AccountId):32/binary>>, <<(MediaId):32/binary>>] ->
+            AccountDb = kzs_util:format_account_db(AccountId),
+            [{'origin', {'db', AccountDb, MediaId}}];
+        [<<(AccountId):32/binary>>, _MediaId] ->
+            AccountDb = kzs_util:format_account_db(AccountId),
+            [{'origin', {'db', AccountDb, <<"media">>}}];
+        [?KZ_MEDIA_DB, <<(MediaId):32/binary>>] ->
+            [{'origin', {'db', ?KZ_MEDIA_DB, MediaId}}];
+        [?KZ_MEDIA_DB, _MediaId] ->
+            [{'origin', {'db', ?KZ_MEDIA_DB, <<"media">>}}];
+        _Parts -> []
+    end.
 
 -spec custom_sip_headers(kz_term:proplist()) -> kz_term:proplist().
 custom_sip_headers(Props) ->

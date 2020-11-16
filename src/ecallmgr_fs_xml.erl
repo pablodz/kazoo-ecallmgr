@@ -23,6 +23,7 @@
         ,conference_resp_xml/1, conference_resp_xml/2
         ,event_filters_resp_xml/1
         ,directory_resp_location_xml/3
+        ,prompt_resp_xml/2
         ]).
 
 -export([build_leg_vars/1
@@ -1784,4 +1785,19 @@ directory_resp_location_xml(ProxyPath, Props, JObj) ->
     Location = list_to_binary(["[^^!", kz_binary:join(Vars, <<"!">>), "]", "sofia", "/", SIPInterface, "/", Id]),
     LocationEl = location_el(Id, Location),
     SectionEl = section_el(<<"directory">>,  LocationEl),
+    {'ok', xmerl:export([SectionEl], 'fs_xml')}.
+
+-spec prompt_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value()) -> kz_types:xml_el().
+prompt_el(Id, Value) ->
+    #xmlElement{name='prompt'
+               ,attributes=[xml_attrib('path', Id)
+                           ,xml_attrib('value', Value)
+                           ]
+               }.
+
+-spec prompt_resp_xml(kz_term:ne_binary(), kz_json:object()) -> {'ok', iolist()}.
+prompt_resp_xml(Url, JObj) ->
+    Id = kzd_fetch:fetch_key_value(JObj),
+    LocationEl = prompt_el(Id, Url),
+    SectionEl = section_el(<<"configuration">>,  LocationEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.

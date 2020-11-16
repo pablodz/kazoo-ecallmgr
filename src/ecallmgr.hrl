@@ -474,6 +474,7 @@
 -define(FETCH_HANDLERS_MODS, ['ecallmgr_fs_fetch_configuration_acl'
                              ,'ecallmgr_fs_fetch_configuration_conference'
                              ,'ecallmgr_fs_fetch_configuration_kazoo'
+                             ,'ecallmgr_fs_fetch_configuration_prompt'
                              ,'ecallmgr_fs_fetch_configuration_sofia'
                              ,'ecallmgr_fs_fetch_dialplan'
                              ,'ecallmgr_fs_fetch_channels'

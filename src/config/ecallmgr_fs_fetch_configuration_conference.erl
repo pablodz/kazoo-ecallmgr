@@ -48,7 +48,6 @@ fix_conference_profile(Resp) ->
 fix_conference_profile(Name, Profile) ->
     lager:debug("fixing up conference profile ~s", [Name]),
     Routines = [fun maybe_fix_profile_tts/1
-               ,fun conference_sounds/1
                ,fun set_verbose_events/1
                ],
     {Name, kz_json:exec(Routines, Profile)}.
@@ -69,20 +68,6 @@ maybe_fix_profile_tts(Profile) ->
 fix_flite_tts(Profile) ->
     Voice = kz_json:get_value(<<"tts-voice">>, Profile),
     kz_json:set_value(<<"tts-voice">>, ecallmgr_fs_flite:voice(Voice), Profile).
-
--spec conference_sounds(kz_json:object()) -> kz_json:object().
-conference_sounds(Profile) ->
-    kz_json:foldl(fun conference_sound/3, Profile, Profile).
-
-conference_sound(Key, Value, Profile) ->
-    maybe_convert_sound(kz_binary:reverse(Key), Key, Value, Profile).
-
-maybe_convert_sound(<<"dnuos-", _/binary>>, Key, Value, Profile) ->
-    MediaName = ecallmgr_util:media_path(Value, 'new', kz_log:get_callid(), kz_json:new()),
-    lager:debug("fixed up ~s from ~s to ~s", [Key, Value, MediaName]),
-    kz_json:set_value(Key, MediaName, Profile);
-maybe_convert_sound(_, _Key, _Value, Profile) ->
-    Profile.
 
 -spec fetch_conference_config(atom(), kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object(), map()) -> fs_sendmsg_ret().
 fetch_conference_config(Node, Id, <<"COMMAND">>, JObj, Ctx) ->

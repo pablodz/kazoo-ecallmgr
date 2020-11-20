@@ -20,7 +20,7 @@
         ,not_found/0, not_found/1
         ,sip_profiles_xml/1, sofia_gateways_xml_to_json/1
         ,sip_channel_xml/1
-        ,conference_resp_xml/1, conference_resp_xml/2
+        ,conference_resp_xml/1
         ,event_filters_resp_xml/1
         ,directory_resp_location_xml/3
         ,prompt_resp_xml/2
@@ -175,17 +175,12 @@ empty_response() ->
 
 -spec conference_resp_xml(kz_term:api_terms()) -> {'ok', iolist()}.
 conference_resp_xml([_|_]=Resp) ->
-    conference_resp_xml(Resp, []);
-conference_resp_xml(Resp) -> conference_resp_xml(kz_json:to_proplist(Resp)).
-
--spec conference_resp_xml(kz_term:api_terms(), kz_term:proplist()) -> {'ok', iolist()}.
-conference_resp_xml([_|_]=Resp, Props) ->
     Ps = props:get_value(<<"Profiles">>, Resp, kz_json:new()),
     CCs = props:get_value(<<"Caller-Controls">>, Resp, kz_json:new()),
     As = props:get_value(<<"Advertise">>, Resp, kz_json:new()),
     CPs = props:get_value(<<"Chat-Permissions">>, Resp, kz_json:new()),
 
-    ProfilesEl = conference_profiles_xml(Ps, Props),
+    ProfilesEl = conference_profiles_xml(Ps),
     AdvertiseEl = advertise_xml(As),
     CallerControlsEl = caller_controls_xml(CCs),
     ChatPermsEl = chat_permissions_xml(CPs),
@@ -196,12 +191,12 @@ conference_resp_xml([_|_]=Resp, Props) ->
     SectionEl = section_el(<<"configuration">>, ConfigurationEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')};
 
-conference_resp_xml(Resp, Props) -> conference_resp_xml(kz_json:to_proplist(Resp), Props).
+conference_resp_xml(Resp) -> conference_resp_xml(kz_json:to_proplist(Resp)).
 
-conference_profiles_xml(Profiles, Props) when is_list(Profiles) ->
-    ProfileEls = [conference_profile_xml(Name, Params, Props) || {Name, Params} <- Profiles],
+conference_profiles_xml(Profiles) when is_list(Profiles) ->
+    ProfileEls = [conference_profile_xml(Name, Params) || {Name, Params} <- Profiles],
     profiles_el(ProfileEls);
-conference_profiles_xml(Profiles, Props) -> conference_profiles_xml(kz_json:to_proplist(Profiles), Props).
+conference_profiles_xml(Profiles) -> conference_profiles_xml(kz_json:to_proplist(Profiles)).
 
 advertise_xml(As) when is_list(As) ->
     RoomEls = [room_el(Name, Status) || {Name, Status} <- As],
@@ -233,16 +228,15 @@ profile_xml(Name, Users) ->
     UserEls = [chat_user_el(User, Commands) || {User, Commands} <- kz_json:to_proplist(Users)],
     profile_el(Name, UserEls).
 
-conference_profile_xml(Name, Params, []) ->
-    ParamEls = [param_el(K, V) || {K, V} <- kz_json:to_proplist(Params)],
-    profile_el(Name, ParamEls);
-conference_profile_xml(Name, Params, Props) ->
+conference_profile_xml(Name, Params) ->
     ParamEls = lists:foldl(fun conference_profile_param/2, [], kz_json:to_proplist(Params)),
-    VariablesEls = variables_el([variable_el(K, V) || {K, V} <- Props]),
-    profile_el(Name, ParamEls ++ [VariablesEls]).
+    profile_el(Name, ParamEls).
 
 conference_profile_param({<<"extra-settings">>, JObj}, Acc) ->
     lists:foldl(fun conference_profile_elem/2, Acc, kz_json:to_proplist(JObj));
+conference_profile_param({<<"conference-variables">>, JObj}, Acc) ->
+    VariablesEls = variables_el([variable_el(K, V) || {K, V} <- kz_json:to_proplist(JObj)]),
+    Acc ++ [VariablesEls];
 conference_profile_param({K, V}, Acc) ->
     [param_el(K, kz_term:to_binary(V)) | Acc].
 
@@ -1118,20 +1112,6 @@ params_el(Children) ->
                }.
 
 -spec param_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value()) -> kz_types:xml_el().
-param_el(<<"moh-sound">> = Name, MediaName) ->
-    Value = ecallmgr_util:media_path(MediaName, kz_log:get_callid(), kz_json:new()),
-    #xmlElement{name='param'
-               ,attributes=[xml_attrib('name', Name)
-                           ,xml_attrib('value', Value)
-                           ]
-               };
-param_el(<<"max-members-sound">> = Name, MediaName) ->
-    Value = ecallmgr_util:media_path(MediaName, kz_log:get_callid(), kz_json:new()),
-    #xmlElement{name='param'
-               ,attributes=[xml_attrib('name', Name)
-                           ,xml_attrib('value', Value)
-                           ]
-               };
 param_el(Name, Value) ->
     #xmlElement{name='param'
                ,attributes=[xml_attrib('name', Name)

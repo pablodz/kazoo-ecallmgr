@@ -38,37 +38,6 @@ conference(#{node := Node, fetch_id := Id, payload := JObj}=Ctx) ->
     kz_log:put_callid(Id),
     fetch_conference_config(Node, Id, kz_api:event_name(JObj), JObj, Ctx).
 
--spec fix_conference_profile(kz_json:object()) -> kz_json:object().
-fix_conference_profile(Resp) ->
-    Ps = kz_json:get_value(<<"Profiles">>, Resp),
-    JObj = kz_json:map(fun fix_conference_profile/2, Ps),
-    kz_json:set_value(<<"Profiles">>, JObj, Resp).
-
--spec fix_conference_profile(kz_json:path(), kz_json:object()) -> {kz_json:path(), kz_json:object()}.
-fix_conference_profile(Name, Profile) ->
-    lager:debug("fixing up conference profile ~s", [Name]),
-    Routines = [fun maybe_fix_profile_tts/1
-               ,fun set_verbose_events/1
-               ],
-    {Name, kz_json:exec(Routines, Profile)}.
-
--spec set_verbose_events(kz_json:object()) -> kz_json:object().
-set_verbose_events(Profile) ->
-    kz_json:set_value(<<"verbose-events">>, <<"true">>, Profile).
-
--spec maybe_fix_profile_tts(kz_json:object()) -> kz_json:object().
-maybe_fix_profile_tts(Profile) ->
-    case kz_json:get_value(<<"tts-engine">>, Profile) of
-        'undefined' -> Profile;
-        <<"flite">> -> fix_flite_tts(Profile);
-        _ -> Profile
-    end.
-
--spec fix_flite_tts(kz_json:object()) -> kz_json:object().
-fix_flite_tts(Profile) ->
-    Voice = kz_json:get_value(<<"tts-voice">>, Profile),
-    kz_json:set_value(<<"tts-voice">>, ecallmgr_fs_flite:voice(Voice), Profile).
-
 -spec fetch_conference_config(atom(), kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object(), map()) -> fs_sendmsg_ret().
 fetch_conference_config(Node, Id, <<"COMMAND">>, JObj, Ctx) ->
     Profile = kz_json:get_value(<<"profile_name">>, JObj),
@@ -138,10 +107,6 @@ fetch_conference_profile(Node, _Id, Profile, Conference, AccountId, Ctx) ->
           ,{<<"Account-ID">>, AccountId}
           | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
           ],
-    Variables = [{<<"Conference-Account-ID">>, AccountId}
-                ,{<<"Conference-Node">>, kz_term:to_binary(node())}
-                ,{<<"Conference-Profile">>, Profile}
-                ],
     lager:debug("fetching profile '~s' for conference '~s' in account '~s'", [Profile, Conference, AccountId]),
     XmlResp = case kz_amqp_worker:call(Cmd
                                       ,fun kapi_conference:publish_config_req/1
@@ -150,8 +115,13 @@ fetch_conference_profile(Node, _Id, Profile, Conference, AccountId, Ctx) ->
                                       )
               of
                   {'ok', Resp} ->
-                      FixedTTS = fix_conference_profile(Resp),
-                      {'ok', Xml} = ecallmgr_fs_xml:conference_resp_xml(FixedTTS, Variables),
+                      Variables = [{<<"Conference-Account-ID">>, AccountId}
+                                  ,{<<"Conference-Node">>, kz_term:to_binary(node())}
+                                  ,{<<"Conference-Profile">>, Profile}
+                                  ],
+                      Key = [<<"Profiles">>, Profile, <<"conference-variables">>],
+                      VarsObj = kz_json:set_value(Key, kz_json:from_list(Variables), kz_json:new()),
+                      {'ok', Xml} = ecallmgr_fs_xml:conference_resp_xml(kz_json:merge(Resp, VarsObj)),
                       lager:debug("replying with conference profile ~s", [Profile]),
                       Xml;
                   {'error', 'timeout'} ->

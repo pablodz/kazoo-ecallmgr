@@ -325,14 +325,26 @@ maybe_kill_unrated_channel(Data, Node) ->
 -spec authz_default(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> {'ok', kz_term:ne_binary()} | boolean().
 %% TODO: fix use of authz_default
 authz_default(Data, CallId, Node) ->
-    case kapps_config:get_ne_binary(?APP_NAME, <<"authz_default_action">>, <<"deny">>) =:= <<"deny">>
-        andalso kapps_config:get_boolean(?APP_NAME, <<"authz_dry_run">>, 'false') =/= 'false'
-    of
-        'false' -> rate_call(Data, CallId, Node);
-        'true' ->
+    case authz_default_action() of
+        'allow' ->
+            rate_call(Data, CallId, Node);
+        'dry_run' ->
+            rate_call(Data, CallId, Node);
+        'deny' ->
             _ = kz_process:spawn(fun kill_channel/2, [Data, Node]),
             'false'
     end.
+
+-spec authz_default_action() -> 'allow' | 'deny' | 'dry_run'.
+authz_default_action() ->
+    authz_default_action(kapps_config:get_ne_binary(?APP_NAME, <<"authz_default_action">>, <<"deny">>)
+                        ,kapps_config:is_true(?APP_NAME, <<"authz_dry_run">>, 'false')
+                        ).
+
+-spec authz_default_action(kz_term:ne_binary(), boolean()) -> 'allow' | 'deny' | 'dry_run'.
+authz_default_action(<<"deny">>, 'true') -> 'dry_run';
+authz_default_action(<<"deny">>, 'false') -> 'deny';
+authz_default_action(_Action, _DryRun) -> 'allow'.
 
 -spec maybe_set_rating_ccvs(kzd_freeswitch:data(), kz_json:object(), atom()) -> 'ok'.
 maybe_set_rating_ccvs(Data, JObj, Node) ->

@@ -1603,13 +1603,11 @@ directory_resp_device_xml(Endpoint, JObj) ->
 
     ProfileParams = get_profile_params(Endpoint),
     ChannelParams = get_channel_params(Endpoint) ++ get_codecs(Endpoint),
-    SIPHeaders = get_custom_sip_headers(Endpoint),
 
     VariableEls = [variable_el(K, V) || {K, V} <- ChannelParams],
-    HeaderEls = [variable_el(<<"sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
     ProxyPathEls = route_uri_els(Endpoint),
 
-    VariablesEl = variables_el(VariableEls ++ HeaderEls ++ ProxyPathEls),
+    VariablesEl = variables_el(VariableEls ++ ProxyPathEls),
 
     Number = kz_json:get_value([<<"Custom-SIP-Headers">>,<<"P-Kazoo-Primary-Number">>], Endpoint),
     Expires = kz_json:get_integer_value(<<"Expires">>, Endpoint),
@@ -1618,14 +1616,18 @@ directory_resp_device_xml(Endpoint, JObj) ->
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
 
+    SIPHeaders = get_custom_sip_headers(Endpoint),
+    SIPHeadersEl = [param_el(<<"dial-var-sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
     Params = [{<<"endpoint-dial-string">>, dial_string(Endpoint, Id)}
              ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}
              ,{<<"endpoint-separator">>, ?SEPARATOR_ENTERPRISE}
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
              ],
-    ParamsEl = params_el([param_el(K,V) || {K,V} <- Params]),
-    UserEl = user_el(UserProps, [VariablesEl, ProfileVariablesEl, ParamsEl, callfwd_el(Endpoint)]),
+    ParamsEl = [param_el(K,V) || {K,V} <- Params],
+    ParamsEls = params_el(ParamsEl ++ SIPHeadersEl),
+
+    UserEl = user_el(UserProps, [VariablesEl, ProfileVariablesEl, ParamsEls, callfwd_el(Endpoint)]),
     DomainEl = domain_el(DomainName, UserEl),
     SectionEl = section_el(<<"directory">>, DomainEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
@@ -1644,10 +1646,8 @@ directory_resp_user_xml(Endpoint, JObj) ->
 
     ProfileParams = get_profile_params(Endpoint),
     ChannelParams = get_channel_params(Endpoint),
-    SIPHeaders = get_custom_sip_headers(Endpoint),
     VariableEls = [variable_el(K, V) || {K, V} <- ChannelParams],
-    HeaderEls = [variable_el(K, V) || {K, V} <- SIPHeaders],
-    VariablesEl = variables_el(VariableEls ++ HeaderEls),
+    VariablesEl = variables_el(VariableEls),
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
     UserProps = props:filter_undefined(user_el_props('undefined', UserId)),
@@ -1661,9 +1661,12 @@ directory_resp_user_xml(Endpoint, JObj) ->
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
              ],
-    ParamsEl = params_el([param_el(K,V) || {K,V} <- Params]),
+    ParamsEl = [param_el(K,V) || {K,V} <- Params],
+    SIPHeaders = get_custom_sip_headers(Endpoint),
+    SIPHeadersEl = [param_el(<<"dial-var-sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
+    ParamsEls = params_el(ParamsEl ++ SIPHeadersEl),
 
-    UserEl = user_el(UserProps, [VariablesEl, ProfileVariablesEl, ParamsEl, callfwd_el(Endpoint)]),
+    UserEl = user_el(UserProps, [VariablesEl, ProfileVariablesEl, ParamsEls, callfwd_el(Endpoint)]),
     DomainEl = domain_el(DomainName, UserEl),
     SectionEl = section_el(<<"directory">>, DomainEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.

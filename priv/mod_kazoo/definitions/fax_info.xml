@@ -1,0 +1,10 @@
+<definition name="fax_info">
+	<filters>
+		<filter name="variable_fax_success" type="include" compare="exists" />
+	</filters>
+	<field name="Fax-Info" type="static" serialize-as="object">
+		<fields verbose="false">
+			<field name="fax_data" type="reference" />
+		</fields>
+	</field>
+</definition>

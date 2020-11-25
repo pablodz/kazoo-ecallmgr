@@ -9,6 +9,7 @@
 		<field name="debug-call" type="reference" />
 		<field name="transfer-history" type="reference" />
 		<field name="originated-legs" type="reference" />
+		<field name="fax_info" type="reference" />
 
 	</fields>
 	<filters>

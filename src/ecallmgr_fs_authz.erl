@@ -275,14 +275,8 @@ allow_call(Data, _CallId, _Node) ->
              ,{<<"Global-Resource">>, kzd_freeswitch:is_consuming_global_resource(Data)}
              ,{<<"Channel-Authorized">>, <<"true">>}
              ]),
-    case kzd_freeswitch:is_call_setup(Data) of
-        'false' ->
-            lager:info("channel is authorized (with channel vars)"),
-            {'true', kz_json:from_list(Vars)};
-        'true' ->
-            lager:info("channel is authorized"),
-            'true'
-    end.
+    lager:info("channel is authorized"),
+    {'true', kz_json:from_list(Vars)}.
 
 -spec rate_channel(kzd_freeswitch:data(), atom()) -> 'ok'.
 rate_channel(Data, Node) ->

@@ -23,4 +23,9 @@
 	<field name="conference-vars" type="reference" />
 	<field name="conference-channel-vars" type="reference" />
 	<field name="conference-bgdial" type="reference" />
+	<field name="call-interaction" type="reference">
+		<filters>
+			<filter name="Action" type="include" compare="value" value="conference-create" />
+		</filters>
+	</field>
 </definition>

@@ -1,0 +1,13 @@
+<definition name="from-to-verto">
+	<filters>
+		<filter name="Caller-Source" type="include" compare="value" value="mod_verto" />
+	</filters>
+
+	<field name="Request" type="expand"	value="${variable_conference_name}@${variable_ecallmgr_Realm}" />
+	<field name="To" type="expand" value="${variable_conference_name}@${variable_ecallmgr_Realm}" />
+	<field name="To-URI" type="expand" value="${variable_conference_name}@${variable_ecallmgr_Realm}" />
+	<field name="Caller-Username" as="From"/>
+	<field name="Caller-Username" as="From-URI" />
+	<field name="Caller-Destination-Number" type="static" value="conference"/>	
+
+</definition>

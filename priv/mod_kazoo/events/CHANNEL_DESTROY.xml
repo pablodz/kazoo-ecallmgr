@@ -2,6 +2,7 @@
 	<fields verbose="false">
 		<field name="call_event" type="reference" />
 		<field name="from-to" type="reference" />
+		<field name="from-to-verto" type="reference" />
 		<field name="sdp" type="reference" />
 		<field name="call-duration" type="reference" />
 		<field name="hangup-fields" type="reference" />

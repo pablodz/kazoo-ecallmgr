@@ -136,6 +136,7 @@
                     ,handling_locally = 'false' :: boolean() | '_' %% was this ecallmgr handling the call control?
                     ,origin_node :: atom() | '_'
                     ,control_node :: atom() | '_'
+                    ,interaction_id :: kz_term:api_binary() | '_'
                     }).
 
 -type conference() :: #conference{}.

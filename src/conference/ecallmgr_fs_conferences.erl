@@ -212,6 +212,7 @@ handle_search_conference(JObj, _Props, Name) ->
                     ,switch_hostname=Hostname
                     ,switch_url=SwitchURL
                     ,switch_external_ip=ExternalIP
+                    ,interaction_id=InteractionId
                     }
         | _Conferences
         ] ->
@@ -229,6 +230,7 @@ handle_search_conference(JObj, _Props, Name) ->
                    ,{<<"Switch-URL">>, SwitchURL}
                    ,{<<"UUID">>, UUID}
                    ,{<<"Zone">>, kz_config:zone('binary')}
+                   ,{<<?CALL_INTERACTION_ID>>, InteractionId}
                    | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
                    ],
             kapi_conference:publish_search_resp(kz_api:server_id(JObj), Resp);
@@ -275,6 +277,7 @@ conference_resp(#conference{uuid=UUID
                            ,switch_hostname=Hostname
                            ,switch_url=SwitchURL
                            ,switch_external_ip=ExternalIP
+                           ,interaction_id=InteractionId
                            }) ->
     Participants = participants(Name),
     {Moderators, Members} = lists:partition(fun is_moderator/1, Participants),
@@ -288,6 +291,7 @@ conference_resp(#conference{uuid=UUID
            ,{<<"Participant-Count">>, length(Participants)}
            ,{<<"Moderators">>, length(Moderators)}
            ,{<<"Members">>, length(Members)}
+           ,{<<?CALL_INTERACTION_ID>>, InteractionId}
            ],
     {Name, kz_json:from_list(Resp)}.
 
@@ -792,6 +796,7 @@ conference_from_jobj(JObj, Node, Conference) ->
                          ,handling_locally = CtrlNode =:= kz_term:to_binary(node())
                          ,origin_node = CtrlNode
                          ,control_node = CtrlNode
+                         ,interaction_id = kzd_interaction:id(JObj)
                          }.
 
 -spec switch_url(atom(), kz_json:object()) -> kz_term:ne_binary().

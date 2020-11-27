@@ -1620,7 +1620,7 @@ directory_resp_device_xml(Endpoint, JObj) ->
     SIPHeadersEl = [param_el(<<"dial-var-sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
     Params = [{<<"endpoint-dial-string">>, dial_string(Endpoint, Id)}
              ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}
-             ,{<<"endpoint-separator">>, ?SEPARATOR_ENTERPRISE}
+             ,{<<"endpoint-separator">>, kz_endpoint_separator()}
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
              ],
@@ -1636,7 +1636,8 @@ directory_resp_device_xml(Endpoint, JObj) ->
 user_dial_string([], _AccountId) ->
     <<"error/no_endpoints">>;
 user_dial_string(Ids, AccountId) ->
-    kz_binary:join([list_to_binary(["kz/", M, "@", AccountId]) || M <- Ids], ?SEPARATOR_ENTERPRISE).
+    kz_binary:join([list_to_binary(["kz/", M, "@", AccountId]) || M <- Ids], kz_endpoint_separator()).
+
 
 -spec directory_resp_user_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
 directory_resp_user_xml(Endpoint, JObj) ->
@@ -1657,7 +1658,7 @@ directory_resp_user_xml(Endpoint, JObj) ->
     Params = [{<<"group-dial-string">>, <<"kz/", Id/binary>>}
              ,{<<"endpoint-dial-string">>,  DialEndpoints}
              ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}
-             ,{<<"endpoint-separator">>, ?SEPARATOR_ENTERPRISE}
+             ,{<<"endpoint-separator">>, kz_endpoint_separator()}
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
              ],
@@ -1784,3 +1785,9 @@ prompt_resp_xml(Url, JObj) ->
     LocationEl = prompt_el(Id, Url),
     SectionEl = section_el(<<"configuration">>,  LocationEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
+
+%% there is an issue with freeswitch
+%% handling enterprise bridge string
+%% with semi-attended transfers
+kz_endpoint_separator() ->
+    ?SEPARATOR_SIMULTANEOUS.

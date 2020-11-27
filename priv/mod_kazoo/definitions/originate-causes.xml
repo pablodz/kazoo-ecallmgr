@@ -1,0 +1,3 @@
+<definition name="originate-causes">
+    <field name="_json_originate_causes" as="Originate-Causes" serialize-as="raw"/>
+</definition>

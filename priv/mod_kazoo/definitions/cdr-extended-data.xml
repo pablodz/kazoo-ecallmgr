@@ -1,0 +1,22 @@
+<definition name="cdr-extended-data">
+    <field name="Extended-Data" type="static" serialize-as="object">
+        <fields verbose="false">
+            <field name="_json_channel_stats" as="Channel-Stats" serialize-as="raw"/>
+            <field name="_json_callflow" as="Channel-CallFlow" serialize-as="raw">
+                <filters>
+                    <filter name="${first-of(variable_kz_cdr_include_callflow|kz_cdr_include_callflow|#${kz_cdr_include_callflow})}" type="include" value="true" />
+                </filters>
+            </field>
+            <field name="_json_channel_media_errors" as="Channel-Media-Errors" serialize-as="raw">
+                <filters>
+                    <filter name="${first-of(variable_kz_cdr_include_media_errors|kz_cdr_include_media_errors|#${kz_cdr_include_media_errors})}" type="include" value="true" />
+                </filters>
+            </field>
+            <field name="_json_application_log" as="Channel-Application-Log" serialize-as="raw">
+                <filters>
+                    <filter name="${first-of(variable_kz_cdr_include_application_log|kz_cdr_include_application_log|#${kz_cdr_include_application_log})}" type="include" value="true" />
+                </filters>
+            </field>
+        </fields>
+	</field>
+</definition>

@@ -1072,7 +1072,15 @@ get_sip_contact(#bridge_endpoint{invite_format = <<"endpoint">>
                                 ,endpoint_uri=EndpointURI
                                 }) ->
     list_to_binary(["kz/", EndpointURI]);
-
+get_sip_contact(#bridge_endpoint{ip_address='undefined'
+                                ,realm=Realm
+                                ,username=Username
+                                ,channel_vars=CVs
+                                }=EP) ->
+    {'ok', Contact, Props} = ecallmgr_registrar:lookup_contact(Realm, Username),
+    Vars = ecallmgr_fs_xml:build_leg_vars(Props),
+    NewEP = EP#bridge_endpoint{channel_vars=Vars ++ CVs},
+    {binary:replace(Contact, <<">">>, <<>>), NewEP};
 get_sip_contact(#bridge_endpoint{ip_address=IPAddress}) -> IPAddress.
 -endif.
 

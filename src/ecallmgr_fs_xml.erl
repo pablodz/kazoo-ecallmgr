@@ -393,13 +393,6 @@ not_found(Name) ->
 route_resp_park() ->
     action_el(<<"park">>).
 
--spec route_resp_capture_id() -> kz_types:xml_el().
-route_resp_capture_id() ->
-    DP = [action_el(<<"export">>, <<"sip_h_k-cid=${uuid}">>, 'true')
-         ,anti_action_el(<<"export">>, <<"sip_h_k-cid=${sip_h_k-cid}">>, 'true')
-         ],
-    condition_el(DP, <<"${sip_h_k-cid}">>, <<"^$">>).
-
 -spec route_resp_bridge_id() -> kz_types:xml_el().
 route_resp_bridge_id() ->
     Action = action_el(<<"export">>, [?SET_CCV(<<"Bridge-ID">>, <<"${UUID}">>)], 'true'),
@@ -1469,7 +1462,6 @@ event_filters_el(Filters) ->
 route_resp_park_xml(JObj, DialplanContext) ->
     Exten = [route_resp_log_winning_node()
             ,route_resp_set_winning_node()
-            ,route_resp_capture_id()
             ,route_resp_bridge_id()
             ,route_resp_ringback(JObj)
             ,route_resp_transfer_ringback(JObj)

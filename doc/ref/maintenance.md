@@ -60,6 +60,7 @@
 | `registrar_sync/0` |  | |
 | `reload_acls/0` |  | |
 | `reload_media_acls/0` |  | |
+| `reload_trusted/0` |  | |
 | `remove_acl/1` | `(Name)` | |
 | `remove_acl/2` | `(Name,false) | (Name,true) | (Name,AsDefault)` | |
 | `remove_fs_node/1` | `(FSNode)` | |

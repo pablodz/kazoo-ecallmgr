@@ -57,6 +57,7 @@
 
 -export([reload_acls/0]).
 -export([reload_media_acls/0]).
+-export([reload_trusted/0]).
 -export([publish_reload_acls/0]).
 -export([flush_acls/0]).
 
@@ -361,6 +362,10 @@ reload_media_acls() ->
 -spec reload_acls() -> 'no_return'.
 reload_acls() ->
     _ = reload_media_acls(),
+    'no_return'.
+
+-spec reload_trusted() -> 'no_return'.
+reload_trusted() ->
     _ = kz_amqp_worker:cast(kz_api:default_headers(?APP_NAME, ?APP_VERSION), fun kapi_trusted:publish_reload/1),
     'no_return'.
 

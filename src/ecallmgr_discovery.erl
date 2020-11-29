@@ -217,8 +217,7 @@ sbc_discovery(ConfigNode, CurrentACLs) ->
             ToUpdate = lists:filter(fun({Node, _IPs}) -> lists:member(Node, Names) end , Nodes),
             SBCACLs = sbc_acls(ToUpdate),
             NewAcls = kz_json:set_values(SBCACLs, CurrentACLs),
-            _ = kapps_config:set_node(?APP_NAME, <<"acls">>, NewAcls, ConfigNode),
-            ecallmgr_maintenance:reload_acls()
+            maybe_update_acls(CurrentACLs, NewAcls, ConfigNode)
     end.
 
 -spec media_discovery() -> any().
@@ -243,8 +242,7 @@ media_discovery(Node, CurrentACLs) ->
             Keys = kz_json:get_keys(Diff),
             Updated = kz_json:filter(fun({K, _V}) -> lists:member(K, Keys) end, Discovered),
             NewAcls = kz_json:set_values(kz_json:to_proplist(Updated), CurrentACLs),
-            _ = kapps_config:set_node(?APP_NAME, <<"acls">>, NewAcls, Node),
-            ecallmgr_maintenance:publish_reload_acls()
+            maybe_update_acls(CurrentACLs, NewAcls, Node)
     end.
 
 -spec is_media_acl(tuple()) -> boolean().
@@ -324,3 +322,11 @@ discovery() ->
                ,fun media_discovery/0
                ],
     lists:foreach(fun(F) -> F() end, Routines).
+
+maybe_update_acls(OldACLs, NewACLs, Node) ->
+    update_acls(kz_json:are_equal(OldACLs, NewACLs), NewACLs, Node).
+
+update_acls(true, _NewACLs, _Node) -> ok;
+update_acls(false, NewACLs, Node) ->
+    _ = kapps_config:set_node(?APP_NAME, <<"acls">>, NewACLs, Node),
+    ecallmgr_maintenance:publish_reload_acls().

@@ -45,7 +45,7 @@ exec_cmd(Node, UUID, JObj, _ControlPid, UUID) ->
         {AppName, AppData, NewNode, ExtraHeaders} ->
             ecallmgr_util:send_cmd(NewNode, UUID, App, AppName, AppData, ExtraHeaders);
         [_|_]=Apps ->
-            ecallmgr_util:send_cmds(Node, UUID, App, [FSApp || FSApp <- Apps])
+            ecallmgr_util:send_cmds(Node, UUID, App, Apps)
     end;
 exec_cmd(_Node, _UUID, JObj, _ControlPid, _DestId) ->
     lager:debug("command ~s not meant for us but for ~s"
@@ -1412,14 +1412,14 @@ get_page_app(Node, UUID, JObj, Endpoints) ->
                ,fun(DP) -> set_page_endpoints(DP, Node, UUID, JObj, Endpoints) end
                ,fun(DP) -> add_page_conference_app(DP, ConferenceName) end
                ],
-    {<<"xferext">>, lists:foldr(fun(F, DP) -> F(DP) end, [], Routines)}.
+    lists:foldr(fun(F, DP) -> F(DP) end, [], Routines).
 
 -spec set_page_conference_vars(kz_term:proplist(), kz_term:ne_binary()) -> kz_term:proplist().
 set_page_conference_vars(Dialplan, PageId) ->
-    [{"application", <<"set api_hangup_hook=conference ", PageId/binary, " kick all">>}
-    ,{"application", <<"set conference_auto_outcall_profile=page">>}
-    ,{"application", <<"set conference_auto_outcall_skip_member_beep=true">>}
-    ,{"application", <<"set conference_auto_outcall_delimiter=|">>}
+    [{"set", <<"api_hangup_hook=conference ", PageId/binary, " kick all">>}
+    ,{"set", <<"conference_auto_outcall_profile=page">>}
+    ,{"set", <<"conference_auto_outcall_skip_member_beep=true">>}
+    ,{"set", <<"conference_auto_outcall_delimiter=|">>}
     | Dialplan
     ].
 
@@ -1428,7 +1428,7 @@ maybe_set_page_two_way_audio(Dialplan, JObj) ->
     case kz_json:is_true([<<"Page-Options">>, <<"Two-Way-Audio">>], JObj, 'false') of
         'true' -> Dialplan;
         'false' ->
-            [{"application", <<"set conference_utils_auto_outcall_flags=mute">>}
+            [{"set", <<"conference_utils_auto_outcall_flags=mute">>}
             | Dialplan
             ]
     end.
@@ -1438,15 +1438,15 @@ set_page_caller_id(Dialplan, JObj) ->
     CIDName = kz_json:get_ne_value(<<"Caller-ID-Name">>, JObj, <<"${caller_id_name}">>),
     CIDNumber = kz_json:get_ne_value(<<"Caller-ID-Number">>, JObj, <<"${caller_id_number}">>),
 
-    [{"application", <<"set conference_auto_outcall_caller_id_name=", CIDName/binary>>}
-    ,{"application", <<"set conference_auto_outcall_caller_id_number=", CIDNumber/binary>>}
+    [{"set", <<"conference_auto_outcall_caller_id_name=", CIDName/binary>>}
+    ,{"set", <<"conference_auto_outcall_caller_id_number=", CIDNumber/binary>>}
     |Dialplan
     ].
 
 -spec set_page_timeout(kz_term:proplist(), kz_json:object()) -> kz_term:proplist().
 set_page_timeout(Dialplan, JObj) ->
     Timeout = kz_json:get_binary_value(<<"Timeout">>, JObj, <<"5">>),
-    [{"application", <<"set conference_auto_outcall_timeout=", Timeout/binary>>}
+    [{"set", <<"conference_auto_outcall_timeout=", Timeout/binary>>}
     |Dialplan
     ].
 
@@ -1466,13 +1466,13 @@ set_page_endpoints(Dialplan, Node, UUID, JObj, Endpoints) ->
     EPs = [kz_json:set_values(Values, Endpoint) || Endpoint <- Endpoints],
     Channels = [<<AutoAnswer/binary, Channel/binary>> || Channel <- ecallmgr_util:build_bridge_channels(EPs)],
     OutCall = kz_binary:join(Channels, <<"|">>),
-    [{"application", <<"conference_set_auto_outcall ", OutCall/binary>>}
+    [{"conference_set_auto_outcall", OutCall}
     | Dialplan
     ].
 
 -spec add_page_conference_app(kz_term:proplist(), kz_term:ne_binary()) -> kz_term:proplist().
 add_page_conference_app(Dialplan, ConferenceName) ->
-    [{"application", <<"conference ", ConferenceName/binary>>}
+    [{"conference", ConferenceName}
     | Dialplan
     ].
 
@@ -1482,7 +1482,7 @@ add_page_exports(DP) ->
               ,{<<"ecallmgr_Ecallmgr-Node">>, <<"${ecallmgr_Ecallmgr-Node}">>}
               ],
     ExportVars = kz_binary:join([K || {K, _V} <- Exports], <<",">>),
-    [{"application", <<"set conference_auto_outcall_export_vars=", ExportVars/binary>>}
+    [{"set", <<"conference_auto_outcall_export_vars=", ExportVars/binary>>}
     |DP
     ].
 

@@ -296,7 +296,6 @@
                               ,{<<"Loopback-From-URI">>, <<"sip_loopback_from_uri">>}
                               ,{<<"Call-Forward-For-UUID">>, <<"loopback_from_uuid">>}
                               ,{<<"Call-Forward-Request-URI">>, <<"sip_loopback_req_uri">>}
-                              ,{<<"Media-Encryption">>, <<"rtp_secure_media">>}
                               ,{<<"Media-Encryption-Enforce-Security">>,<<"sdp_secure_savp_only">>}
                               ,{<<"Media-Files-Separator">>, <<"playback_delimiter">>}
                               ,{<<"Media-Group-ID">>, <<"media_group_id">>}

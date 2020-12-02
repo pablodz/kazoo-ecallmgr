@@ -41,8 +41,10 @@ init() ->
 %%------------------------------------------------------------------------------
 -spec fetch_directory(map()) -> fs_handlecall_ret().
 fetch_directory(#{node := Node, fetch_id := FetchId, payload := JObj}=Ctx) ->
-    kz_log:put_callid(FetchId),
-    lager:debug("received directory ~s fetch request from ~s", [kzd_fetch:fetch_action(JObj, <<"sip_auth">>), Node]),
+    kz_log:put_callid(JObj),
+    lager:debug("received directory ~s fetch request ~s from ~s"
+               ,[kzd_fetch:fetch_action(JObj, <<"sip_auth">>), FetchId, Node]
+               ),
     case kzd_fetch:fetch_action(JObj, <<"sip_auth">>) of
         <<"sip_auth">> -> lookup_registrar(Ctx);
         <<"jsonrpc-authenticate">> -> validate_token(Ctx);

@@ -35,8 +35,11 @@ init() ->
     'ok'.
 
 -spec dialplan(dialplan_context()) -> {'ok', dialplan_context()}.
-dialplan(#{fetch_id := FetchId, payload := FetchJObj}=Map) ->
-    lager:debug("start dialplan fetch ~s for ~s", [FetchId, kzd_fetch:call_id(FetchJObj)]),
+dialplan(#{node := Node, fetch_id := FetchId, payload := FetchJObj}=Map) ->
+    kz_log:put_callid(FetchJObj),
+    lager:debug("received dialplan fetch request ~s from ~s"
+               ,[FetchId, Node]
+               ),
     Routines = [fun call_id/1
                ,fun timeout/1
                ,{fun add_time_marker/2, 'start_processing'}

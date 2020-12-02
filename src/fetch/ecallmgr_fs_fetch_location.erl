@@ -41,8 +41,10 @@ init() ->
 %%------------------------------------------------------------------------------
 -spec fetch_location(map()) -> fs_handlecall_ret().
 fetch_location(#{node := Node, fetch_id := FetchId, payload := JObj}=Ctx) ->
-    kz_log:put_callid(FetchId),
-    lager:debug("received directory location ~s fetch request from ~s", [kzd_fetch:fetch_action(JObj), Node]),
+    kz_log:put_callid(JObj),
+    lager:debug("received location ~s fetch request ~s from ~s"
+               ,[kzd_fetch:fetch_action(JObj), FetchId, Node]
+               ),
     case kzd_fetch:fetch_action(JObj) of
         <<"call">> -> fetch_registrar(Ctx, endpoint(JObj));
         _Other -> lager:debug("unhandled action '~s' in fetch location", [_Other]),

@@ -5,8 +5,8 @@
 	<field name="Switch-Nodename" as="Node" />
 	<field name="Fetch-UUID" />
 	<field name="Fetch-UUID" as="Msg-ID" />
-	<!-- <field name="Call-ID" type="first-of" value="Unique-ID" /> -->
-    <field name="Unique-ID" as="Call-ID"/>
+	<field name="Call-ID" as="Fetch-Call-UUID" />
+	<field name="Unique-ID" as="Call-ID"/>
 	<field name="Fetch-Section" />
 	<field name="Fetch-Timeout" serialize-as="number" />
 	<field name="Fetch-Timestamp-Micro" serialize-as="number" />

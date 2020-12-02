@@ -35,8 +35,11 @@ init() ->
 
 -spec channel_req(map()) -> 'ok'.
 channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Ctx) ->
-    kz_log:put_callid(FetchId),
     TargetUUID = kz_json:get_ne_binary_value(<<"replaces-call-id">>, JObj),
+    kz_log:put_callid(JObj),
+    lager:debug("received channel fetch request ~s from ~s for ~s"
+               ,[FetchId, Node, TargetUUID]
+               ),
     UUID = kz_json:get_ne_binary_value(<<"refer-from-channel-id">>, JObj),
     ForUUID = kz_json:get_ne_binary_value(<<"refer-for-channel-id">>, JObj),
     lager:info("received channels request from ~s for ~s", [Node, TargetUUID]),

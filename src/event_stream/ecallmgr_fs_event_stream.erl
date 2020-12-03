@@ -345,7 +345,7 @@ run_publish(Ctx) ->
     Routing = create_routing(<<"publish">>, Ctx),
     kazoo_bindings:map(Routing, Ctx, run_publish_options()).
 
-create_routing(Name, #{category := undefined} = Ctx) ->
+create_routing(Name, #{category := 'undefined'} = Ctx) ->
     create_routing(Name, Ctx#{category => <<"invalid">>});
 create_routing(Name, #{category := Category, event := Event}) ->
     <<"event_stream.", Name/binary, ".", Category/binary, ".", Event/binary>>.

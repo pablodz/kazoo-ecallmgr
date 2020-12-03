@@ -207,6 +207,7 @@ new(#channel{}=Channel) ->
 destroy(UUID, Node) ->
     gen_server:cast(?SERVER, {'destroy_channel', UUID, Node}).
 
+%% @doc Updates UUID channel record
 -spec update(kz_term:ne_binary(), channel()) -> 'ok'.
 update(UUID, Channel) ->
     gen_server:call(?SERVER, {'update_channel', UUID, Channel}).
@@ -401,14 +402,14 @@ send_empty_channel_resp(CallId, JObj) ->
 %%------------------------------------------------------------------------------
 -spec init([]) -> {'ok', state()}.
 init([]) ->
-    kz_log:put_callid(?DEFAULT_LOG_SYSTEM_ID),
+    kz_log:put_callid(?MODULE),
     process_flag('trap_exit', 'true'),
     lager:debug("starting new fs channels"),
     _ = ets:new(?CHANNELS_TBL, ['set'
                                ,'protected'
                                ,'named_table'
                                ,{'keypos', #channel.uuid}
-                               ,{read_concurrency, true}
+                               ,{'read_concurrency', 'true'}
                                ]),
     {'ok', #state{max_channel_cleanup_ref=start_cleanup_ref()}}.
 
@@ -426,7 +427,6 @@ start_cleanup_ref() ->
 %%------------------------------------------------------------------------------
 -spec handle_call(any(), kz_term:pid_ref(), state()) -> kz_types:handle_call_ret_state(state()).
 handle_call({'new_channel', #channel{uuid=UUID}=Channel}, _, State) ->
-    kz_log:put_callid(UUID),
     case ets:insert_new(?CHANNELS_TBL, Channel) of
         'true'->
             lager:debug("channel ~s added", [UUID]),
@@ -436,9 +436,7 @@ handle_call({'new_channel', #channel{uuid=UUID}=Channel}, _, State) ->
             {'reply', {'error', 'channel_exists'}, State}
     end;
 handle_call({'update_channel', UUID, Channel}, _, State) ->
-    kz_log:put_callid(UUID),
-    lager:debug("updating channel ~s", [UUID]),
-    ets:insert(?CHANNELS_TBL, Channel),
+    maybe_update_channel(UUID, Channel),
     {'reply', 'ok', State};
 handle_call({'channel_updates', _UUID, []}, _, State) ->
     {'reply', 'ok', State};
@@ -452,14 +450,17 @@ handle_call(_, _, State) ->
 %% @doc Handling cast messages.
 %% @end
 %%------------------------------------------------------------------------------
+maybe_log_updates('false', UUID, _Updates) ->
+    lager:debug("channel ~s not found, no property updates", [UUID]);
+maybe_log_updates('true', UUID, Updates) ->
+    lager:debug("updating channel ~s properties: ~s", [UUID, format_updates(Updates)]).
+
 -spec handle_cast(any(), state()) -> {'noreply', state()}.
 handle_cast({'channel_updates', UUID, Updates}, State) ->
-    kz_log:put_callid(UUID),
-    lager:debug("updating channel properties: ~s", [format_updates(Updates)]),
-    ets:update_element(?CHANNELS_TBL, UUID, Updates),
+    WasUpdated = ets:update_element(?CHANNELS_TBL, UUID, Updates),
+    maybe_log_updates(WasUpdated, UUID, Updates),
     {'noreply', State};
 handle_cast({'destroy_channel', UUID, Node}, State) ->
-    kz_log:put_callid(UUID),
     MatchSpec = [{#channel{uuid='$1', node='$2', _ = '_'}
                  ,[{'andalso', {'=:=', '$2', {'const', Node}}
                    ,{'=:=', '$1', UUID}}
@@ -467,7 +468,7 @@ handle_cast({'destroy_channel', UUID, Node}, State) ->
                   ['true']
                  }],
     N = ets:select_delete(?CHANNELS_TBL, MatchSpec),
-    lager:debug("removed ~p channel(s) with id ~s on ~s", [N, UUID, Node]),
+    lager:debug("removed ~p channel(s) with call-id ~s on ~s", [N, UUID, Node]),
     {'noreply', State, 'hibernate'};
 
 handle_cast({'sync_channels', Node, Channels}, State) ->
@@ -918,3 +919,16 @@ delete_and_maybe_disconnect(Node, UUID, [_Channel]) ->
     ets:delete(?CHANNELS_TBL, UUID);
 delete_and_maybe_disconnect(Node, UUID, []) ->
     lager:debug("channel ~s not found during sync delete with ~s", [UUID, Node]).
+
+-spec maybe_update_channel(kz_term:ne_binary(), channel()) -> 'ok'.
+maybe_update_channel(UUID, Channel) ->
+    try ets:lookup_element(?CHANNELS_TBL, UUID, #channel.uuid) of
+        UUID ->
+            'true' = ets:insert(?CHANNELS_TBL, Channel),
+            lager:debug("updated channel ~s", [UUID])
+    catch
+        _:_ ->
+            lager:info("channel ~s missing, not updating with ~p"
+                      ,[UUID, ecallmgr_fs_channel:to_json(Channel)]
+                      )
+    end.

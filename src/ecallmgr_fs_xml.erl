@@ -1716,17 +1716,24 @@ fold_user_el(Key, _J, Acc) ->
     Param = param_el(<<"dial-string">>, <<>>),
     [user_el(UserProps, [params_el([Param])]) | Acc].
 
-callfwd_el(Endpoint) ->
-    case callfwd_properties(Endpoint) of
-        [] -> 'undefined';
-        Props -> variables_el('call-forward', [variable_el(K, kz_term:to_binary(V)) || {K, V} <- Props])
-    end.
-
 -define(CALLFWD_FILTER, [<<"Call-Forward">>
                         ,<<"Is-Failover">>
                         ,<<"Is-Substitute">>
                         ,<<"Direct-Calls-Only">>
+                        ,<<"Failover-Reasons">>
                         ]).
+
+callfwd_el(Endpoint) ->
+    case callfwd_properties(Endpoint) of
+        [] -> 'undefined';
+        Props -> variables_el('call-forward', [variable_el(K, callfwd_property(K, V)) || {K, V} <- Props])
+    end.
+
+-spec callfwd_property(kz_term:ne_binary(), kz_json:json_term()) -> binary().
+callfwd_property(<<"Failover-Reasons">>, Value)
+  when is_list(Value) ->
+    kz_binary:join(Value, <<"|">>);
+callfwd_property(_, Value) -> kz_term:to_binary(Value).
 
 callfwd_properties(Endpoint) ->
     filter_call_fwd_props(kz_json:to_proplist([<<"CallForward">>, <<"Custom-Channel-Vars">>], Endpoint)).
@@ -1782,4 +1789,4 @@ prompt_resp_xml(Url, JObj) ->
 %% handling enterprise bridge string
 %% with semi-attended transfers
 kz_endpoint_separator() ->
-    ?SEPARATOR_SIMULTANEOUS.
+    ?SEPARATOR_ENTERPRISE.

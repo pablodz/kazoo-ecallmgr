@@ -1491,8 +1491,8 @@ maybe_add_expires_deviation_ms(Expires) ->
 
 -spec get_dial_separator(kz_term:api_object() | kz_term:ne_binary(), kz_json:objects()) -> kz_term:ne_binary().
 get_dial_separator(?DIAL_METHOD_SINGLE, _Endpoints) -> ?SEPARATOR_SINGLE;
-%%get_dial_separator(?DIAL_METHOD_SIMUL, [_, _|_]) -> ?SEPARATOR_SIMULTANEOUS;
-get_dial_separator(?DIAL_METHOD_SIMUL, [_, _|_]) -> ?SEPARATOR_ENTERPRISE;
+get_dial_separator(?DIAL_METHOD_SIMUL, [_, _|_]) -> ?SEPARATOR_SIMULTANEOUS;
+%%get_dial_separator(?DIAL_METHOD_SIMUL, [_, _|_]) -> ?SEPARATOR_ENTERPRISE;
 get_dial_separator(?DIAL_METHOD_SIMUL, [_]) -> ?SEPARATOR_SINGLE;
 get_dial_separator('undefined', _Endpoints) -> ?SEPARATOR_SINGLE;
 get_dial_separator(JObj, Endpoints) ->

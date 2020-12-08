@@ -165,7 +165,7 @@ handle_hold_media(DP, _Node, UUID, _Channel, JObj) ->
                 Media ->
                     Stream = ecallmgr_util:media_path(Media, 'extant', UUID, JObj),
                     lager:debug("bridge has custom music-on-hold in channel vars: ~s", [Stream]),
-                    [{"application", <<"set hold_music=", Stream/binary>>}
+                    [{"application", <<"set temp_hold_music=", Stream/binary>>}
                     ,{"application", <<"set transfer_ringback=", Stream/binary>>}
                     |DP
                     ]
@@ -173,7 +173,7 @@ handle_hold_media(DP, _Node, UUID, _Channel, JObj) ->
         Media ->
             Stream = ecallmgr_util:media_path(Media, 'extant', UUID, JObj),
             lager:debug("bridge has custom music-on-hold: ~s", [Stream]),
-            [{"application", <<"set hold_music=", Stream/binary>>}
+            [{"application", <<"set temp_hold_music=", Stream/binary>>}
             ,{"application", <<"set transfer_ringback=", Stream/binary>>}
             |DP
             ]

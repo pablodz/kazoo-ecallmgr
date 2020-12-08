@@ -884,6 +884,8 @@ get_channel_params(JObj) ->
           {kz_term:ne_binary(), kz_term:ne_binary()}.
 get_channel_params_fold(<<"Hold-Media">>=Key, Media) ->
     {ecallmgr_util:get_fs_key(Key), ecallmgr_util:moh_media_path(Media, 'extant', kz_log:get_callid(), kz_json:new())};
+get_channel_params_fold(<<"Custom-Hold-Media">>=Key, Media) ->
+    {ecallmgr_util:get_fs_key(Key), ecallmgr_util:moh_media_path(Media, 'extant', kz_log:get_callid(), kz_json:new())};
 get_channel_params_fold(Key, Val) ->
     {ecallmgr_util:get_fs_key(Key), ecallmgr_util:maybe_sanitize_fs_value(Key, Val)}.
 

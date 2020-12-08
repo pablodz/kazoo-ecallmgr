@@ -544,6 +544,9 @@ get_fs_kv(Key, Value) ->
 get_fs_kv(<<"Hold-Media">>, Media, UUID) ->
     MediaPath = moh_media_path(Media, 'extant', UUID, kz_json:new()),
     list_to_binary(["hold_music=", MediaPath]);
+get_fs_kv(<<"Custom-Hold-Media">>, Media, UUID) ->
+    MediaPath = moh_media_path(Media, 'extant', UUID, kz_json:new()),
+    list_to_binary(["temp_hold_music=", MediaPath]);
 get_fs_kv(?CCV(Key), Val, UUID) ->
     get_fs_kv(Key, Val, UUID);
 get_fs_kv(Key, Val, _) ->
@@ -572,6 +575,9 @@ get_fs_key(Key) ->
           [{kz_term:ne_binary(), binary()}] |
           'skip'.
 get_fs_key_and_value(<<"Hold-Media">>=Key, Media, UUID) ->
+    MediaPath = moh_media_path(Media, 'extant', UUID, kz_json:new()),
+    {get_fs_key(Key), MediaPath};
+get_fs_key_and_value(<<"Custom-Hold-Media">>=Key, Media, UUID) ->
     MediaPath = moh_media_path(Media, 'extant', UUID, kz_json:new()),
     {get_fs_key(Key), MediaPath};
 get_fs_key_and_value(<<"Diversions">>=Key, Diversions, _UUID) ->
@@ -625,6 +631,10 @@ maybe_sanitize_fs_value(<<"Export-Variables">>, Val) ->
 maybe_sanitize_fs_value(<<"Require-Fail-On-Single-Reject">>, <<Val/binary>>) ->
     Val;
 maybe_sanitize_fs_value(<<"Require-Fail-On-Single-Reject">>, Val) when is_list(Val) ->
+    kz_binary:join(Val, <<",">>);
+maybe_sanitize_fs_value(<<"Failover-Reasons">>, <<Val/binary>>) ->
+    Val;
+maybe_sanitize_fs_value(<<"Failover-Reasons">>, Val) when is_list(Val) ->
     kz_binary:join(Val, <<",">>);
 maybe_sanitize_fs_value(Key, Val) when not is_binary(Key) ->
     maybe_sanitize_fs_value(kz_term:to_binary(Key), Val);

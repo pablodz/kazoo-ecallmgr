@@ -119,7 +119,7 @@ channel_resp_dialprefix(JObj, Channel, ChannelVars, ForChannelCCVs) ->
               ,{<<"ecallmgr_Owner-ID">>, props:get_value(<<"Owner-ID">>, ChannelVars)}
               ,{<<"presence_id">>, props:get_value(<<"Presence-ID">>, ChannelVars)}
 
-              ,{<<"sip_h_X-FS-Auth-Token">>, nighmare_auth_token(ForChannelCCVs)}
+              ,{<<"sip_h_X-FS-Auth-Token">>, nightmare_auth_token(ForChannelCCVs)}
               ,{<<"sip_h_X-FS-", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, ChannelVars)}
               ,{<<"sip_h_X-ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, ChannelVars)}
               ,{<<"sip_h_X-FS-From-Core-UUID">>, kz_json:get_value(<<"Core-UUID">>, JObj)}
@@ -128,13 +128,15 @@ channel_resp_dialprefix(JObj, Channel, ChannelVars, ForChannelCCVs) ->
               ]),
     fs_props_to_binary(Props).
 
-nighmare_auth_token(ChannelVars) ->
+-spec nightmare_auth_token(kz_term:proplist()) -> kz_term:api_ne_binary().
+nightmare_auth_token(ChannelVars) ->
     case props:get_value(<<"Authorizing-ID">>, ChannelVars) of
         'undefined' -> 'undefined';
-        AuthorizingID -> list_to_binary([AuthorizingID
-                                        ,"@"
-                                        ,props:get_value(<<"Account-ID">>, ChannelVars)
-                                        ])
+        AuthorizingID ->
+            list_to_binary([AuthorizingID
+                           ,"@"
+                           ,props:get_value(<<"Account-ID">>, ChannelVars)
+                           ])
     end.
 
 -spec fs_props_to_binary(kz_term:proplist()) -> kz_term:ne_binary().

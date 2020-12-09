@@ -64,14 +64,17 @@ process(#{payload := FetchJObj, channel := Channel}=Map) ->
                ],
     maybe_expired(kz_maps:exec(Routines, Map)).
 
+-spec request(dialplan_context()) -> dialplan_context().
 request(#{request := _Request}=Map) -> Map;
 request(#{control_q := ControlQ, control_p := ControlP, payload := FetchJObj}=Map) ->
     Map#{request => kz_json:set_value(?KEY_SERVER_ID, kapi:encode_pid(ControlQ, ControlP), FetchJObj)}.
 
+-spec control_p(dialplan_context()) -> dialplan_context().
 control_p(#{control_p := _Pid}=Map) -> Map;
 control_p(Map) ->
     Map#{control_p => self()}.
 
+-spec timeout(dialplan_context()) -> dialplan_context().
 timeout(#{timeout := _Timeout}=Map) -> Map;
 timeout(#{payload := FetchJObj}=Map) ->
     NowUs = erlang:system_time('micro_seconds'),
@@ -82,6 +85,7 @@ timeout(#{payload := FetchJObj}=Map) ->
     T6 = T5 div 1000,
     Map#{timeout => T6 - 750}.
 
+-spec call_id(dialplan_context()) -> dialplan_context().
 call_id(#{call_id := _CallId}=Map) -> Map;
 call_id(#{payload := JObj}=Map) ->
     Map#{call_id => kzd_fetch:call_id(JObj)}.
@@ -122,23 +126,27 @@ maybe_blocked(#{request := Request}=Map) ->
     wait_for_route_resp(add_time_marker(Map, 'request_sent')).
 
 -spec wait_for_route_resp(dialplan_context()) -> {'ok', dialplan_context()}.
-wait_for_route_resp(#{timeout := TimeoutMs}=Map) ->
-    lager:debug("waiting ~B ms for route response", [TimeoutMs]),
+wait_for_route_resp(#{timeout := TimeoutMs, fetch_id := FetchId}=Map) ->
+    lager:debug("waiting ~B ms for route response to request ~s"
+               ,[TimeoutMs, FetchId]),
     StartTime = kz_time:start_time(),
     receive
         {'kapi', {_, {'dialplan', 'route_resp'}, Resp}} ->
             case kz_api:defer_response(Resp) of
                 'true' ->
                     NewTimeoutMs = TimeoutMs - kz_time:elapsed_ms(StartTime),
-                    lager:debug("received deferred reply - waiting for others for ~B ms", [NewTimeoutMs]),
+                    lager:debug("received deferred reply for ~s - waiting for others for ~B ms"
+                               ,[FetchId, NewTimeoutMs]),
                     wait_for_route_resp(Map#{timeout => NewTimeoutMs, reply => #{payload => Resp}});
                 'false' ->
-                    lager:info("received route reply"),
+                    lager:info("received route reply for ~s", [FetchId]),
                     NewTimeoutMs = TimeoutMs - kz_time:elapsed_ms(StartTime),
                     maybe_wait_for_authz(Map#{reply => #{payload => Resp}, authz_timeout => NewTimeoutMs})
             end
     after TimeoutMs ->
-            lager:warning("timeout after ~B receiving route response", [TimeoutMs]),
+            lager:warning("timeout after ~B receiving route response for ~s"
+                         ,[TimeoutMs, FetchId]
+                         ),
             send_reply(Map)
     end.
 
@@ -168,8 +176,11 @@ maybe_wait_for_authz(#{}=Map) ->
 wait_for_authz(#{authz_worker := {Pid, Ref}
                 ,authz_timeout := Timeout
                 ,reply := #{payload := JObj}=Reply
+                ,fetch_id := FetchId
                 }=Map) ->
-    lager:info("waiting for authz reply from worker ~p", [Pid]),
+    lager:info("waiting for authz reply ~s from worker ~p"
+              ,[FetchId, Pid]
+              ),
     receive
         {'authorize_reply', Ref, 'false'} -> send_reply(forbidden_reply(Map));
         {'authorize_reply', Ref, 'true'} -> send_reply(Map);
@@ -181,37 +192,41 @@ wait_for_authz(#{authz_worker := {Pid, Ref}
                                  ),
             send_reply(Map#{reply => Reply#{payload => J}})
     after Timeout ->
-            lager:warning("timeout waiting for authz reply from worker ~p", [Pid]),
+            lager:warning("timeout waiting for authz reply ~s from worker ~p"
+                         ,[FetchId, Pid]
+                         ),
             {'ok', Map}
     end.
 
 -spec send_reply(dialplan_context()) -> {'ok', dialplan_context()}.
-send_reply(#{node := Node, fetch_id := FetchId, reply := #{payload := Reply}}=Ctx) ->
-    {'ok', XML} = ecallmgr_fs_xml:route_resp_xml('dialplan', Reply, Ctx),
+send_reply(#{node := Node, fetch_id := FetchId, reply := #{payload := Reply}}=Context) ->
+    {'ok', XML} = ecallmgr_fs_xml:route_resp_xml('dialplan', Reply, Context),
     lager:debug("sending xml dialplan reply for request ~s tp ~s", [FetchId, Node]),
-    _ = freeswitch:fetch_reply(Ctx#{reply => iolist_to_binary(XML)}),
+    _ = freeswitch:fetch_reply(Context#{reply => iolist_to_binary(XML)}),
     case kz_api:defer_response(Reply)
         orelse kz_json:get_ne_binary_value(<<"Method">>, Reply) =/= <<"park">>
     of
-        'true' -> {'ok', Ctx};
-        'false' -> wait_for_route_winner(Ctx)
+        'true' -> {'ok', Context};
+        'false' -> wait_for_route_winner(Context)
     end.
 
 -spec wait_for_route_winner(dialplan_context()) -> {'ok', dialplan_context()}.
-wait_for_route_winner(Ctx) ->
+wait_for_route_winner(#{fetch_id := FetchId}=Context) ->
     receive
         {'kapi', {_, {'dialplan', 'ROUTE_WINNER'}, JObj}} ->
-            activate_call_control(Ctx#{winner => #{payload => JObj}});
+            activate_call_control(Context#{winner => #{payload => JObj}});
         {'route_winner', JObj, _Props} ->
-            activate_call_control(Ctx#{winner => #{payload => JObj}})
+            activate_call_control(Context#{winner => #{payload => JObj}})
     after ?ROUTE_WINNER_TIMEOUT ->
-            lager:warning("timeout after ~B receiving route winner", [?ROUTE_WINNER_TIMEOUT]),
-            {'ok', Ctx}
+            lager:warning("timeout after ~B receiving route winner for ~s"
+                         ,[?ROUTE_WINNER_TIMEOUT, FetchId]
+                         ),
+            {'ok', Context}
     end.
 
 -spec activate_call_control(dialplan_context()) -> {'ok', dialplan_context()}.
-activate_call_control(#{call_id := CallId, winner := #{payload := JObj}} = Map) ->
-    lager:info("we are the route winner handling node"),
+activate_call_control(#{call_id := CallId, fetch_id := FetchId, winner := #{payload := JObj}} = Map) ->
+    lager:info("we are the route winner handling request ~s", [FetchId]),
     kz_log:put_callid(CallId),
     CCVs = kzd_fetch:ccvs(JObj),
     ControllerQ = kzd_fetch:controller_queue(JObj),
@@ -244,14 +259,14 @@ forbidden_reply(#{fetch_id := FetchId}=Map) ->
     Map#{reply => #{payload => error_message(<<"403">>, <<"Incoming call barred">>)}}.
 
 -spec route_winner(dialplan_context()) -> 'ok'.
-route_winner(#{payload := JObj}=_Map) ->
+route_winner(#{fetch_id := FetchId, payload := JObj}=_Map) ->
     NodeWinner = kzd_fetch:ccv(JObj, <<"Ecallmgr-Node">>),
     case NodeWinner =:= kz_term:to_binary(node()) of
         'true' ->
             Pid = kz_term:to_pid(kz_api:reply_to(JObj)),
             Pid ! {'route_winner', JObj, []};
         'false' ->
-            lager:info("route winner handled by other node : ~s", [NodeWinner])
+            lager:info("route request ~s handled by other node : ~s", [FetchId, NodeWinner])
     end.
 
 

@@ -40,10 +40,10 @@ init() ->
     'ok'.
 
 -spec language_req(map()) -> fs_sendmsg_ret().
-language_req(#{fetch_id := Id, payload := JObj} = Ctx) ->
+language_req(#{fetch_id := Id, payload := JObj} = Context) ->
     kz_log:put_callid(Id),
     {ok, Xml} = language_resp_xml(JObj),
-    freeswitch:fetch_reply(Ctx#{reply => iolist_to_binary(Xml)}).
+    freeswitch:fetch_reply(Context#{reply => iolist_to_binary(Xml)}).
 
 -spec language_resp_xml(kz_json:object()) -> {'ok', iolist()}.
 language_resp_xml(JObj) ->

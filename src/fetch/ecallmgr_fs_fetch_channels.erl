@@ -34,7 +34,7 @@ init() ->
     'ok'.
 
 -spec channel_req(map()) -> 'ok'.
-channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Ctx) ->
+channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Context) ->
     TargetUUID = kz_json:get_ne_binary_value(<<"replaces-call-id">>, JObj),
     kz_log:put_callid(JObj),
     lager:debug("received channel fetch request ~s from ~s for ~s"
@@ -42,7 +42,8 @@ channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Ctx) ->
                ),
     UUID = kz_json:get_ne_binary_value(<<"refer-from-channel-id">>, JObj),
     ForUUID = kz_json:get_ne_binary_value(<<"refer-for-channel-id">>, JObj),
-    lager:info("received channels request from ~s for ~s", [Node, TargetUUID]),
+    lager:info("request ~s is looking call ~s on ~s"
+              ,[FetchId, TargetUUID, Node]),
     {'ok', ForChannel} = ecallmgr_fs_channel:fetch(ForUUID, 'proplist'),
     TargetChannel = ecallmgr_fs_channel:fetch_channel(TargetUUID),
     Channel = ecallmgr_fs_channel:fetch_channel(UUID),
@@ -50,22 +51,28 @@ channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Ctx) ->
         andalso TargetChannel =/= 'undefined'
     of
         'false' ->
-            channel_not_found(Ctx);
+            channel_not_found(Context);
         'true' ->
             SwitchURL = props:get_ne_binary_value(<<"switch_url">>, TargetChannel),
             ToUser = kz_json:get_ne_binary_value(<<"refer-to-user">>, JObj),
             ToRealm = props:get_ne_binary_value(<<"realm">>, Channel),
             case build_sip_url(SwitchURL, ToUser, ToRealm) of
                 'undefined' ->
-                    lager:notice_unsafe("ctx => ~p", [Ctx]),
-                    lager:notice_unsafe("channel => ~p", [Channel]),
-                    lager:notice_unsafe("target channel => ~p", [TargetChannel]),
-                    channel_not_found(Ctx);
+                    lager:notice_unsafe("fetch ~s context => ~p"
+                                       ,[FetchId, Context]
+                                       ),
+                    lager:notice_unsafe("fetch ~s channel => ~p"
+                                       ,[FetchId, Channel]
+                                       ),
+                    lager:notice_unsafe("fetch ~s target channel => ~p"
+                                       ,[FetchId, TargetChannel]
+                                       ),
+                    channel_not_found(Context);
                 URL ->
                     CCVs = ecallmgr_fs_channel:channel_ccvs(Channel),
                     ForChannelCCVs = ecallmgr_fs_channel:channel_ccvs(ForChannel),
                     DialPrefix = channel_resp_dialprefix(JObj, Channel, CCVs, ForChannelCCVs),
-                    build_channel_resp(Ctx#{url => URL, dial_prefix => DialPrefix})
+                    build_channel_resp(Context#{url => URL, dial_prefix => DialPrefix})
             end
     end.
 
@@ -90,7 +97,7 @@ build_sip_url(SwitchURL, ToUser, ToRealm) ->
     end.
 
 -spec build_channel_resp(map()) -> 'ok'.
-build_channel_resp(#{url := URL, dial_prefix := DialPrefix} = Ctx) ->
+build_channel_resp(#{url := URL, dial_prefix := DialPrefix} = Context) ->
     %% NOTE
     %% valid properties to return are
     %% sip-url , dial-prefix, absolute-dial-string, sip-profile (defaulted to current channel profile)
@@ -101,7 +108,7 @@ build_channel_resp(#{url := URL, dial_prefix := DialPrefix} = Ctx) ->
              [{<<"sip-url">>, URL}
              ,{<<"dial-prefix">>, DialPrefix}
              ]),
-    try_channel_resp(Ctx, Resp).
+    try_channel_resp(Context, Resp).
 
 -spec channel_resp_dialprefix(kz_json:object(), kz_term:proplist(), kz_term:proplist(), kz_term:proplist()) -> kz_term:ne_binary().
 channel_resp_dialprefix(JObj, Channel, ChannelVars, ForChannelCCVs) ->
@@ -145,18 +152,22 @@ fs_props_to_binary([{Hk,Hv}|T]) ->
     <<"[", Hk/binary, "='", (kz_term:to_binary(Hv))/binary, "'", Rest/binary, "]">>.
 
 -spec try_channel_resp(map(), kz_term:proplist()) -> 'ok'.
-try_channel_resp(#{node := Node} = Ctx, Props) ->
+try_channel_resp(#{node := Node, fetch_id := FetchId} = Context, Props) ->
     try ecallmgr_fs_xml:sip_channel_xml(Props) of
         {'ok', ConfigXml} ->
-            lager:debug("sending sofia XML to ~s: ~s", [Node, ConfigXml]),
-            freeswitch:fetch_reply(Ctx#{reply => erlang:iolist_to_binary(ConfigXml)})
+            lager:debug("sending sofia XML to ~s for request ~s: ~s"
+                       ,[Node, FetchId, ConfigXml]
+                       ),
+            freeswitch:fetch_reply(Context#{reply => erlang:iolist_to_binary(ConfigXml)})
     catch
         _E:_R:_ ->
-            lager:info("sofia profile resp failed to convert to XML (~s): ~p", [_E, _R]),
-            channel_not_found(Ctx)
+            lager:info("sofia profile resp ~s failed to convert to XML (~s): ~p"
+                      ,[FetchId, _E, _R]
+                      ),
+            channel_not_found(Context)
     end.
 
 -spec channel_not_found(map()) -> 'ok'.
-channel_not_found(Ctx) ->
+channel_not_found(Context) ->
     {'ok', Resp} = ecallmgr_fs_xml:not_found(),
-    freeswitch:fetch_reply(Ctx#{reply => iolist_to_binary(Resp)}).
+    freeswitch:fetch_reply(Context#{reply => iolist_to_binary(Resp)}).

@@ -1518,16 +1518,6 @@ directory_resp_group_id(Endpoint, JObj) ->
         GroupID -> GroupID
     end.
 
-call_forward_dial_string(Endpoint) ->
-    case kz_json:get_json_value(<<"CallForward">>, Endpoint) of
-        'undefined' ->
-            <<>>;
-        Failover ->
-            URI = kz_json:get_ne_binary_value(<<"Call-Forward-Request-URI">>, Failover),
-            Vars = channel_vars(Failover),
-            list_to_binary(["[^^!", kz_binary:join(Vars, <<"!">>), "]loopback/", URI])
-    end.
-
 dial_string(Endpoint, Id) ->
     Uri = kz_json:get_ne_binary_value(<<"SIP-Invite-Route-URI">>, Endpoint),
     SIPInterface = kz_json:get_ne_binary_value(<<"SIP-Interface">>, Endpoint, ?DEFAULT_FS_PROFILE),
@@ -1613,7 +1603,6 @@ directory_resp_device_xml(Endpoint, JObj) ->
     SIPHeaders = get_custom_sip_headers(Endpoint),
     SIPHeadersEl = [param_el(<<"dial-var-sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
     Params = [{<<"endpoint-dial-string">>, dial_string(Endpoint, Id)}
-             ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}
              ,{<<"endpoint-separator">>, kz_endpoint_separator()}
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
@@ -1651,7 +1640,6 @@ directory_resp_user_xml(Endpoint, JObj) ->
 
     Params = [{<<"group-dial-string">>, <<"kz/", Id/binary>>}
              ,{<<"endpoint-dial-string">>,  DialEndpoints}
-             ,{<<"callforward-dial-string">>, call_forward_dial_string(Endpoint)}
              ,{<<"endpoint-separator">>, kz_endpoint_separator()}
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
@@ -1723,6 +1711,7 @@ fold_user_el(Key, _J, Acc) ->
                         ,<<"Is-Substitute">>
                         ,<<"Direct-Calls-Only">>
                         ,<<"Failover-Reasons">>
+                        ,<<"Dial-String">>
                         ]).
 
 callfwd_el(Endpoint) ->
@@ -1738,7 +1727,19 @@ callfwd_property(<<"Failover-Reasons">>, Value)
 callfwd_property(_, Value) -> kz_term:to_binary(Value).
 
 callfwd_properties(Endpoint) ->
-    filter_call_fwd_props(kz_json:to_proplist([<<"CallForward">>, <<"Custom-Channel-Vars">>], Endpoint)).
+    case kz_json:get_json_value(<<"CallForward">>, Endpoint) of
+        undefined ->
+            [];
+        CallForward ->
+            DialString = call_forward_dial_string(CallForward),
+            Props = kz_json:to_proplist(<<"Custom-Channel-Vars">>, CallForward),
+            filter_call_fwd_props([{<<"Dial-String">>, DialString} | Props])
+    end.
+
+call_forward_dial_string(CallForward) ->
+    URI = kz_json:get_ne_binary_value(<<"Call-Forward-Request-URI">>, CallForward),
+    Vars = channel_vars(CallForward),
+    list_to_binary(["[^^!", kz_binary:join(Vars, <<"!">>), "]loopback/", URI]).
 
 filter_call_fwd_props(Props) ->
     lists:filter(fun({K,_V}) -> lists:member(K, ?CALLFWD_FILTER) end, Props).

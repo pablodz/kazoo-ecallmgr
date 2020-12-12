@@ -1565,10 +1565,9 @@ directory_resp_resource_xml(Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
 
-    ChannelParams = get_channel_params(Endpoint),
     ProfileParams = get_profile_params(Endpoint),
     SIPHeaders = get_custom_sip_headers(Endpoint),
-    VariableEls = [variable_el(K, V) || {K, V} <- ChannelParams],
+    VariableEls =get_directory_variables(Endpoint),
     HeaderEls = [variable_el(K, V) || {K, V} <- SIPHeaders],
     VariablesEl = variables_el(VariableEls ++ HeaderEls),
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
@@ -1586,9 +1585,7 @@ directory_resp_device_xml(Endpoint, JObj) ->
     Id = <<UserId/binary, "@", DomainName/binary>>,
 
     ProfileParams = get_profile_params(Endpoint),
-    ChannelParams = get_channel_params(Endpoint) ++ get_codecs(Endpoint),
-
-    VariableEls = [variable_el(K, V) || {K, V} <- ChannelParams],
+    VariableEls = get_directory_variables(Endpoint),
     ProxyPathEls = route_uri_els(Endpoint),
 
     VariablesEl = variables_el(VariableEls ++ ProxyPathEls),
@@ -1629,8 +1626,7 @@ directory_resp_user_xml(Endpoint, JObj) ->
     Id = <<UserId/binary, "@", DomainName/binary>>,
 
     ProfileParams = get_profile_params(Endpoint),
-    ChannelParams = get_channel_params(Endpoint),
-    VariableEls = [variable_el(K, V) || {K, V} <- ChannelParams],
+    VariableEls = get_directory_variables(Endpoint),
     VariablesEl = variables_el(VariableEls),
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
@@ -1660,11 +1656,7 @@ directory_resp_group_ep_xml(Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     GroupId = directory_resp_user_id(Endpoint, JObj),
     GroupProps = user_el_default_props(GroupId),
-    ChannelParams = get_channel_params(Endpoint),
-    DialPrefix = list_to_binary(["<"
-                                ,kz_binary:join([<<K/binary, "='", V/binary, "'">> || {K,V} <- ChannelParams], <<",">>)
-                                ,">"
-                                ]),
+    VariableEls = get_directory_variables(Endpoint),
     Members = kz_json:get_list_value(<<"Members">>, Endpoint, []),
     Dial = lists:foldr(fun(EP, Acc) ->
                                Id = kz_json:get_ne_binary_value(<<"id">>, EP, <<"error">>),
@@ -1679,9 +1671,8 @@ directory_resp_group_ep_xml(Endpoint, JObj) ->
                                                   ]),
                                [D | Acc]
                        end, [], Members),
-    DialEndpoints = kz_binary:join(Dial, ?SEPARATOR_ENTERPRISE),
-    Params = [param_el(<<"dial-string">>, list_to_binary([DialPrefix, DialEndpoints]))],
-    GroupEl = user_el(GroupProps, [params_el(Params)]),
+    Params = [param_el(<<"dial-string">>, kz_binary:join(Dial, ?SEPARATOR_ENTERPRISE))],
+    GroupEl = user_el(GroupProps, [params_el(Params), variables_el(VariableEls)]),
     DomainEl = domain_el(DomainName, GroupEl),
     SectionEl = section_el(<<"directory">>, DomainEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
@@ -1693,8 +1684,9 @@ directory_resp_group_xml(Endpoint, JObj) ->
     GroupProps = [{<<"name">>, GroupId}],
     Members = kz_json:get_json_value(<<"Members">>, Endpoint, kz_json:new()),
     MembersEl = kz_json:foldr(fun fold_user_el/3, [], Members),
+    VariableEls = get_directory_variables(Endpoint),
 
-    GroupEl = group_el(GroupProps, [users_el(MembersEl)]),
+    GroupEl = group_el(GroupProps, [users_el(MembersEl),variables_el(VariableEls)]),
 
     DomainEl = domain_el(DomainName, [groups_el([GroupEl])]),
     SectionEl = section_el(<<"directory">>, DomainEl),
@@ -1744,15 +1736,6 @@ call_forward_dial_string(CallForward) ->
 filter_call_fwd_props(Props) ->
     lists:filter(fun({K,_V}) -> lists:member(K, ?CALLFWD_FILTER) end, Props).
 
-get_codecs(Endpoint) ->
-    case kz_json:get_list_value(<<"Codecs">>, Endpoint, []) of
-        [] -> [];
-        Cs ->
-            Codecs = [kz_term:to_list(codec_mappings(C)) || C <- Cs, not kz_term:is_empty(C)],
-            CodecStr = string:join(Codecs, ":"),
-            [{<<"absolute_codec_string">> , list_to_binary(["^^:", CodecStr])}]
-    end.
-
 -spec location_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value()) -> kz_types:xml_el().
 location_el(Id, Value) ->
     #xmlElement{name='location'
@@ -1788,8 +1771,60 @@ prompt_resp_xml(Url, JObj) ->
     SectionEl = section_el(<<"configuration">>,  LocationEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
 
-%% there is an issue with freeswitch
-%% handling enterprise bridge string
-%% with semi-attended transfers
 kz_endpoint_separator() ->
     ?SEPARATOR_SIMULTANEOUS.
+
+-define(EXCLUDE_VARIABLE_GROUPS, []).
+
+-define(DIRECTORY_VARIABLES_KEYS, [<<"Custom-Channel-Vars">>
+                                  ,<<"Codecs">>
+                                  ]).
+
+-spec get_directory_variables(kz_json:object()) -> kz_types:xml_els().
+get_directory_variables(JObj) ->
+    Fun = fun(Key, Acc) -> get_directory_variables(Key, JObj, Acc) end,
+    lists:foldl(Fun, [], ?DIRECTORY_VARIABLES_KEYS).
+
+get_directory_variables(<<"Codecs">>, Endpoint, Acc) ->
+    codecs_els(Endpoint) ++ Acc;
+get_directory_variables(ObjectKey, JObj, Acc) ->
+    Props = kz_json:to_proplist(ObjectKey, JObj),
+    get_directory_variables(Props, Acc).
+
+get_directory_variables(Props, Acc)
+  when is_list(Props) ->
+    Fun = fun({K, V}, Acc1) ->
+                  [get_directory_variables_fold(K, V) | Acc1]
+          end,
+    lists:foldl(Fun, Acc, Props);
+get_directory_variables(JObj, Acc) ->
+    Props = kz_json:to_proplist(JObj),
+    get_directory_variables(Props, Acc).
+
+-spec get_directory_variables_fold(kz_term:ne_binary(), kz_term:ne_binary()) -> kz_types:xml_el().
+get_directory_variables_fold(Key, Value) ->
+    case kz_json:is_json_object(Value)
+        andalso not lists:member(Key, ?EXCLUDE_VARIABLE_GROUPS)
+    of
+        true ->
+            K = kz_term:to_atom(kz_json:normalize_key(Key), true),
+            variables_el(K, get_directory_variables(Value, []));
+        false ->
+            get_directory_variable(Key, Value)
+    end.
+
+get_directory_variable({Key, Value}) ->
+    variable_el(Key, Value).
+
+get_directory_variable(Key, Value) ->
+    get_directory_variable(get_channel_params_fold(Key, Value)).
+
+codecs_els(Endpoint) ->
+    case kz_json:get_list_value(<<"Codecs">>, Endpoint, []) of
+        [] -> [];
+        Cs -> [codecs_el(Cs)]
+    end.
+
+codecs_el(Codecs) ->
+    CodecsMap = [codec_mappings(Codec) || Codec <- Codecs, not kz_term:is_empty(Codec)],
+    variable_el(<<"absolute_codec_string">> , list_to_binary(["^^:", kz_binary:join(CodecsMap, <<":">>)])).

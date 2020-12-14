@@ -259,16 +259,15 @@ forbidden_reply(#{fetch_id := FetchId}=Map) ->
     Map#{reply => #{payload => error_message(<<"403">>, <<"Incoming call barred">>)}}.
 
 -spec route_winner(dialplan_context()) -> 'ok'.
-route_winner(#{fetch_id := FetchId, payload := JObj}=_Map) ->
+route_winner(#{payload := JObj}) ->
     NodeWinner = kzd_fetch:ccv(JObj, <<"Ecallmgr-Node">>),
     case NodeWinner =:= kz_term:to_binary(node()) of
         'true' ->
             Pid = kz_term:to_pid(kz_api:reply_to(JObj)),
             Pid ! {'route_winner', JObj, []};
         'false' ->
-            lager:info("route request ~s handled by other node : ~s", [FetchId, NodeWinner])
+            lager:info("route request ~s handled by other node : ~s", [kzd_fetch:fetch_uuid(JObj), NodeWinner])
     end.
-
 
 -spec block_call_routines(dialplan_context()) -> dialplan_context().
 block_call_routines(Map) ->

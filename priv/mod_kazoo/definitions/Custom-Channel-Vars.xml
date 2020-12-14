@@ -33,21 +33,21 @@
 
 			<field name="redirect" type="group">
 				<filters>
-					<filter name="variable_sip_redirected_by" type="include"
-						compare="exists" />
+					<filter name="variable_sip_redirected_by" type="include" compare="exists" />
 				</filters>
 				<fields verbose="false">
-					<field name="Redirected-By" type="expand"
-						value="sip:${regex(${variable_sip_redirected_by}|&lt;sips?:(.*)>|%1)}" />
-					<field name="Redirected-Reason" type="expand"
-						value="${regex(${variable_sip_redirected_by}|reason=(.*)|%1)}" />
+					<field name="Redirected-By" type="expand" value="sip:${regex(${variable_sip_redirected_by}|&lt;sips?:(.*)>|%1)}" />
+					<field name="Redirected-By" type="expand" value="sip:${regex(${variable_sip_redirected_by}|&lt;sips?:(.*)>|%1)};endpoint_id=${variable_redirected_by_Endpoint-ID}">
+						<filters>
+							<filter name="variable_redirected_by_Endpoint-ID" type="include" compare="exists" />
+						</filters>
+					</field>
+					<field name="Redirected-Reason" type="expand" value="${regex(${variable_sip_redirected_by}|reason=(.*)|%1)}" />
 				</fields>
 			</field>
 
-			<field name="Caller-Privacy-Hide-Number" as="Privacy-Hide-Number"
-				serialize-as="boolean" />
-			<field name="Caller-Privacy-Hide-Name" as="Privacy-Hide-Name"
-				serialize-as="boolean" />
+			<field name="Caller-Privacy-Hide-Number" as="Privacy-Hide-Number" serialize-as="boolean" />
+			<field name="Caller-Privacy-Hide-Name" as="Privacy-Hide-Name" serialize-as="boolean" />
 
 		</fields>
 	</field>

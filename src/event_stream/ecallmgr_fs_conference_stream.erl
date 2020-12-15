@@ -64,7 +64,7 @@ handle_event(#{node := Node, payload := JObj}) ->
 
 -spec process_event(kz_term:ne_binary(), kz_json:object(), atom()) -> any().
 process_event(<<"conference-create">>, JObj, Node) ->
-    set_conference_interaction_id(Node, JObj),
+    _ = set_conference_interaction_id(Node, JObj),
     _ = ecallmgr_fs_conferences:create(JObj, Node),
     ConferenceId = kz_conference_event:conference_id(JObj),
     UUID = kz_conference_event:instance_id(JObj),
@@ -76,7 +76,7 @@ process_event(<<"conference-destroy">>, JObj, Node) ->
     _ = ecallmgr_conference_control_sup:stop_conference_control(Node, ConferenceId, InstanceId);
 
 process_event(<<"add-member">>, JObj, Node) ->
-    set_participant_interaction_id(Node, JObj),
+    _ = set_participant_interaction_id(Node, JObj),
     ecallmgr_fs_conferences:participant_create(JObj, Node);
 process_event(<<"del-member">>, JObj, _Node) ->
     ecallmgr_fs_conferences:participant_destroy(kz_conference_event:call_id(JObj));
@@ -105,23 +105,27 @@ update_participant(JObj) ->
     ecallmgr_fs_conferences:participant_update(UUID, Update).
 
 should_process_interaction() ->
-    kapps_config:get_boolean(?INTERACTION_CAT, <<"process_conference">>, true).
+    kapps_config:get_boolean(?INTERACTION_CAT, <<"process_conference">>, 'true').
 
+-spec set_conference_interaction_id(atom(), kz_json:object()) -> 'ok' | pid().
 set_conference_interaction_id(Node, JObj) ->
     set_conference_interaction_id(Node, JObj, should_process_interaction()).
 
-set_conference_interaction_id(_Node, _JObj, false) -> ok;
-set_conference_interaction_id(Node, JObj, true) ->
+-spec set_conference_interaction_id(atom(), kz_json:object(), boolean()) -> 'ok' | pid().
+set_conference_interaction_id(_Node, _JObj, 'false') -> 'ok';
+set_conference_interaction_id(Node, JObj, 'true') ->
     InteractionId = kzd_interaction:id(JObj),
     ConferenceId = kz_conference_event:conference_id(JObj),
     Args = list_to_binary([ConferenceId, " set_var conference-interaction-id ", InteractionId]),
     kz_process:spawn(fun freeswitch:api/3, [Node, 'conference', Args]).
 
+-spec set_participant_interaction_id(atom(), kz_json:object()) -> 'ok' | pid().
 set_participant_interaction_id(Node, JObj) ->
     set_participant_interaction_id(Node, JObj, should_process_interaction()).
 
-set_participant_interaction_id(_Node, _JObj, false) -> ok;
-set_participant_interaction_id(Node, JObj, true) ->
+-spec set_participant_interaction_id(atom(), kz_json:object(), boolean()) -> 'ok' | pid().
+set_participant_interaction_id(_Node, _JObj, 'false') -> 'ok';
+set_participant_interaction_id(Node, JObj, 'true') ->
     ConferenceId = kz_conference_event:conference_id(JObj),
     CallId = kz_conference_event:call_id(JObj),
     Args = list_to_binary([CallId, " ", ?CALL_INTERACTION_ID, " ${conference(", ConferenceId, " get_var conference-interaction-id)}"]),

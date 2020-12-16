@@ -347,7 +347,7 @@ try_create_bridge_string(Endpoints, JObj) ->
     case ecallmgr_util:build_bridge_string(Endpoints, DialSeparator) of
         <<>> ->
             lager:warning("bridge string resulted in no endpoints"),
-            throw(<<"registrar returned no endpoints">>);
+            throw({no_endpoints, <<"registrar returned no endpoints">>});
         BridgeString -> BridgeString
     end.
 

@@ -264,7 +264,7 @@ media_node({Node, Data}) ->
     {Node, media_node_ips(Data)}.
 
 media_node_ips(Data) ->
-    Interfaces = kz_json:get_json_value(<<"Interfaces">>, Data),
+    Interfaces = kz_json:get_json_value(<<"Interfaces">>, Data, kz_json:new()),
     kz_json:foldl(fun media_node_ip/3 , {[], []}, Interfaces).
 
 media_node_ip(_InterfaceName, SIPInterface, Acc) ->

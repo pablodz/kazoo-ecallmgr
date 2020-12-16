@@ -913,6 +913,11 @@ execute_control_request(Cmd, #state{node=Node
             send_error_resp(Node, CallId, Cmd, 'throw', ErrMsg),
             Srv ! {'force_queue_advance', CallId},
             'ok';
+        'throw':{Error, Msg} ->
+            lager:debug("failed to execute ~s: ~s : ~s", [Application, Error, Msg]),
+            send_error_resp(Node, CallId, Cmd, Error, Msg),
+            Srv ! {'force_queue_advance', CallId},
+            'ok';
         'throw':Msg ->
             lager:debug("failed to execute ~s: ~s", [Application, Msg]),
             lager:debug("only handling call id(s): ~p", [[CallId | OtherLegs]]),

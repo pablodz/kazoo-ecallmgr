@@ -865,7 +865,6 @@ execute_control_request(Cmd, #state{node=Node
                                    ,other_legs=OtherLegs
                                    }) ->
     kz_log:put_callid(CallId),
-    Srv = self(),
 
     Application = kapi_dialplan:application_name(Cmd),
 
@@ -884,7 +883,6 @@ execute_control_request(Cmd, #state{node=Node
                                  ," not found for ", Application
                                  ]),
             send_error_resp(Node, CallId, Cmd, 'baduuid', Msg),
-            Srv ! {'force_queue_advance', CallId},
             'ok';
         _:{'error', 'nosession'}:_ ->
             lager:debug("unable to execute command, no session"),
@@ -892,7 +890,6 @@ execute_control_request(Cmd, #state{node=Node
                                  ," not found for ", Application
                                  ]),
             send_error_resp(Node, CallId, Cmd, 'nosession', Msg),
-            Srv ! {'force_queue_advance', CallId},
             'ok';
         'error':{'badmatch', {'error', 'nosession'}}:_ ->
             lager:debug("unable to execute command, no session"),
@@ -900,36 +897,30 @@ execute_control_request(Cmd, #state{node=Node
                                  ," not found for ", Application
                                  ]),
             send_error_resp(Node, CallId, Cmd, 'nosession', Msg),
-            Srv ! {'force_queue_advance', CallId},
             'ok';
         'error':{'badmatch', {'error', ErrMsg}}:ST ->
             lager:debug("invalid command ~s: ~p", [Application, ErrMsg]),
             kz_log:log_stacktrace(ST),
             send_error_resp(Node, CallId, Cmd, ErrMsg),
-            Srv ! {'force_queue_advance', CallId},
             'ok';
         'throw':{'msg', ErrMsg} ->
             lager:debug("error while executing command ~s: ~s", [Application, ErrMsg]),
             send_error_resp(Node, CallId, Cmd, 'throw', ErrMsg),
-            Srv ! {'force_queue_advance', CallId},
             'ok';
         'throw':{Error, Msg} ->
             lager:debug("failed to execute ~s: ~s : ~s", [Application, Error, Msg]),
             send_error_resp(Node, CallId, Cmd, Error, Msg),
-            Srv ! {'force_queue_advance', CallId},
             'ok';
         'throw':Msg ->
             lager:debug("failed to execute ~s: ~s", [Application, Msg]),
             lager:debug("only handling call id(s): ~p", [[CallId | OtherLegs]]),
 
             send_error_resp(Node, CallId, Cmd, 'throw', Msg),
-            Srv ! {'force_queue_advance', CallId},
             'ok';
         _A:Error:ST ->
             lager:debug("exception (~s) while executing ~s: ~p", [_A, Application, Error]),
             kz_log:log_stacktrace(ST),
             send_error_resp(Node, CallId, Cmd, Error),
-            Srv ! {'force_queue_advance', CallId},
             'ok'
     end.
 
@@ -1080,6 +1071,7 @@ handle_event_info(CallId, JObj, #state{call_id=CallId}=State) ->
     Application = kz_call_event:application_name(JObj),
     case kz_call_event:event_name(JObj) of
         <<"CHANNEL_EXECUTE_COMPLETE">> ->
+            lager:info("handling channel execute complete for ~s : ~s", [Application, kz_call_event:application_uuid(JObj)]),
             {'noreply', handle_execute_complete(Application, kz_call_event:application_uuid(JObj), JObj, State)};
         <<"CHANNEL_DESTROY">> ->
             {'noreply', handle_channel_destroyed(State)};
@@ -1138,6 +1130,7 @@ query_state(Node, CallId) ->
 
 -spec send_error_resp(error()) -> 'ok'.
 send_error_resp(#{app_name := <<"hangup">>}) -> 'ok';
+send_error_resp(#{app_name := <<"noop">>}) -> 'ok';
 send_error_resp(Error) -> publish_error_resp(Error).
 
 -spec send_error_resp(atom(), kz_term:ne_binary(), kz_json:object(), atom() | kz_term:ne_binary(), kz_term:ne_binary()) -> 'ok'.

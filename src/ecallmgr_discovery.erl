@@ -22,6 +22,8 @@
 
 -export([discover/0]).
 
+-export([enable/0, disable/0]).
+
 -include("ecallmgr.hrl").
 
 -define(SERVER, ?MODULE).
@@ -52,6 +54,7 @@ start_link() ->
 -spec init(list()) -> {'ok', state(), ?MILLISECONDS_IN_SECOND}.
 init([]) ->
     lager:info("starting discovery"),
+    erlang:put(discovery_updates_enabled, true),
     {'ok', kz_time:start_time(), ?MILLISECONDS_IN_SECOND}.
 
 %%------------------------------------------------------------------------------
@@ -69,6 +72,14 @@ handle_call(_Request, _From, Startup) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec handle_cast(any(), state()) -> kz_types:handle_cast_ret_state(state()).
+handle_cast('enable', Startup) ->
+    lager:warning("enable discovery updates"),
+    erlang:put(discovery_updates_enabled, true),
+    {'noreply', Startup, next_timeout(kz_time:elapsed_s(Startup))};
+handle_cast('disable', Startup) ->
+    lager:warning("disable discovery updates"),
+    erlang:put(discovery_updates_enabled, false),
+    {'noreply', Startup, next_timeout(kz_time:elapsed_s(Startup))};
 handle_cast('discovery', Startup) ->
     lager:warning("starting discovery"),
     _ = discovery(),
@@ -302,7 +313,9 @@ media_node_unique({NodeName, {IPs, Ports}} = Node, Acc) ->
     end.
 
 -spec media_node_acl({kz_term:ne_binary(), {kz_term:ne_binaries(), [inet:port_number()]}}) ->
-          {kz_term:ne_binary(), kz_json:object()}.
+          {kz_term:ne_binary(), kz_json:object()} | undefined.
+media_node_acl({_Node, {[], _Ports}}) -> undefined;
+media_node_acl({_Node, {_IPs, []}}) -> undefined;
 media_node_acl({Node, {IPs, Ports}}) ->
     CIDRs = [<<IP/binary, "/32">> || IP <- IPs],
     ACL = kz_json:from_list([{<<"type">>, <<"allow">>}
@@ -310,11 +323,20 @@ media_node_acl({Node, {IPs, Ports}}) ->
                             ,{<<"cidr">>, CIDRs}
                             ,{<<"ports">>, Ports}
                             ]),
-    {Node, ACL}.
+    {Node, ACL};
+media_node_acl(_) -> undefined.
 
 -spec discover() -> 'ok'.
 discover() ->
     gen_server:cast(?MODULE, 'discovery').
+
+-spec enable() -> 'ok'.
+enable() ->
+    gen_server:cast(?MODULE, 'enable').
+
+-spec disable() -> 'ok'.
+disable() ->
+    gen_server:cast(?MODULE, 'disable').
 
 -spec discovery() -> any().
 discovery() ->
@@ -326,9 +348,16 @@ discovery() ->
 maybe_update_acls(Type, OldACLs, NewACLs, Node) ->
     update_acls(kz_json:are_equal(OldACLs, NewACLs), Type, NewACLs, Node).
 
-update_acls(true, _Type, _NewACLs, _Node) ->
-    lager:debug("no changes detected for ~s", [_Type]);
+update_acls(true, _Type, _NewACLs, _Node) -> ok;
 update_acls(false, Type, NewACLs, Node) ->
+    do_update_acls(should_update(), Type, NewACLs, Node).
+
+do_update_acls(false, _Type, _NewACLs, _Node) ->
+    lager:warning("NOT updating acls from discover process for ~s (disabled)", [_Type]);
+do_update_acls(true, Type, NewACLs, Node) ->
     lager:warning("updating acls from discover process for ~s", [Type]),
     _ = kapps_config:set_node(?APP_NAME, <<"acls">>, NewACLs, Node),
     ecallmgr_maintenance:publish_reload_acls().
+
+should_update() ->
+    kz_term:is_true(erlang:get('discovery_updates_enabled')).

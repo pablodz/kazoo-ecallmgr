@@ -45,6 +45,7 @@ fetch_directory(#{node := Node, fetch_id := FetchId, payload := JObj}=Context) -
     lager:debug("received directory ~s fetch request ~s from ~s"
                ,[kzd_fetch:fetch_action(JObj, <<"sip_auth">>), FetchId, Node]
                ),
+
     case kzd_fetch:fetch_action(JObj, <<"sip_auth">>) of
         <<"sip_auth">> -> lookup_registrar(Context);
         <<"jsonrpc-authenticate">> -> validate_token(Context);
@@ -79,7 +80,8 @@ lookup_directory(_EndpointId, _Realm, Context) ->
 directory_not_found(#{node := Node, fetch_id := FetchId} = Context) ->
     {'ok', Xml} = ecallmgr_fs_xml:not_found(),
     lager:debug("sending directory not found XML to ~w as reply for ~s"
-               ,[Node, FetchId]),
+               ,[Node, FetchId]
+               ),
     freeswitch:fetch_reply(Context#{reply => iolist_to_binary(Xml)}).
 
 -spec validate_token(map()) -> fs_handlecall_ret().
@@ -107,18 +109,26 @@ validate_token(#{payload := JObj} = Context, {'ok', Claims}) ->
 
 -spec lookup_registrar(map()) -> fs_handlecall_ret().
 lookup_registrar(#{payload := JObj}=Context) ->
-    lookup_registrar(Context
-                    ,kzd_fetch:fetch_user(JObj)
-                    ,kzd_fetch:fetch_key_value(JObj)
+    EndpointId = kzd_fetch:fetch_user(JObj),
+    AccountId = kzd_fetch:fetch_key_value(JObj),
+    KVs = [{<<"Requested-User-ID">>, EndpointId}
+          ,{<<"Requested-Domain-Name">>, AccountId}
+          ],
+    lookup_registrar(Context#{payload => kz_json:set_values(KVs, JObj)}
+                    ,EndpointId
+                    ,AccountId
                     ).
 
 lookup_registrar(Context, EndpointId, AccountId) ->
+    lager:debug("lookup registration for endpoint: ~s", [EndpointId]),
     case ecallmgr_registrar:lookup_endpoint(EndpointId, AccountId) of
-        {'error', 'not_found'} -> lookup_directory(Context);
-        {'ok', Endpoint} -> fetch_directory(EndpointId, AccountId, Context, [{'endpoint', kz_json:from_list(Endpoint)}])
+        {'error', 'not_found'} ->
+            lookup_directory(Context);
+        {'ok', Endpoint} ->
+            fetch_directory(EndpointId, AccountId, Context, [{'endpoint', kz_json:from_list(Endpoint)}])
     end.
 
--spec fetch_direction(kz_json:object()) -> binary().
+-spec fetch_direction(kz_json:object()) -> kz_term:ne_binary().
 fetch_direction(JObj) ->
     case kzd_fetch:fetch_action(JObj) of
         <<"user_call">> -> <<"outbound">>;
@@ -141,7 +151,8 @@ fetch_directory(EndpointId, AccountId, Context) ->
 fetch_directory(EndpointId, AccountId, #{payload := JObj, fetch_id := FetchId} = Context, Options) ->
     Opts = props:set_values(Options, fetch_options(Context)),
     lager:debug("fetching directory for ~s : ~s for request ~s"
-               ,[EndpointId, AccountId, FetchId]),
+               ,[EndpointId, AccountId, FetchId]
+               ),
     case kz_directory:lookup(EndpointId, AccountId, Opts) of
         {'ok', Endpoint} ->
             {'ok', Xml} = ecallmgr_fs_xml:directory_resp_endpoint_xml(Endpoint, JObj),

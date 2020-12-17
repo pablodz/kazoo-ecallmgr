@@ -92,7 +92,7 @@
                       ,expires = ?EXPIRES_MISSING_VALUE :: non_neg_integer() | '_' | '$1'
                       ,from_host :: kz_term:api_ne_binary() | '_'
                       ,from_user = <<"nouser">> :: kz_term:ne_binary() | '_'
-                      ,id :: {kz_term:ne_binary(), kz_term:ne_binary()} | '_' | '$1'
+                      ,id :: {kz_term:ne_binary(), kz_term:ne_binary() | '_'} | '_' | '$1'
                       ,initial = 'true' :: boolean() | '_'
                       ,initial_registration = kz_time:now_s() :: kz_time:gregorian_seconds() | '_'
                       ,last_registration = kz_time:now_s() :: kz_time:gregorian_seconds() | '_' | '$2'
@@ -150,7 +150,20 @@ handle_reg_success(RegSuccess, _Props) ->
     'true' = kapi_registration:success_v(RegSuccess),
     _ = kz_log:put_callid(RegSuccess),
     Registration = create_registration(RegSuccess),
-    insert_registration(Registration).
+    insert_registration(Registration),
+    maybe_insert_endpoint_registration(Registration).
+
+%% @doc if reg.endpoint-info.endpoint-id =/= authz-id, insert matching registration for endpoint-id
+-spec maybe_insert_endpoint_registration(registration()) -> 'ok'.
+maybe_insert_endpoint_registration(#registration{endpoint_info=EndpointInfo}=Registration) ->
+    maybe_insert_endpoint_registration(Registration, kz_json:get_ne_binary_value(<<"Endpoint-ID">>, EndpointInfo)).
+
+-spec maybe_insert_endpoint_registration(registration(), kz_term:api_ne_binary()) -> 'ok'.
+maybe_insert_endpoint_registration(_Registration, 'undefined') -> 'ok';
+maybe_insert_endpoint_registration(#registration{authorizing_id=AuthzId}, AuthzId) -> 'ok';
+maybe_insert_endpoint_registration(#registration{id={_Username, Realm}}=Registration, EndpointId) ->
+    lager:info("cloning registration ~s to endpoint ~s", [_Username, EndpointId]),
+    insert_registration(Registration#registration{id={EndpointId, Realm}}).
 
 -spec handle_reg_query(kapi_registration:query_req(), kz_term:proplist()) -> 'ok'.
 handle_reg_query(QueryJObj, Props) ->
@@ -203,7 +216,7 @@ lookup_endpoint(<<>>, _AccountId) -> {'error', 'not_found'};
 lookup_endpoint(_EndpointId, <<>>) -> {'error', 'not_found'};
 lookup_endpoint(<<EndpointId/binary>>, <<AccountId/binary>>) ->
     MatchSpec = #registration{account_id = AccountId
-                             ,authorizing_id = EndpointId
+                             ,id = {EndpointId, '_'}
                              ,_ = '_'
                              },
 

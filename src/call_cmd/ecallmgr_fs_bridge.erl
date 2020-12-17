@@ -86,7 +86,7 @@ call_command(Node, UUID, JObj) ->
                        ,fun pre_exec/5
                        ,fun handle_loopback/5
                        ,fun create_command/6
-                       ,fun post_exec/1
+                       ,{fun post_exec/2, AppUUID}
                        ],
             lager:debug("creating bridge dialplan"),
             XferExt = lists:foldr(fun(F, DP) when is_function(F, 1) ->
@@ -302,14 +302,17 @@ pre_exec(DP, _Node, _UUID, _Channel, JObj) ->
     |DP
     ].
 
--spec post_exec(kz_term:proplist()) -> kz_term:proplist().
-post_exec(DP) ->
-    [{"application", "park"}
+-spec post_exec(kz_term:proplist(), kz_term:ne_binary()) -> kz_term:proplist().
+post_exec(DP, AppUUID) ->
+    Props = [{<<"Application-UUID">>, AppUUID}],
+    Event = ecallmgr_util:create_masquerade_event(<<"bridge">>, <<"CHANNEL_EXECUTE_COMPLETE">>, Props),
+    [{"application", Event}
+    ,{"application", "park"}
     |DP
     ].
 
 -spec create_command(kz_term:proplist(), atom(), kz_term:ne_binary(), channel(), kz_json:object(), kz_term:ne_binary()) -> kz_term:proplist().
-create_command(DP, Node, UUID, #channel{profile=ChannelProfile}, JObj, AppUUID) ->
+create_command(DP, Node, UUID, #channel{profile=ChannelProfile}, JObj, _AppUUID) ->
     BypassAfterBridge = ?BYPASS_MEDIA_AFTER_BRIDGE,
     BridgeProfile = kz_term:to_binary(kz_json:get_value(<<"SIP-Interface">>, JObj, ?DEFAULT_FS_PROFILE)),
     EPs = kz_json:get_list_value(<<"Endpoints">>, JObj, []),
@@ -321,7 +324,6 @@ create_command(DP, Node, UUID, #channel{profile=ChannelProfile}, JObj, AppUUID) 
     UpdatedJObj = kz_json:set_value(<<"Endpoints">>, UniqueEndpoints, kz_json:merge(JObj, CommonProperties)),
 
     LiftedCmd = list_to_binary(["bridge "
-                               ,"%[app_uuid=", AppUUID, ",app_uuid_name=bridge]"
                                ,build_channels_vars(Node, UUID, UniqueEndpoints, UpdatedJObj)
                                ,try_create_bridge_string(UniqueEndpoints, UpdatedJObj)
                                ]),

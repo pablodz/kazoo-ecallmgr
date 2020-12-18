@@ -1266,7 +1266,6 @@ media_path(<<"https://", _/binary>> = URI, _Type, _UUID, _) -> get_fs_playback(U
 media_path(<<?HTTP_GET_PREFIX, _/binary>> = Media, _Type, _UUID, _) -> Media;
 media_path(<<"\$", _/binary>> = Media, _Type, _UUID, _) -> Media;
 media_path(<<"prompt://", _/binary>> = Media, _Type, _UUID, _) -> Media;
-media_path(<<"/", _/binary>> = Media, _Type, _UUID, _) -> <<"prompt:/", Media/binary>>;
 media_path(MediaName, Type, UUID, JObj) ->
     case lookup_media(MediaName, Type, UUID, JObj) of
         {'error', _E} ->

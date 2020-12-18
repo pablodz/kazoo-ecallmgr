@@ -19,11 +19,12 @@
 
 -spec handle_req(kz_json:object(), kz_term:proplist()) -> 'ok'.
 handle_req(JObj, Props) ->
+    kz_log:put_callid(JObj),
     Node = props:get_value('node', Props),
     Options = props:get_value('node_options', Props),
     'true' = kapi_switch:fs_command_v(JObj),
     Cmd = kz_json:get_ne_binary_value(<<"Command">>, JObj),
-    Args = kz_json:get_value(<<"Args">>, JObj),
+    Args = kz_json:get_json_value(<<"Args">>, JObj),
     exec_cmd(Cmd, Args, JObj, Node, Options).
 
 -spec exec_cmd(kz_term:ne_binary(), kz_term:api_object(), kz_json:object(), atom(), kz_term:proplist()) -> 'ok'.
@@ -97,4 +98,3 @@ send_http_cb('error', Reply, FSProps, [JobId, JObj, _File, _Node, Channel]) ->
     _ = kz_amqp_channel:consumer_channel(Channel),
     Props = ecallmgr_util:unserialize_fs_props(FSProps),
     reply_error(Reply, kz_json:from_list(Props), JObj).
-

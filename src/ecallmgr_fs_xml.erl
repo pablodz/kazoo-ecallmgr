@@ -1704,6 +1704,7 @@ fold_user_el(Key, _J, Acc) ->
                         ,<<"Direct-Calls-Only">>
                         ,<<"Failover-Reasons">>
                         ,<<"Dial-String">>
+                        ,<<"Request-URI">>
                         ]).
 
 callfwd_el(Endpoint) ->
@@ -1724,8 +1725,12 @@ callfwd_properties(Endpoint) ->
             [];
         CallForward ->
             DialString = call_forward_dial_string(CallForward),
+            URI = kz_json:get_ne_binary_value(<<"Call-Forward-Request-URI">>, CallForward),
             Props = kz_json:to_proplist(<<"Custom-Channel-Vars">>, CallForward),
-            filter_call_fwd_props([{<<"Dial-String">>, DialString} | Props])
+            filter_call_fwd_props([{<<"Dial-String">>, DialString}
+                                  ,{<<"Request-URI">>, URI}
+                                  | Props
+                                  ])
     end.
 
 call_forward_dial_string(CallForward) ->

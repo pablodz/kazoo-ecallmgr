@@ -31,6 +31,7 @@
 -export([version/1]).
 -export([instance_uuid/1]).
 -export([fetch_timeout/0, fetch_timeout/1]).
+-export([node_restart/1]).
 -export([init/1
         ,handle_call/3
         ,handle_cast/2
@@ -105,10 +106,8 @@
                               ]).
 
 -record(state, {node               :: atom()
-                                                %               ,instance_uuid      :: kz_term:api_ne_binary()
                ,options = []       :: kz_term:proplist()
-                                                %               ,interfaces = []    :: interfaces()
-               ,info          :: kz_term:api_object()
+               ,info               :: kz_term:api_object()
                ,start_cmds_pid_ref :: kz_term:api_pid_ref()
                }).
 -type state() :: #state{}.
@@ -284,11 +283,9 @@ init(Node, Info, Options) ->
     gproc:reg({'p', 'l', 'fs_node'}),
     sync_channels(self()),
     sync_conferences(self()),
-    PidRef = run_start_cmds(Node, Info, Options),
-    lager:debug("running start commands in ~p", [PidRef]),
+    gen_listener:cast(self(), run_cmds),
     {'ok', #state{node=Node
                  ,options=Options
-                 ,start_cmds_pid_ref=PidRef
                  ,info=Info
                  }}.
 
@@ -332,6 +329,17 @@ handle_cast('sync_info', #state{node=Node}=State) ->
         {'ok', JObj} -> {'noreply', State#state{info=JObj}};
         _ -> {'noreply', State}
     end;
+handle_cast('run_cmds', #state{node=Node
+                              ,info=Info
+                              ,options=Options
+                              ,start_cmds_pid_ref='undefined'
+                              }=State) ->
+    PidRef = run_start_cmds(Node, Info, Options),
+    lager:debug("running start commands in ~p", [PidRef]),
+    {'noreply', State#state{start_cmds_pid_ref=PidRef}};
+handle_cast('run_cmds', #state{start_cmds_pid_ref=PidRef}=State) ->
+    lager:debug("already running start commands in ~p", [PidRef]),
+    {'noreply', State};
 handle_cast('sync_capabilities', #state{node=Node, info=Info}=State) ->
     _Pid = kz_process:spawn(fun probe_capabilities/2, [Node, Info]),
     lager:debug("syncing capabilities in ~p", [_Pid]),
@@ -570,9 +578,12 @@ interface(Node) ->
 interface(Node, Profile) ->
     gen_server:call(find_srv(Node), {'interface', Profile}).
 
--spec instance_uuid(atom() | binary()) -> kz_term:api_ne_binary().
+-spec instance_uuid(atom() | binary() | pid()) -> kz_term:api_ne_binary().
 instance_uuid(Node) ->
-    gen_server:call(find_srv(Node), 'instance_uuid').
+    case find_srv(Node) of
+        undefined -> undefined;
+        Pid -> gen_server:call(Pid, 'instance_uuid')
+    end.
 
 -spec sessions(fs_node()) -> kz_term:api_binary().
 sessions(Srv) ->
@@ -592,4 +603,13 @@ info(Srv) ->
                 _:_:_ -> 'undefined'
             end;
         _ -> 'undefined'
+    end.
+
+-spec node_restart(fs_node()) -> 'ok' | {'error', 'invalid_node'}.
+node_restart(Srv) ->
+    case find_srv(Srv) of
+        undefined -> {'error', 'invalid_node'};
+        Pid when is_pid(Pid) ->
+            gen_server:cast(Pid, 'sync_info'),
+            gen_server:cast(Pid, 'run_cmds')
     end.

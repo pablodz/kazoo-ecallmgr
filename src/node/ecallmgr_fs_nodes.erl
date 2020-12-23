@@ -26,6 +26,7 @@
 -export([is_node/1, is_node_up/1, is_node_down/1]).
 -export([sip_url/1, sip_url/2]).
 -export([sip_external_ip/1, sip_external_ip/2]).
+-export([instance_uuid/1]).
 -export([summary/0]).
 -export([details/0
         ,details/1
@@ -956,4 +957,14 @@ min_version(#node{client_version=ClientVersion,node=NodeName}) ->
             lager:warning("node ~s does not have minimum version ~s required to use this ecallmgr version.", [NodeName, ?MIN_FS_VERSION]),
             lager:warning("please upgrade your media node (~s) to freeswitch 1.10 or later", [NodeName]),
             'false'
+    end.
+
+-spec instance_uuid(atom() | binary()) -> kz_term:api_ne_binary().
+instance_uuid(Node) ->
+    case is_node_up(Node)
+        andalso ecallmgr_fs_node_sup:node_srv(Node)
+    of
+        false -> undefined;
+        Pid when is_pid(Pid) -> ecallmgr_fs_node:instance_uuid(Pid);
+        _Else -> undefined
     end.

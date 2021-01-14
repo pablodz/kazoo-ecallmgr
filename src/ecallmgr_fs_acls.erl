@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2020, 2600Hz
+%%% @copyright (C) 2012-2021, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -232,8 +232,8 @@ trusted_acl(K, V) ->
         'false' -> 'false';
         'true' ->
             {'ok', Master} = kapps_util:get_master_account_id(),
-            KVs = [{<<"account_id">>, Master}
-                  ,{<<"authorizing_id">>, kz_binary:rand_hex(16)}
+            KVs = [{<<"account_id">>, kz_json:get_ne_binary_value(<<"account_id">>, V, Master)}
+                  ,{<<"authorizing_id">>, kz_json:get_ne_binary_value(<<"authorizing_id">>, V, kz_binary:rand_hex(16))}
                   ],
             JObj = kz_json:set_values(KVs, V),
             {'true', {K, JObj}}

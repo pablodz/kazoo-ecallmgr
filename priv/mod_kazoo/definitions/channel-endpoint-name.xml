@@ -1,0 +1,3 @@
+<definition name="channel-endpoint-name">
+	<field name="variable_channel_endpoint_name" as="Channel-Endpoint-Name"/>
+</definition>

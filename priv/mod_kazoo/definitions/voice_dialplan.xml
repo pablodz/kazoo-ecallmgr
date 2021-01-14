@@ -9,7 +9,7 @@
 	<field name="caller-id" type="reference" />
 	<field name="from-network" type="reference" />
 	<field name="user-agent" type="reference" />
-	<field name="from-to" type="reference" />
+	<!--<field name="from-to" type="reference" />-->
 	<field name="to-did" type="reference" />
 	<field name="loopback" type="reference" />
 	<field name="sip-tags" type="reference" />

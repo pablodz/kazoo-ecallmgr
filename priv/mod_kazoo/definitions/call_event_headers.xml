@@ -16,4 +16,6 @@
 	<field name="variable_sip_invite_domain" as="Domain-Name" />
 	<field name="App-Name" type="static" value="freeswitch" />
 	<field name="App-Version" type="static" value="1.0" />
+	<field name="channel-endpoint-name" type="reference" />
+
 </definition>

@@ -138,11 +138,14 @@ collect(ACLs, PidRefs, Timeout) ->
     Start = kz_time:start_time(),
 
     receive
-        ?ACL_RESULT(IP, ACL) ->
+        ?ACL_RESULT(ACLName, ACL) ->
             lager:info("adding acl for '~s' to network list ~s"
-                      ,[IP, kzd_acls:network_list_name(ACL)]
+                      ,[ACLName, kzd_acls:network_list_name(ACL)]
                       ),
-            collect(kz_json:set_value(IP, ACL, ACLs), PidRefs, kz_time:decr_timeout(Timeout, Start));
+            collect(kz_json:set_value(ACLName, ACL, ACLs)
+                   ,PidRefs
+                   ,kz_time:decr_timeout(Timeout, Start)
+                   );
         {'DOWN', Ref, 'process', Pid, _Reason} ->
             case lists:keytake(Pid, 1, PidRefs) of
                 'false' ->
@@ -274,7 +277,7 @@ report_sip_auth_ips(Collector, RawIPs) ->
 report_sip_auth_hosts(Collector, RawHosts) ->
     PidRefs = [kz_process:spawn_monitor(fun resolve_hostname/4
                                        ,[Collector
-                                        ,Host
+                                        ,{Host, 'undefined'}
                                         ,JObj
                                         ,fun handle_sip_auth_result/3
                                         ]
@@ -311,31 +314,45 @@ wait_for_pid_refs(PidRefs, Timeout) ->
             lager:info("timed out waiting for pid refs: ~p", [PidRefs])
     end.
 
--spec resolve_hostname(pid(), kz_term:ne_binary(), kzd_resources:doc(), acl_builder_fun()) -> 'ok'.
-resolve_hostname(Collector, ResolveMe, Resource, ACLBuilderFun) ->
-    lager:debug("attempting to resolve '~s'", [ResolveMe]),
+-spec resolve_hostname(pid(), {kz_term:ne_binary(), kz_term:api_integer()}, kzd_resources:doc(), acl_builder_fun()) -> 'ok'.
+resolve_hostname(Collector, {ResolveMe, Port}, Resource, ACLBuilderFun) ->
+    lager:debug("attempting to resolve '~s':~p", [ResolveMe, Port]),
     StrippedHost = hd(binary:split(ResolveMe, <<";">>)),
-    case (not kz_network_utils:is_ipv4(StrippedHost))
-        andalso kz_network_utils:resolve(StrippedHost)
-    of
-        'false' ->
-            maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun);
-        [] ->
-            lager:debug("no IPs returned, checking for raw IP"),
-            maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun);
-        IPs ->
-            ACLBuilderFun(Collector, Resource, IPs),
-            lager:debug("resolved '~s' (~s) for ~p: '~s'"
-                       ,[StrippedHost, ResolveMe, Collector, kz_binary:join(IPs, <<"','">>)]
-                       )
+
+    case binary:split(StrippedHost, <<":">>) of
+        [StrippedHost] ->
+            resolve_hostname(Collector, ResolveMe, Resource, ACLBuilderFun, StrippedHost, Port);
+        [Host, HardcodedPort] ->
+            lager:info("host ~s comes with hardcoded port ~s, overriding ~p"
+                      ,[Host, HardcodedPort, Port]
+                      ),
+            resolve_hostname(Collector, ResolveMe, Resource, ACLBuilderFun, Host, kz_term:to_integer(HardcodedPort))
     end.
 
--spec maybe_capture_ip(pid(), kz_term:ne_binary(), kzd_resources:doc(), acl_builder_fun()) -> 'ok'.
-maybe_capture_ip(Collector, CaptureMe, Resource, ACLBuilderFun) ->
+-spec resolve_hostname(pid(), kz_term:ne_binary(), kzd_resources:doc(), acl_builder_fun(), kz_term:ne_binary(), kz_term:api_integer()) -> 'ok'.
+resolve_hostname(Collector, ResolveMe, Resource, ACLBuilderFun, Host, Port) ->
+    case kz_network_utils:is_ipv4(Host) of
+        'true' ->
+            maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun, Port);
+        'false' ->
+            case kz_network_utils:resolve(Host) of
+                [] ->
+                    lager:debug("no IPs returned, checking for raw IP"),
+                    maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun, Port);
+                IPs ->
+                    ACLBuilderFun(Collector, Resource, [{IP, Port} || IP <- IPs]),
+                    lager:debug("resolved '~s' (~s) for ~p: '~s'"
+                               ,[Host, ResolveMe, Collector, kz_binary:join(IPs, <<"','">>)]
+                               )
+            end
+    end.
+
+-spec maybe_capture_ip(pid(), kz_term:ne_binary(), kzd_resources:doc(), acl_builder_fun(), kz_term:api_integer()) -> 'ok'.
+maybe_capture_ip(Collector, CaptureMe, Resource, ACLBuilderFun, Port) ->
     case re:run(CaptureMe, ?IP_REGEX, [{'capture', 'all', 'binary'}]) of
         {'match', [_All, IP]} ->
-            ACLBuilderFun(Collector, Resource, [IP]),
-            lager:debug("captured '~s' from ~s", [IP, CaptureMe]);
+            ACLBuilderFun(Collector, Resource, [{IP, Port}]),
+            lager:debug("captured '~s' from ~s port ~p", [IP, CaptureMe, Port]);
         'nomatch' ->
             lager:debug("failed to find IP at start of '~s'", [CaptureMe])
     end.
@@ -375,11 +392,13 @@ handle_resource_results(Collector, ViewResources) ->
 -spec handle_resource_result(pid(), kz_json:object()) -> 'ok'.
 handle_resource_result(Collector, ViewResource) ->
     Resource = kz_json:get_json_value(<<"doc">>, ViewResource),
+
     InboundPidRefs = resource_inbound_ips(Collector, Resource),
     ServerPidRefs = resource_server_ips(Collector, Resource),
     wait_for_pid_refs(InboundPidRefs ++ ServerPidRefs).
 
--spec handle_resource_result(pid(), kzd_resources:doc(), kz_term:ne_binaries()) -> 'ok'.
+%% IPs could be [IP] | [{IP, Port}]
+-spec handle_resource_result(pid(), kzd_resources:doc(), kz_term:ne_binaries() | kz_term:proplist()) -> 'ok'.
 handle_resource_result(Collector, Resource, IPs) ->
     AuthorizingId = kz_doc:id(Resource),
     {'ok', Master} = kapps_util:get_master_account_id(),
@@ -389,7 +408,7 @@ handle_resource_result(Collector, Resource, IPs) ->
 -spec resource_inbound_ips(pid(), kzd_resources:doc()) -> kz_term:pid_refs().
 resource_inbound_ips(Collector, Resource) ->
     [kz_process:spawn_monitor(fun resolve_hostname/4, [Collector
-                                                      ,IP
+                                                      ,{IP, 'undefined'}
                                                       ,Resource
                                                       ,fun handle_resource_result/3
                                                       ])
@@ -399,7 +418,9 @@ resource_inbound_ips(Collector, Resource) ->
 -spec resource_server_ips(pid(), kzd_resources:doc()) -> kz_term:pid_refs().
 resource_server_ips(Collector, Resource) ->
     [kz_process:spawn_monitor(fun resolve_hostname/4, [Collector
-                                                      ,kz_json:get_ne_binary_value(<<"server">>, Gateway)
+                                                      ,{kz_json:get_ne_binary_value(<<"server">>, Gateway)
+                                                       ,kz_json:get_integer_value(<<"port">>, Gateway)
+                                                       }
                                                       ,Resource
                                                       ,fun handle_resource_result/3
                                                       ])
@@ -408,36 +429,48 @@ resource_server_ips(Collector, Resource) ->
         kz_json:is_true(<<"enabled">>, Gateway, 'false')
     ].
 
--spec add_trusted_objects(pid(), kz_term:api_binary(), kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binaries()) -> 'ok'.
-add_trusted_objects(_Collector, _AccountId, _AuthorizingId, _AuthorizingType, []) -> 'ok';
-add_trusted_objects(Collector, AccountId, AuthorizingId, AuthorizingType, [IP|IPs]) ->
-    JObj = kz_json:from_list(
-             [{<<"type">>, <<"allow">>}
-             ,{<<"network-list-name">>, <<"trusted">>}
-             ,{<<"cidr">>, <<IP/binary, "/32">>}
-             ,{<<"account_id">>, AccountId}
-             ,{<<"authorizing_id">>, AuthorizingId}
-             ,{<<"authorizing_type">>, AuthorizingType}
-             ]),
-    Collector ! ?ACL_RESULT(IP, JObj),
-    add_trusted_objects(Collector, AccountId, AuthorizingId, AuthorizingType, IPs).
+-spec add_trusted_objects(pid(), kz_term:api_binary(), kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binaries() | kz_term:proplist()) -> 'ok'.
+add_trusted_objects(Collector, AccountId, AuthorizingId, AuthorizingType, IPs) ->
+    BaseACL = kz_json:from_list(
+                [{<<"type">>, <<"allow">>}
+                ,{<<"network-list-name">>, <<"trusted">>}
+                ,{<<"account_id">>, AccountId}
+                ,{<<"authorizing_id">>, AuthorizingId}
+                ,{<<"authorizing_type">>, AuthorizingType}
+                ]),
+    lists:foreach(fun(IP) -> add_trusted_object(Collector, BaseACL, IP) end, IPs).
+
+add_trusted_object(Collector, BaseACL, {IP, 'undefined'}) ->
+    add_trusted_object(Collector, BaseACL, IP);
+add_trusted_object(Collector, BaseACL, {IP, Port}) ->
+    ACLName = <<IP/binary, ":", (kz_term:to_binary(Port))/binary>>,
+    ACL = kz_json:set_values([{<<"cidr">>, <<IP/binary, "/32">>}
+                             ,{<<"ports">>, [Port]}
+                             ]
+                            ,BaseACL
+                            ),
+    Collector ! ?ACL_RESULT(ACLName, ACL);
+add_trusted_object(Collector, BaseACL, <<IP/binary>>) ->
+    ACL = kz_json:set_value(<<"cidr">>, <<IP/binary, "/32">>, BaseACL),
+    Collector ! ?ACL_RESULT(IP, ACL).
 
 -spec cidrs(kz_json:object()) -> kz_json:object().
 cidrs(JObj) ->
     kz_json:map(fun cidrs/2, JObj).
 
 -spec cidrs(kz_term:ne_binary(), kz_json:object()) -> boolean() | {'true', kz_json:object()}.
-cidrs(K, V) ->
-    CIDRs = case kz_json:get_list_value(<<"cidr">>, V) of
-                'undefined' -> [kz_json:get_ne_binary_value(<<"cidr">>, V)];
+cidrs(IP, ACL) ->
+    CIDRs = case kz_json:get_list_value(<<"cidr">>, ACL) of
+                'undefined' -> [kz_json:get_ne_binary_value(<<"cidr">>, ACL)];
                 List -> List
             end,
     KVs = [{<<"cidrs">>, CIDRs}
           ,{<<"cidr">>, 'null'}
           ,{<<"network-list-name">>, 'null'}
           ,{<<"type">>, 'null'}
+          ,{<<"ports">>, kz_json:get_list_value(<<"ports">>, ACL)}
           ],
-    {K, kz_json:set_values(KVs, V)}.
+    {IP, kz_json:set_values(KVs, ACL)}.
 
 
 -spec token(kz_json:object()) -> kz_json:object().

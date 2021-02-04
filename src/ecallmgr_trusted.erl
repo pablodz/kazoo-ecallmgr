@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%% @doc monitors usurp_control
 %%%
 %%%
@@ -122,7 +122,6 @@ terminate(_Reason, _State) -> 'ok'.
 -spec code_change(any(), state(), any()) -> {'ok', state()}.
 code_change(_OldVsn, State, _Extra) ->
     {'ok', State}.
-
 
 -spec handle_query(kz_json:object(), kz_term:proplist()) -> 'ok'.
 handle_query(JObj, _Props) ->

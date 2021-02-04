@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2020, 2600Hz
+%%% @copyright (C) 2012-2021, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -633,11 +633,11 @@ remove_acl(Name, ACLs, ConfigFun) ->
 
 -spec list_acls(kz_json:object(), kz_term:api_binary()) -> 'no_return'.
 list_acls(ACLs, Network) ->
-    ThinBar  = "+--------------------------------+--------------------+---------------+-------+------------------+----------------------------------+\n",
-    ThickBar = "+================================+====================+===============+=======+==================+==================================+\n",
+    ThinBar  = "+--------------------------------+--------------------+---------------+-------+------------------+----------------------------------+-------+\n",
+    ThickBar = "+================================+====================+===============+=======+==================+==================================+=======+\n",
     io:put_chars(ThinBar),
-    FormatString = "| ~-30s | ~-18s | ~-13s | ~-5s | ~-16s | ~-32s |~n",
-    io:format(FormatString, [<<"Name">>, <<"CIDR">>, <<"List">>, <<"Type">>, <<"Authorizing Type">>, <<"ID">>]),
+    FormatString = "| ~-30s | ~-18s | ~-13s | ~-5s | ~-16s | ~-32s | ~s |~n",
+    io:format(FormatString, [<<"Name">>, <<"CIDR">>, <<"List">>, <<"Type">>, <<"Authorizing Type">>, <<"ID">>, <<"Ports">>]),
     io:put_chars(ThickBar),
     Props = kz_json:foldl(fun(Name, ACL, Acc) ->
                                   [{kz_json:get_value(<<"network-list-name">>, ACL)
@@ -664,14 +664,15 @@ maybe_print_acl(Network, FormatString, ACL) ->
 
 -spec print_acl(string(), kz_json:object()) -> 'ok'.
 print_acl(FormatString, ACL) ->
+    ACLAuthzId = kz_json:get_first_defined([<<"account_id">>, <<"authorizing_id">>], ACL, <<>>),
+
     io:format(FormatString, [kz_json:get_value(<<"name">>, ACL)
                             ,kz_json:get_value(<<"cidr">>, ACL)
                             ,kz_json:get_value(<<"network-list-name">>, ACL)
                             ,kz_json:get_value(<<"type">>, ACL)
                             ,kz_json:get_value(<<"authorizing_type">>, ACL, <<"system_config">>)
-                            ,kz_json:get_first_defined([<<"account_id">>
-                                                       ,<<"authorizing_id">>
-                                                       ], ACL, <<>>)
+                            ,ACLAuthzId
+                            ,kz_binary:join(kz_json:get_list_value(<<"ports">>, ACL, [<<"all">>]))
                             ]).
 
 -spec get_acls() -> kz_json:object().

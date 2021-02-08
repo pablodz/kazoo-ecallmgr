@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2020, 2600Hz
+%%% @copyright (C) 2013-2021, 2600Hz
 %%% @doc Track the FreeSWITCH channel information, and provide accessors
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -27,6 +27,7 @@
         ,get_other_leg/2
         ,new/3
         ,update/3
+        ,new_or_update/3
         ]).
 -export([to_json/1
         ,to_props/1
@@ -370,69 +371,91 @@ maybe_other_bridge_leg(UUID, Props, _, _) ->
 
 -spec jobj_to_record(atom(), kz_term:ne_binary(), kz_json:object()) -> channel().
 jobj_to_record(Node, UUID, JObj) ->
+    lists:foldl(fun update_channel_property/2
+               ,#channel{}
+               ,jobj_to_updates(Node, UUID, JObj)
+               ).
+
+update_channel_property({Index, Value}, Channel) ->
+    erlang:setelement(Index, Channel, Value).
+
+jobj_to_updates(Node, UUID, JObj) ->
     CCVs = kz_json:get_json_value(<<"Custom-Channel-Vars">>, JObj, kz_json:new()),
     CAVs = kz_json:get_json_value(<<"Custom-Application-Vars">>, JObj, kz_json:new()),
     OtherLeg = kz_json:get_ne_binary_value(<<"Other-Leg-Call-ID">>, JObj),
     Profile = kz_json:get_ne_binary_value(<<"Caller-Profile">>, JObj, ?DEFAULT_FS_PROFILE),
-    #channel{uuid=UUID
-            ,destination=kz_json:get_ne_binary_value(<<"Caller-Destination-Number">>, JObj)
-            ,direction=kz_json:get_ne_binary_value(<<"Call-Direction">>, JObj)
+    props:filter_undefined([{#channel.uuid, UUID}
+                           ,{#channel.destination, kz_json:get_ne_binary_value(<<"Caller-Destination-Number">>, JObj)}
+                           ,{#channel.direction, kzd_freeswitch:original_call_direction(JObj)}
 
-            ,account_id=kz_json:get_ne_binary_value(<<"Account-ID">>, CCVs)
-            ,account_billing=kz_json:get_ne_binary_value(<<"Account-Billing">>, CCVs)
-            ,authorizing_id=kz_json:get_ne_binary_value(<<"Authorizing-ID">>, CCVs)
-            ,authorizing_type=kz_json:get_ne_binary_value(<<"Authorizing-Type">>, CCVs)
-            ,is_authorized=kz_json:is_true(<<"Channel-Authorized">>, CCVs)
-            ,owner_id=kz_json:get_ne_binary_value(<<"Owner-ID">>, CCVs)
-            ,resource_id=kz_json:get_ne_binary_value(<<"Resource-ID">>, CCVs)
-            ,fetch_id=kz_json:get_ne_binary_value(<<"Fetch-ID">>, CCVs)
-            ,bridge_id=kz_json:get_ne_binary_value(<<"Bridge-ID">>, CCVs, UUID)
-            ,reseller_id=kz_json:get_ne_binary_value(<<"Reseller-ID">>, CCVs)
-            ,reseller_billing=kz_json:get_ne_binary_value(<<"Reseller-Billing">>, CCVs)
-            ,precedence=kz_term:to_integer(kz_json:get_integer_value(<<"Precedence">>, CCVs, 5))
+                           ,{#channel.account_id, kz_json:get_ne_binary_value(<<"Account-ID">>, CCVs)}
+                           ,{#channel.account_billing, kz_json:get_ne_binary_value(<<"Account-Billing">>, CCVs)}
+                           ,{#channel.authorizing_id, kz_json:get_ne_binary_value(<<"Authorizing-ID">>, CCVs)}
+                           ,{#channel.authorizing_type, kz_json:get_ne_binary_value(<<"Authorizing-Type">>, CCVs)}
+                           ,{#channel.is_authorized, kz_json:is_true(<<"Channel-Authorized">>, CCVs)}
+                           ,{#channel.owner_id, kz_json:get_ne_binary_value(<<"Owner-ID">>, CCVs)}
+                           ,{#channel.resource_id, kz_json:get_ne_binary_value(<<"Resource-ID">>, CCVs)}
+                           ,{#channel.fetch_id, kz_json:get_ne_binary_value(<<"Fetch-ID">>, CCVs)}
+                           ,{#channel.bridge_id, kz_json:get_ne_binary_value(<<"Bridge-ID">>, CCVs, UUID)}
+                           ,{#channel.reseller_id, kz_json:get_ne_binary_value(<<"Reseller-ID">>, CCVs)}
+                           ,{#channel.reseller_billing, kz_json:get_ne_binary_value(<<"Reseller-Billing">>, CCVs)}
+                           ,{#channel.precedence, kz_term:to_integer(kz_json:get_integer_value(<<"Precedence">>, CCVs, 5))}
 
-            ,presence_id=kz_json:get_ne_binary_value(<<"Presence-ID">>, JObj)
-            ,realm=kz_json:get_ne_binary_value(<<"Realm">>, CCVs)
-            ,username=kz_json:get_ne_binary_value(<<"Username">>, CCVs)
+                           ,{#channel.presence_id, kz_json:get_ne_binary_value(<<"Presence-ID">>, JObj)}
+                           ,{#channel.realm, kz_json:get_ne_binary_value(<<"Realm">>, CCVs)}
+                           ,{#channel.username, kz_json:get_ne_binary_value(<<"Username">>, CCVs)}
 
-            ,answered=kz_json:get_ne_binary_value(<<"Answer-State">>, JObj) =:= <<"answered">>
-            ,node=Node
-            ,timestamp=kz_time:current_tstamp()
+                           ,{#channel.answered, kz_json:get_ne_binary_value(<<"Answer-State">>, JObj) =:= <<"answered">>}
+                           ,{#channel.node, Node}
+                           ,{#channel.timestamp, kz_time:current_tstamp()}
 
-            ,profile=Profile
-            ,context=kz_json:get_ne_binary_value(<<"Caller-Context">>, JObj, ?DEFAULT_FREESWITCH_CONTEXT)
-            ,dialplan=kz_json:get_ne_binary_value(<<"Caller-Dialplan">>, JObj, ?DEFAULT_FS_DIALPLAN)
+                           ,{#channel.profile, Profile}
+                           ,{#channel.context, kzd_freeswitch:context(JObj, ?DEFAULT_FREESWITCH_CONTEXT)}
+                           ,{#channel.dialplan, kz_json:get_ne_binary_value(<<"Caller-Dialplan">>, JObj, ?DEFAULT_FS_DIALPLAN)}
 
-            ,other_leg=OtherLeg
-            ,handling_locally=handling_locally(kz_json:get_ne_binary_value(<<"Ecallmgr-Node">>, CCVs), OtherLeg)
+                           ,{#channel.other_leg, OtherLeg}
+                           ,{#channel.handling_locally, handling_locally(kz_json:get_ne_binary_value(<<"Ecallmgr-Node">>, CCVs), OtherLeg)}
 
-            ,to_tag=kz_json:get_value(<<"To-Tag">>, JObj)
-            ,from_tag=kz_json:get_value(<<"From-Tag">>, JObj)
+                           ,{#channel.to_tag, kzd_freeswitch:to_tag(JObj)}
+                           ,{#channel.from_tag, kzd_freeswitch:from_tag(JObj)}
 
-            ,interaction_id=kz_json:get_ne_binary_value(<<?CALL_INTERACTION_ID>>, CCVs)
+                           ,{#channel.interaction_id, kz_json:get_ne_binary_value(<<?CALL_INTERACTION_ID>>, CCVs)}
 
-            ,is_loopback=kz_json:is_true(<<"Channel-Is-Loopback">>, JObj)
-            ,loopback_leg_name=kz_json:get_value(<<"Channel-Loopback-Leg">>, JObj)
-            ,loopback_other_leg=kz_json:get_value(<<"Channel-Loopback-Other-Leg-ID">>, JObj)
+                           ,{#channel.is_loopback, kzd_freeswitch:is_loopback(JObj)}
+                           ,{#channel.loopback_leg_name, kzd_freeswitch:loopback_leg_name(JObj)}
+                           ,{#channel.loopback_other_leg, kzd_freeswitch:loopback_other_leg(JObj)}
 
-            ,callflow_id=kz_json:get_ne_binary_value(<<"CallFlow-ID">>, CCVs)
-            ,cavs=CAVs
-            ,ccvs=CCVs
-            ,from=kz_json:get_ne_binary_value(<<"From">>, JObj)
-            ,to=kz_json:get_ne_binary_value(<<"To">>, JObj)
-            ,switch_url = kz_json:get_ne_binary_value(<<"Switch-URL">>, JObj, ecallmgr_fs_nodes:sip_url(Node, Profile))
-            }.
+                           ,{#channel.callflow_id, kz_json:get_ne_binary_value(<<"CallFlow-ID">>, CCVs)}
+                           ,{#channel.cavs, CAVs}
+                           ,{#channel.ccvs, CCVs}
+                           ,{#channel.from, kzd_freeswitch:from(JObj)}
+                           ,{#channel.to, kzd_freeswitch:to(JObj)}
+                           ,{#channel.switch_url, switch_url(Node, JObj, Profile)}
+                           ]).
+
+switch_url(Node, JObj, Profile) ->
+    case kzd_freeswitch:switch_url(JObj) of
+        'undefined' -> ecallmgr_fs_nodes:sip_url(Node, Profile);
+        URL -> URL
+    end.
 
 -spec handling_locally(kz_term:api_binary(), kz_term:api_binary()) -> boolean().
 handling_locally('undefined', 'undefined') -> 'false';
 handling_locally(Node, _X) ->
     Node =:= kz_term:to_binary(node()).
 
+%% @doc for CHANNEL_CREATE, insert new record
 -spec new(atom(), kz_term:ne_binary(), kz_json:object()) -> 'ok'.
 new(Node, UUID, JObj) ->
     lager:debug("adding new channel ~s", [UUID]),
     ecallmgr_fs_channels:new(jobj_to_record(Node, UUID, JObj)).
 
+%% @doc for CHANNEL_SYNC, insert or update the channel record
+-spec new_or_update(atom(), kz_term:ne_binary(), kz_json:object()) -> 'ok'.
+new_or_update(Node, UUID, JObj) ->
+    ecallmgr_fs_channels:new_or_update(jobj_to_record(Node, UUID, JObj)).
+
+%% @doc for all other events, only update the channel record if the record exists
 -spec update(atom(), kz_term:ne_binary(), kz_json:object()) -> 'ok'.
 update(Node, UUID, JObj) ->
-    ecallmgr_fs_channels:update(UUID, jobj_to_record(Node, UUID, JObj)).
+    ecallmgr_fs_channels:updates(UUID, jobj_to_updates(Node, UUID, JObj)).

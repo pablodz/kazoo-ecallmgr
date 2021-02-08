@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%% @doc When connecting to a FreeSWITCH node, we create three processes: one to
 %%% handle authentication (directory) requests; one to handle route (dialplan)
 %%% requests, and one to monitor the node and various stats about the node.
@@ -964,7 +964,7 @@ instance_uuid(Node) ->
     case is_node_up(Node)
         andalso ecallmgr_fs_node_sup:node_srv(Node)
     of
-        false -> undefined;
+        'false' -> 'undefined';
         Pid when is_pid(Pid) -> ecallmgr_fs_node:instance_uuid(Pid);
-        _Else -> undefined
+        _Else -> 'undefined'
     end.

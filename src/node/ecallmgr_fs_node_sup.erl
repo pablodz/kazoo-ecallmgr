@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2020, 2600Hz
+%%% @copyright (C) 2012-2021, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -50,7 +50,7 @@
 start_link(Node, Options) ->
     supervisor:start_link({'local', Node}, ?MODULE, [Node, Options]).
 
--spec node_srv(pid()) -> kz_term:api_pid().
+-spec node_srv(supervisor:sup_ref()) -> kz_term:api_pid().
 node_srv(Supervisor) ->
     srv(which_children(Supervisor), "edon_").
 
@@ -184,7 +184,7 @@ fix_module(Mod) ->
 
 -spec which_children(SupRef) -> [{Id,Child,Type,Modules}] | {'EXIT', any()} when
       SupRef :: supervisor:sup_ref(),
-      Id :: supervisor:child_id() | undefined,
+      Id :: supervisor:child_id() | 'undefined',
       Child :: supervisor:child() | 'restarting',
       Type :: supervisor:worker(),
       Modules :: supervisor:modules().

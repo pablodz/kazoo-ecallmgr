@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2020, 2600Hz
+%%% @copyright (C) 2013-2021, 2600Hz
 %%% @doc Track the FreeSWITCH channel information, and provide accessors
 %%%
 %%% @author James Aimonetti
@@ -78,7 +78,7 @@ channel_sync(#{node := Node, call_id := UUID, payload := JObj}) ->
         andalso kz_json:get_ne_binary_value(<<"Event-PID">>, JObj)
     of
         'false' -> lager:warning("sync not for this node ~s / ~s", [Node, EventNode]);
-        'undefined' -> ecallmgr_fs_channel:update(Node, UUID, JObj);
+        'undefined' -> ecallmgr_fs_channel:new_or_update(Node, UUID, JObj);
         Pid -> kz_term:to_pid(Pid) ! {'channel_sync', JObj}
     end.
 

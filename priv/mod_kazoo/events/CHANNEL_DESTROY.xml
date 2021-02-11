@@ -6,12 +6,12 @@
 		<field name="sdp" type="reference" />
 		<field name="call-duration" type="reference" />
 		<field name="hangup-fields" type="reference" />
+		<field name="hangup-disposition" type="reference" />
 		<field name="variable_Media-Recordings" as="Media-Recordings" as-array="true"/>
 		<field name="debug-call" type="reference" />
 		<field name="transfer-history" type="reference" />
 		<field name="originated-legs" type="reference" />
 		<field name="fax_info" type="reference" />
-
 	</fields>
 	<filters>
 		<!-- <filter name="variable_hangup_cause" type="exclude" compare="value"	value="CALL_REJECTED" /> -->

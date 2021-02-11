@@ -1,4 +1,5 @@
 <definition name="hangup-disposition">
 	<field name="Disposition" type="first-of" value="variable_originate_disposition|variable_endpoint_disposition" />
+	<field name="SIP-Disposition" type="first-of" value="variable_sip_hangup_disposition|sip_hangup_disposition" />
 	<field name="variable_endpoint_disposition" as="Endpoint-Disposition"/>
 </definition>

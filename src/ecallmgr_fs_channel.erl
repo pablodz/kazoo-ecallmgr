@@ -465,7 +465,15 @@ handling_locally(Node, _X) ->
 %% @doc for CHANNEL_CREATE, insert new record
 -spec new(atom(), kz_term:ne_binary(), kz_json:object()) -> 'ok'.
 new(Node, UUID, JObj) ->
-    lager:debug("adding new channel ~s", [UUID]),
+    InteractionId = kz_json:get_ne_binary_value([<<"Custom-Channel-Vars">>, <<"Call-Interaction-ID">>], JObj),
+    case kz_json:get_ne_binary_value(<<"Other-Leg-Call-ID">>, JObj) of
+        'undefined' ->
+            lager:info("adding new channel ~s with interaction id ~s", [UUID, InteractionId]);
+        OtherLegId ->
+            lager:info("adding new channel ~s with interaction id ~s bridged to ~s"
+                      ,[UUID, InteractionId, OtherLegId]
+                      )
+    end,
     ecallmgr_fs_channels:new(jobj_to_record(Node, UUID, JObj)).
 
 %% @doc for CHANNEL_SYNC, insert or update the channel record

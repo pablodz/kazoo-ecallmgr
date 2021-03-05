@@ -215,7 +215,7 @@ destroy(UUID, Node) ->
 
 -spec update(kz_term:ne_binary(), pos_integer(), any()) -> 'ok'.
 update(UUID, Key, Value) ->
-    updates(UUID, [{Key, Value}]).
+    gen_server:cast(?SERVER, {'channel_updates', UUID, [{Key, Value}]}).
 
 -spec updates(kz_term:ne_binary(), channel_updates()) -> 'ok'.
 updates(UUID, Updates) ->

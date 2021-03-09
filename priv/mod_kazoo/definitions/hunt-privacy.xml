@@ -1,0 +1,9 @@
+<definition name="hunt-privacy">
+	<field name="Privacy" type="static" serialize-as="object">
+		<fields verbose="false">
+			<field name="Hunt-Privacy-Hide-Number" as="Hide-Number" serialize-as="boolean" />
+			<field name="Hunt-Privacy-Hide-Name" as="Hide-Name" serialize-as="boolean" />
+			<field name="Hunt-Screen-Bit" as="Screen-Bit" serialize-as="boolean" />
+		</fields>
+	</field>
+</definition>

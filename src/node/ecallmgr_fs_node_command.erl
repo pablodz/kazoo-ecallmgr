@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%% @doc Execute node commands
 %%% @author Luis Azedo
 %%%
@@ -36,8 +36,9 @@ exec_cmd(<<"send_http">>, Args, JObj, Node, Options) ->
     lager:debug("received http_send command for node ~s with version ~s", [Node, Version]),
     Url = kz_json:get_ne_binary_value(<<"Url">>, Args),
     File = kz_json:get_value(<<"File-Name">>, Args),
-    Method = <<"kz_http_", (kz_json:get_value(<<"Http-Method">>, Args, <<"put">>))/binary>>,
-    send_http(Node, File, Url, Method, JObj);
+    Method = kz_term:to_lower_binary(kz_json:get_ne_binary_value(<<"Http-Method">>, Args, <<"put">>)),
+    APIMethod = kz_term:to_atom(<<"kz_http_", Method/binary>>, 'true'),
+    send_http(Node, File, Url, APIMethod, JObj);
 
 exec_cmd(Cmd, _Args, JObj, _Node, _Options) ->
     reply_error(<<Cmd/binary, " not_implemented">>, JObj).
@@ -76,15 +77,17 @@ reply_success(JObj, Response) ->
     Queue = kz_api:server_id(JObj),
     kapi_switch:publish_fs_reply(Queue, API).
 
--spec send_http(atom(), binary(), binary(),  kz_term:ne_binary(), kz_json:object()) -> 'ok'.
+-spec send_http(atom(), binary(), binary(), atom(), kz_json:object()) -> 'ok'.
+send_http(_Node, undefined, _Url, _Method, JObj) ->
+    reply_error(<<"missing file">>, JObj);
+send_http(_Node, _File, undefined, _Method, JObj) ->
+    reply_error(<<"missing url">>, JObj);
 send_http(Node, File, Url, Method, JObj) ->
     lager:debug("processing http_send command : ~s / ~s", [File, Url]),
     Args = <<Url/binary, " ", File/binary>>,
-    M = kz_term:to_atom(Method, 'true'),
-    A = kz_term:to_list(Args),
     Channel = kz_amqp_channel:consumer_channel(),
-    case freeswitch:bgapi4(Node, M, A, fun send_http_cb/4, [JObj, File, Node, Channel]) of
-        {'error', _} -> reply_error(<<"failure">>, JObj);
+    case freeswitch:bgapi4(Node, Method, Args, fun send_http_cb/4, [JObj, File, Node, Channel]) of
+        {'error', _Other} -> reply_error(<<"failure">>, JObj);
         {'ok', JobId} -> lager:debug("send_http command started ~p", [JobId])
     end.
 

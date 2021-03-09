@@ -21,4 +21,16 @@
 			<field name="Callee-ID-Name" type="first-of" value="KZ-Callee-ID-Name|variable_origination_callee_id_name|variable_effective_callee_id_name|Caller-Callee-ID-Name|Other-Leg-Caller-ID-Name" />
 		</fields>
 	</field>
+	<field name="caller-id" type="group">
+		<filters>
+			<filter name="Call-Direction" type="include" compare="value" value="outbound" />
+			<filter name="Channel-Flags" type="include" compare="contains" value="DIALPLAN" />
+		</filters>
+		<fields verbose="false">
+			<field name="Caller-ID-Number" type="first-of"	value="KZ-Caller-ID-Number|KZ-Caller-ID-Number|variable_origination_caller_id_number|variable_effective_caller_id_number|Caller-Caller-ID-Number" />
+			<field name="Caller-ID-Name" type="first-of" value="KZ-Caller-ID-Number|KZ-Caller-ID-Name|variable_origination_caller_id_name|variable_effective_caller_id_name|Caller-Caller-ID-Name" />
+			<field name="Callee-ID-Number" type="first-of" value="KZ-Callee-ID-Number|variable_origination_callee_id_number|variable_effective_callee_id_number|Caller-Callee-ID-Number|Other-Leg-Caller-ID-Number" />
+			<field name="Callee-ID-Name" type="first-of" value="KZ-Callee-ID-Name|variable_origination_callee_id_name|variable_effective_callee_id_name|Caller-Callee-ID-Name|Other-Leg-Caller-ID-Name" />
+		</fields>
+	</field>
 </definition>

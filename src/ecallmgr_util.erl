@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2020, 2600Hz
+%%% @copyright (C) 2010-2021, 2600Hz
 %%% @doc Various utilities specific to ecallmgr. More general utilities go
 %%% in kazoo_util.erl
 %%%
@@ -1178,6 +1178,7 @@ maybe_format_user(Contact, #bridge_endpoint{invite_format = <<"strip_plus">>, nu
 maybe_format_user(Contact, _) -> Contact.
 
 -spec maybe_set_interface(kz_term:ne_binary(), bridge_endpoint()) -> kz_term:ne_binary().
+maybe_set_interface(<<"dlg/", _/binary>>=Contact, _EP) -> Contact;
 maybe_set_interface(<<"kz/", _/binary>>=Contact, _EP) -> Contact;
 maybe_set_interface(<<"sofia/", _/binary>>=Contact, _) -> Contact;
 maybe_set_interface(<<"loopback/", _/binary>>=Contact, _) -> Contact;

@@ -6,7 +6,7 @@
 	<field name="Unique-ID" as="Call-ID" />
 	<field name="variable_sip_invite_domain" as="Domain-Name" />
 	<field name="call-direction" type="reference" />
-	<field name="caller-id" type="reference" />
+	<field name="hunt-caller-id" type="reference" />
 	<field name="from-network" type="reference" />
 	<field name="user-agent" type="reference" />
 	<!--<field name="from-to" type="reference" />-->

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2020, 2600Hz
+%%% @copyright (C) 2011-2021, 2600Hz
 %%% @doc Generate the XML for various FS responses
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -1790,12 +1790,14 @@ get_directory_variables(JObj) ->
     Fun = fun(Key, Acc) -> get_directory_variables(Key, JObj, Acc) end,
     lists:foldl(Fun, [], ?DIRECTORY_VARIABLES_KEYS).
 
+-spec get_directory_variables(kz_term:ne_binary(), kz_json:object(), kz_types:xml_els()) -> kz_types:xml_els().
 get_directory_variables(<<"Codecs">>, Endpoint, Acc) ->
     codecs_els(Endpoint) ++ Acc;
 get_directory_variables(ObjectKey, JObj, Acc) ->
     Props = kz_json:to_proplist(ObjectKey, JObj),
     get_directory_variables(Props, Acc).
 
+-spec get_directory_variables(kz_term:api_terms(), kz_types:xml_els()) -> kz_types:xml_els().
 get_directory_variables(Props, Acc)
   when is_list(Props) ->
     Fun = fun({K, V}, Acc1) ->
@@ -1806,7 +1808,7 @@ get_directory_variables(JObj, Acc) ->
     Props = kz_json:to_proplist(JObj),
     get_directory_variables(Props, Acc).
 
--spec get_directory_variables_fold(kz_term:ne_binary(), kz_term:ne_binary()) -> kz_types:xml_el().
+-spec get_directory_variables_fold(kz_json:key(), kz_json:json_term()) -> kz_types:xml_el().
 get_directory_variables_fold(Key, Value) ->
     case kz_json:is_json_object(Value)
         andalso not lists:member(Key, ?EXCLUDE_VARIABLE_GROUPS)
@@ -1818,18 +1820,22 @@ get_directory_variables_fold(Key, Value) ->
             get_directory_variable(Key, Value)
     end.
 
+-spec get_directory_variable({kz_json:key(), kz_json:json_term()}) -> kz_types:xml_el().
 get_directory_variable({Key, Value}) ->
     variable_el(Key, Value).
 
+-spec get_directory_variable(kz_json:key(), kz_json:json_term()) -> kz_types:xml_el().
 get_directory_variable(Key, Value) ->
     get_directory_variable(get_channel_params_fold(Key, Value)).
 
+-spec codecs_els(kz_json:object()) -> kz_types:xml_els().
 codecs_els(Endpoint) ->
-    case kz_json:get_list_value(<<"Codecs">>, Endpoint, []) of
+    case kz_json:get_ne_binaries(<<"Codecs">>, Endpoint, []) of
         [] -> [];
         Cs -> [codecs_el(Cs)]
     end.
 
+-spec codecs_el(kz_term:ne_binaries()) -> kz_types:xml_el().
 codecs_el(Codecs) ->
     CodecsMap = [codec_mappings(Codec) || Codec <- Codecs, not kz_term:is_empty(Codec)],
-    variable_el(<<"absolute_codec_string">> , list_to_binary(["^^:", kz_binary:join(CodecsMap, <<":">>)])).
+    variable_el(<<"absolute_codec_string">> , kz_binary:join(CodecsMap, <<",">>)).

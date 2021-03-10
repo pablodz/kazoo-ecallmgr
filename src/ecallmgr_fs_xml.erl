@@ -669,12 +669,11 @@ kazoo_var_to_fs_var({<<"Hold-Media">>, Media}, Vars) ->
 kazoo_var_to_fs_var({<<"Codecs">>, []}, Vars) ->
     Vars;
 kazoo_var_to_fs_var({<<"Codecs">>, Cs}, Vars) ->
-    Codecs = [kz_term:to_list(codec_mappings(C))
+    Codecs = [codec_mappings(C)
               || C <- Cs,
                  not kz_term:is_empty(C)
              ],
-    CodecStr = string:join(Codecs, ":"),
-    [list_to_binary(["absolute_codec_string='^^:", CodecStr, "'"])
+    [list_to_binary(["absolute_codec_string='", kz_binary:join(Codecs, <<",">>), "'"])
     |Vars
     ];
 

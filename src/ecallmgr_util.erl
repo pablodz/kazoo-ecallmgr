@@ -639,6 +639,10 @@ maybe_sanitize_fs_value(<<"Require-Fail-On-Single-Reject">>, <<Val/binary>>) ->
     Val;
 maybe_sanitize_fs_value(<<"Require-Fail-On-Single-Reject">>, Val) when is_list(Val) ->
     kz_binary:join(Val, <<",">>);
+maybe_sanitize_fs_value(<<"Fail-On-Single-Reject">>, <<Val/binary>>) ->
+    Val;
+maybe_sanitize_fs_value(<<"Fail-On-Single-Reject">>, Val) when is_list(Val) ->
+    kz_binary:join(Val, <<",">>);
 maybe_sanitize_fs_value(<<"Failover-Reasons">>, <<Val/binary>>) ->
     Val;
 maybe_sanitize_fs_value(<<"Failover-Reasons">>, Val) when is_list(Val) ->

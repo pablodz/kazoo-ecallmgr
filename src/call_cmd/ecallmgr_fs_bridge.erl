@@ -45,10 +45,12 @@
                          ,<<"Confirm-File">>
                          ,<<"Confirm-Key">>
                          ,<<"Confirm-Read-Timeout">>
+                         ,<<"Confirm-Timeout">>
                          ,[<<"Custom-Channel-Vars">>, <<"Confirm-Cancel-Timeout">>]
                          ,[<<"Custom-Channel-Vars">>, <<"Confirm-File">>]
                          ,[<<"Custom-Channel-Vars">>, <<"Confirm-Key">>]
                          ,[<<"Custom-Channel-Vars">>, <<"Confirm-Read-Timeout">>]
+                         ,[<<"Custom-Channel-Vars">>, <<"Confirm-Timeout">>]
                          ,<<"Account-ID">>
                          ]).
 

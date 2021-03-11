@@ -257,6 +257,7 @@
                               ,{<<"Confirm-File">>, <<"group_confirm_file">>}
                               ,{<<"Confirm-Key">>, <<"group_confirm_key">>}
                               ,{<<"Confirm-Read-Timeout">>, <<"group_confirm_read_timeout">>}
+                              ,{<<"Confirm-Timeout">>, <<"group_confirm_timeout">>}
 
                               ,{<<"Continue-On-Fail">>, <<"continue_on_fail">>}
                               ,{<<"Default-Language">>, <<"default_language">>}

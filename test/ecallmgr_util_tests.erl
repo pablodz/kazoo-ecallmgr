@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2020, 2600Hz
+%%% @copyright (C) 2011-2021, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -50,11 +50,11 @@ build_simple_channels_test_() ->
     ,{"with custom sip headers"
      ,?_assertEqual([<<"[^^"
                        ?BRIDGE_CHANNEL_VAR_SEPARATOR
-                       "sip_h_X-Caller-Macro=${caller_id_number}"
+                       "sip_h_X-Caller-Macro='${caller_id_number}'"
                        ?BRIDGE_CHANNEL_VAR_SEPARATOR
-                       "sip_h_X-Billing-Number=1234"
+                       "sip_h_X-Billing-Number='1234'"
                        ?BRIDGE_CHANNEL_VAR_SEPARATOR
-                       "sip_h_X-Account-ID=${ecallmgr_Account-ID}]"
+                       "sip_h_X-Account-ID='${ecallmgr_Account-ID}']"
                        "sofia/", ?SIP_INTERFACE, "/to_user@to_realm"
                      >>
                     ]

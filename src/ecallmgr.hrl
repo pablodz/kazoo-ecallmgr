@@ -369,6 +369,9 @@
                               ,{<<"sip_rh_X-Redirect-Server">>, <<"sip_rh_X-Redirect-Server">>}
                               ,{<<"tts_engine">>, <<"tts_engine">>}
                               ,{<<"tts_voice">>, <<"tts_voice">>}
+                              ,{<<"CDR-URI-From">>, <<"cdr_uri_from">>}
+                              ,{<<"CDR-URI-To">>, <<"cdr_uri_to">>}
+                              ,{<<"CDR-URI-Request">>, <<"cdr_uri_request">>}
                               ]).
 
 -define(CALLER_PROFILE_VARS, [{<<"Caller-ID-Name">>, <<"caller_id_name">>}

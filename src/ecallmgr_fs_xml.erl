@@ -404,7 +404,7 @@ route_resp_set_originating_proxy(#{payload := Payload}) ->
 
 -spec unset_custom_sip_headers() -> kz_types:xml_el().
 unset_custom_sip_headers() ->
-    action_el(<<"kz_prefix_unset">>, <<"sip_h_X-">>).
+    action_el(<<"kz_prefix_unset">>, <<"sip_h_X-AUTH">>).
 
 -spec route_resp_log_winning_node() -> kz_types:xml_el().
 route_resp_log_winning_node() ->

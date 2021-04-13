@@ -105,6 +105,7 @@
                  ,is_onhold = 'false' :: boolean() | '_'
                  ,cavs :: kz_term:api_object() | '_'
                  ,ccvs :: kz_term:api_object() | '_'
+                 ,cshs :: kz_term:api_object() | '_'
                  ,from :: kz_term:api_binary() | '_'
                  ,to :: kz_term:api_binary() | '_'
                  ,switch_url :: kz_term:api_binary() | '_'

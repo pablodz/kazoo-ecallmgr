@@ -1,9 +1,7 @@
-<definition name="Custom-SIP-Headers">
+<definition name="fetch-info-csh">
 	<field name="Custom-SIP-Headers" type="static" serialize-as="object">
 		<filters>
 			<filter name="ecallmgr" type="include" compare="prefix" value="variable_sip_h_" />
-			<!-- excluding any csh that starts with X-AUTH because of the way we do auth from kamailio and we don't want to leak those into channel ets -->
-			<filter name="ecallmgr" type="exclude" compare="prefix" value="variable_sip_h_X-AUTH" />
 		</filters>
 		<fields verbose="false">
 			<field name="variable_sip_h_" type="prefix" exclude-prefix="true" />

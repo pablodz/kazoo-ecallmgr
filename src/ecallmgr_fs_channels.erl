@@ -376,6 +376,7 @@ handle_channel_status(JObj, _Props) ->
                   ,{<<"Username">>, kz_json:get_value(<<"username">>, Channel)}
                   ,{<<"Custom-Channel-Vars">>, kz_json:from_list(ecallmgr_fs_channel:channel_ccvs(Channel))}
                   ,{<<"Custom-Application-Vars">>, kz_json:from_list(ecallmgr_fs_channel:channel_cavs(Channel))}
+                  ,{<<"Custom-SIP-Headers">>, kz_json:from_list(ecallmgr_fs_channel:channel_cshs(Channel))}
                   ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
                   | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
                   ]

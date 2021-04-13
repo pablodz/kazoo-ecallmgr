@@ -1,5 +1,5 @@
 <definition name="application-uuid">
 	<field name="application-all" type="reference" />
 	<field name="Application-UUID" type="first-of"
-		value="app_uuid|variable_app_uuid|Application-UUID" />
+		value="app_uuid|variable_app_uuid|Application-UUID|variable_Application-UUID|scope_variable_Application-UUID" />
 </definition>

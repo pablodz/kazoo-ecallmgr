@@ -33,6 +33,7 @@
         ,to_props/1
         ,channel_ccvs/1
         ,channel_cavs/1
+        ,channel_cshs/1
         ]).
 -export([to_api_json/1
         ,to_api_props/1
@@ -199,6 +200,7 @@ to_props(Channel) ->
       ,{<<"context">>, Channel#channel.context}
       ,{<<"custom_application_vars">>, Channel#channel.cavs}
       ,{<<"custom_channel_vars">>, Channel#channel.ccvs}
+      ,{<<"custom_sip_headers">>, Channel#channel.cshs}
       ,{<<"destination">>, Channel#channel.destination}
       ,{<<"dialplan">>, Channel#channel.dialplan}
       ,{<<"direction">>, Channel#channel.direction}
@@ -253,6 +255,7 @@ to_api_props(#channel{}=Channel) ->
       ,{<<"Context">>, Channel#channel.context}
       ,{<<"Custom-Application-Vars">>, Channel#channel.cavs}
       ,{<<"Custom-Channel-Vars">>, Channel#channel.ccvs}
+      ,{<<"Custom-SIP-Headers">>, Channel#channel.cshs}
       ,{<<"Destination">>, Channel#channel.destination}
       ,{<<"Dialplan">>, Channel#channel.dialplan}
       ,{<<"Elapsed-Seconds">>, kz_time:elapsed_s(Channel#channel.timestamp)}
@@ -304,6 +307,19 @@ channel_cavs([_|_]=Props) ->
     kz_json:to_proplist(props:get_value(<<"custom_application_vars">>, Props, kz_json:new()));
 channel_cavs(JObj) ->
     kz_json:to_proplist(<<"Custom-Application-Vars">>, JObj).
+
+-spec channel_cshs(channel() | kz_json:object() | kz_term:proplist()) -> kz_term:proplist().
+channel_cshs(#channel{cshs='undefined'}) -> [];
+channel_cshs(#channel{cshs=CSHs}) -> kz_json:to_proplist(CSHs);
+channel_cshs([_|_]=Props) ->
+    case props:get_value(<<"custom_sip_headers">>, Props, kz_json:new()) of
+        List when is_list(List) -> List;
+        JObj -> kz_json:to_proplist(JObj)
+    end;
+channel_cshs(JObj) ->
+    kz_json:to_proplist(kz_json:get_first_defined([<<"Custom-SIP-Headers">>
+                                                  ,<<"custom_sip_headers">>
+                                                  ], JObj, kz_json:new())).
 
 -spec fetch_channel(kz_term:ne_binary()) -> kz_term:proplist() | 'undefined'.
 fetch_channel(UUID) ->
@@ -382,6 +398,7 @@ update_channel_property({Index, Value}, Channel) ->
 jobj_to_updates(Node, UUID, JObj) ->
     CCVs = kz_json:get_json_value(<<"Custom-Channel-Vars">>, JObj, kz_json:new()),
     CAVs = kz_json:get_json_value(<<"Custom-Application-Vars">>, JObj, kz_json:new()),
+    CSHs = kz_json:get_json_value(<<"Custom-SIP-Headers">>, JObj, kz_json:new()),
     OtherLeg = kz_json:get_ne_binary_value(<<"Other-Leg-Call-ID">>, JObj),
     Profile = kz_json:get_ne_binary_value(<<"Caller-Profile">>, JObj, ?DEFAULT_FS_PROFILE),
     props:filter_undefined([{#channel.uuid, UUID}
@@ -428,6 +445,7 @@ jobj_to_updates(Node, UUID, JObj) ->
                            ,{#channel.callflow_id, kz_json:get_ne_binary_value(<<"CallFlow-ID">>, CCVs)}
                            ,{#channel.cavs, CAVs}
                            ,{#channel.ccvs, CCVs}
+                           ,{#channel.cshs, CSHs}
                            ,{#channel.from, kzd_freeswitch:from(JObj)}
                            ,{#channel.to, kzd_freeswitch:to(JObj)}
                            ,{#channel.switch_url, switch_url(Node, JObj, Profile)}

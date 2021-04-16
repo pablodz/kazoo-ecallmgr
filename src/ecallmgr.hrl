@@ -323,6 +323,7 @@
                               ,{<<"Record-Sample-Rate">>, <<"record_sample_rate">>}
                               ,{<<"Request-URI">>, <<"sip_req_uri">>}
                               ,{<<"Signal-Bridge-To">>, <<"signal_bridge_to">>}
+                              ,{<<"SIP-Invite-Contact-User">>, <<"sip_contact_user">>}
                               ,{<<"SIP-Invite-Domain">>, <<"sip_invite_domain">>}
                               ,{<<"SIP-Invite-To-URI">>, <<"sip_invite_to_uri">>}
                               ,{<<"SIP-Invite-Request-URI">>, <<"sip_invite_req_uri">>}
@@ -373,6 +374,8 @@
                               ,{<<"CDR-URI-From">>, <<"cdr_uri_from">>}
                               ,{<<"CDR-URI-To">>, <<"cdr_uri_to">>}
                               ,{<<"CDR-URI-Request">>, <<"cdr_uri_request">>}
+                              ,{<<?CALL_INTERACTION_ID>>, <<?CALL_INTERACTION_ID>>}
+                              ,{<<"Existing-Call-ID">>, <<"kz_originate_aleg_uuid">>}
                               ]).
 
 -define(CALLER_PROFILE_VARS, [{<<"Caller-ID-Name">>, <<"caller_id_name">>}

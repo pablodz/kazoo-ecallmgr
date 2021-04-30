@@ -693,6 +693,12 @@ kazoo_var_to_fs_var({<<"Confirm-File">>, V}, Vars) ->
     Val = ecallmgr_util:media_path(V, 'extant', get('callid'), kz_json:new()),
     [encode_fs_val("group_confirm_file", Val) | Vars];
 
+kazoo_var_to_fs_var({<<"Confirm-Play-Count">>, V}, Vars) ->
+    [encode_fs_val("group_confirm_play_count", V)
+    ,encode_fs_val("group_confirm_timeout", 0)
+    | Vars
+    ];
+
 kazoo_var_to_fs_var({<<"SIP-Invite-Parameters">>, V}, Vars) ->
     Val = kz_term:iolist_join(<<";">>, V),
     [encode_fs_val("sip_invite_params", Val) | Vars];

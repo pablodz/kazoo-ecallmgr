@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2020, 2600Hz
+%%% @copyright (C) 2012-2021, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -54,7 +54,7 @@ start_link() ->
 -spec init(list()) -> {'ok', state(), ?MILLISECONDS_IN_SECOND}.
 init([]) ->
     lager:info("starting discovery"),
-    erlang:put(discovery_updates_enabled, true),
+    enable_updates(),
     {'ok', kz_time:start_time(), ?MILLISECONDS_IN_SECOND}.
 
 %%------------------------------------------------------------------------------
@@ -74,11 +74,11 @@ handle_call(_Request, _From, Startup) ->
 -spec handle_cast(any(), state()) -> kz_types:handle_cast_ret_state(state()).
 handle_cast('enable', Startup) ->
     lager:warning("enable discovery updates"),
-    erlang:put(discovery_updates_enabled, true),
+    enable_updates(),
     {'noreply', Startup, next_timeout(kz_time:elapsed_s(Startup))};
 handle_cast('disable', Startup) ->
     lager:warning("disable discovery updates"),
-    erlang:put(discovery_updates_enabled, false),
+    disable_updates(),
     {'noreply', Startup, next_timeout(kz_time:elapsed_s(Startup))};
 handle_cast('discovery', Startup) ->
     lager:warning("starting discovery"),
@@ -204,18 +204,18 @@ sbc_acl(IPs) ->
 sbc_acls(Nodes) ->
     [{Node, sbc_acl(IPs)} || {Node, IPs} <- Nodes].
 
--spec sbc_discovery() -> any().
+-spec sbc_discovery() -> 'ok'.
 sbc_discovery() ->
     sbc_discovery(<<"default">>).
 
--spec sbc_discovery(kz_term:ne_binary()) -> any().
+-spec sbc_discovery(kz_term:ne_binary()) -> 'ok'.
 sbc_discovery(Node) ->
     case ecallmgr_fs_acls:system(Node) of
         {'error', Error} -> lager:warning("error fetching current acls - ~p", [Error]);
         CurrentACLs -> sbc_discovery(Node, CurrentACLs)
     end.
 
--spec sbc_discovery(kz_term:ne_binary(), kz_json:object()) -> any().
+-spec sbc_discovery(kz_term:ne_binary(), kz_json:object()) -> 'ok'.
 sbc_discovery(ConfigNode, CurrentACLs) ->
     ACLs = filter_acls(CurrentACLs),
     CIDRs = sbc_cidrs(ACLs),
@@ -228,21 +228,21 @@ sbc_discovery(ConfigNode, CurrentACLs) ->
             ToUpdate = lists:filter(fun({Node, _IPs}) -> lists:member(Node, Names) end , Nodes),
             SBCACLs = sbc_acls(ToUpdate),
             NewAcls = kz_json:set_values(SBCACLs, CurrentACLs),
-            maybe_update_acls(sbc, CurrentACLs, NewAcls, ConfigNode)
+            maybe_update_acls('sbc', CurrentACLs, NewAcls, ConfigNode)
     end.
 
--spec media_discovery() -> any().
+-spec media_discovery() -> 'ok'.
 media_discovery() ->
     media_discovery(<<"default">>).
 
--spec media_discovery(kz_term:ne_binary()) -> any().
+-spec media_discovery(kz_term:ne_binary()) -> 'ok'.
 media_discovery(Node) ->
     case ecallmgr_fs_acls:system(Node) of
         {'error', Error} -> lager:warning("error fetching current acls - ~p", [Error]);
         CurrentACLs -> media_discovery(Node, CurrentACLs)
     end.
 
--spec media_discovery(kz_term:ne_binary(), kz_json:object()) -> any().
+-spec media_discovery(kz_term:ne_binary(), kz_json:object()) -> 'ok'.
 media_discovery(Node, CurrentACLs) ->
     Current = kz_json:filter(fun is_media_acl/1, filter_acls(CurrentACLs)),
     Discovered = media_nodes(),
@@ -253,7 +253,7 @@ media_discovery(Node, CurrentACLs) ->
             Keys = kz_json:get_keys(Diff),
             Updated = kz_json:filter(fun({K, _V}) -> lists:member(K, Keys) end, Discovered),
             NewAcls = kz_json:set_values(kz_json:to_proplist(Updated), CurrentACLs),
-            maybe_update_acls(media, CurrentACLs, NewAcls, Node)
+            maybe_update_acls('media', CurrentACLs, NewAcls, Node)
     end.
 
 -spec is_media_acl(tuple()) -> boolean().
@@ -313,9 +313,9 @@ media_node_unique({NodeName, {IPs, Ports}} = Node, Acc) ->
     end.
 
 -spec media_node_acl({kz_term:ne_binary(), {kz_term:ne_binaries(), [inet:port_number()]}}) ->
-          {kz_term:ne_binary(), kz_json:object()} | undefined.
-media_node_acl({_Node, {[], _Ports}}) -> undefined;
-media_node_acl({_Node, {_IPs, []}}) -> undefined;
+          {kz_term:ne_binary(), kz_json:object()} | 'undefined'.
+media_node_acl({_Node, {[], _Ports}}) -> 'undefined';
+media_node_acl({_Node, {_IPs, []}}) -> 'undefined';
 media_node_acl({Node, {IPs, Ports}}) ->
     CIDRs = [<<IP/binary, "/32">> || IP <- IPs],
     ACL = kz_json:from_list([{<<"type">>, <<"allow">>}
@@ -324,7 +324,7 @@ media_node_acl({Node, {IPs, Ports}}) ->
                             ,{<<"ports">>, Ports}
                             ]),
     {Node, ACL};
-media_node_acl(_) -> undefined.
+media_node_acl(_) -> 'undefined'.
 
 -spec discover() -> 'ok'.
 discover() ->
@@ -338,7 +338,7 @@ enable() ->
 disable() ->
     gen_server:cast(?MODULE, 'disable').
 
--spec discovery() -> any().
+-spec discovery() -> 'ok'.
 discovery() ->
     Routines = [fun sbc_discovery/0
                ,fun media_discovery/0
@@ -348,16 +348,27 @@ discovery() ->
 maybe_update_acls(Type, OldACLs, NewACLs, Node) ->
     update_acls(kz_json:are_equal(OldACLs, NewACLs), Type, NewACLs, Node).
 
-update_acls(true, _Type, _NewACLs, _Node) -> ok;
-update_acls(false, Type, NewACLs, Node) ->
+update_acls('true', _Type, _NewACLs, _Node) -> 'ok';
+update_acls('false', Type, NewACLs, Node) ->
     do_update_acls(should_update(), Type, NewACLs, Node).
 
-do_update_acls(false, _Type, _NewACLs, _Node) ->
+do_update_acls('false', _Type, _NewACLs, _Node) ->
     lager:warning("NOT updating acls from discover process for ~s (disabled)", [_Type]);
-do_update_acls(true, Type, NewACLs, Node) ->
+do_update_acls('true', Type, NewACLs, Node) ->
     lager:warning("updating acls from discover process for ~s", [Type]),
     _ = kapps_config:set_node(?APP_NAME, <<"acls">>, NewACLs, Node),
-    ecallmgr_maintenance:publish_reload_acls().
+    ecallmgr_maintenance:publish_reload_acls(),
+    lager:debug("published reload of ACLs").
 
+-spec should_update() -> boolean().
 should_update() ->
-    kz_term:is_true(erlang:get('discovery_updates_enabled')).
+    kz_term:is_true(get_updates()).
+
+get_updates() ->
+    erlang:get('discovery_updates_enabled').
+
+enable_updates() ->
+    erlang:put('discovery_updates_enabled', 'true').
+
+disable_updates() ->
+    erlang:put('discovery_updates_enabled', 'false').

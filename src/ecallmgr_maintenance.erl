@@ -750,7 +750,7 @@ hangup_long_running_channels(MaxAge) ->
     N = ecallmgr_fs_channels:cleanup_old_channels(kz_term:to_integer(MaxAge)),
     io:format("hungup ~p channels~n", [N]).
 
--spec hangup(kz_term:text()) -> freeswitch:fs_api_ret().
+-spec hangup(kz_term:text()) -> freeswitch:fs_api_return().
 hangup(UUID) ->
     case ecallmgr_fs_channel:fetch(UUID, 'record') of
         {'ok', #channel{node=Node}} ->

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2020, 2600Hz
+%%% @copyright (C) 2012-2021, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -30,10 +30,10 @@ start(_StartType, _StartArgs) ->
     _ = event_stream_bind(),
     _ = fetch_handlers_bind(),
     _ = freeswitch_nodesup_bind(),
-    ok = build_mod_kazoo_config(),
+    'ok' = build_mod_kazoo_config(),
     ecallmgr_sup:start_link().
 
--spec request(kz_nodes:request_acc()) -> kz_nodes:request_acc().
+-spec request(kazoo_bindings:fold_results()) -> kazoo_bindings:fold_results().
 request(Acc) ->
     Servers = [{kz_term:to_binary(Server)
                ,node_info(Server, Started)

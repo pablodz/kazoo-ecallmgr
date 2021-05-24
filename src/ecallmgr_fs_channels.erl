@@ -87,10 +87,6 @@
 -record(state, {max_channel_cleanup_ref :: reference()}).
 -type state() :: #state{}.
 
-
--define(DESTROY_DEFER_MAX_TRIES, 5).
--define(DESTROY_DEFER_TIME, 5 * ?MILLISECONDS_IN_SECOND).
-
 %%%=============================================================================
 %%% API
 %%%=============================================================================

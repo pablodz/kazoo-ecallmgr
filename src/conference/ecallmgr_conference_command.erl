@@ -28,7 +28,7 @@ exec_cmd(Node, ConferenceId, JObj) ->
 -spec exec_cmd(atom(), kz_term:ne_binary(), kz_json:object(), kz_term:ne_binary()) -> api_response().
 exec_cmd(Node, ConferenceId, JObj, ConferenceId) ->
     App = kz_json:get_value(<<"Application-Name">>, JObj),
-    case get_conf_command(App, Node, ConferenceId, JObj) of
+    case get_conf_command(App, ConferenceId, JObj) of
         {'error', Msg} -> throw({'msg', Msg});
         {_, _}=Cmd -> api(Node, ConferenceId, Cmd)
     end;
@@ -45,14 +45,14 @@ api(Node, ConferenceId, {AppName, AppData}) ->
     lager:debug("api: ~s ~s", [Node, Command]),
     freeswitch:api(Node, 'conference', Command).
 
--spec get_conf_command(kz_term:ne_binary(), atom(), kz_term:ne_binary(), kz_json:object()) ->
+-spec get_conf_command(kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object()) ->
           fs_app() | fs_apps() |
           {'return', 'error' | kz_term:ne_binary()} |
           {'error', kz_term:ne_binary()}.
 
 %% The following conference commands can operate on the entire conference
 
-get_conf_command(<<"lock">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"lock">>, _ConferenceId, JObj) ->
     case kapi_conference:lock_v(JObj) of
         'false' ->
             {'error', <<"conference lock failed to execute as JObj did not validate.">>};
@@ -60,7 +60,7 @@ get_conf_command(<<"lock">>, _Focus, _ConferenceId, JObj) ->
             {<<"lock">>, <<>>}
     end;
 
-get_conf_command(<<"unlock">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"unlock">>, _ConferenceId, JObj) ->
     case kapi_conference:unlock_v(JObj) of
         'false' ->
             {'error', <<"conference unlock failed to execute as JObj did not validate.">>};
@@ -68,7 +68,7 @@ get_conf_command(<<"unlock">>, _Focus, _ConferenceId, JObj) ->
             {<<"unlock">>, <<>>}
     end;
 
-get_conf_command(<<"record">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"record">>, _ConferenceId, JObj) ->
     case kapi_conference:record_v(JObj) of
         'false' ->
             {'error', <<"conference record failed to execute as JObj did not validate.">>};
@@ -78,7 +78,7 @@ get_conf_command(<<"record">>, _Focus, _ConferenceId, JObj) ->
             {<<"recording">>, [<<"start ">>, RecordingName]}
     end;
 
-get_conf_command(<<"recordstop">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"recordstop">>, _ConferenceId, JObj) ->
     case kapi_conference:recordstop_v(JObj) of
         'false' -> {'error', <<"conference recordstop failed validation">>};
         'true' ->
@@ -86,7 +86,7 @@ get_conf_command(<<"recordstop">>, _Focus, _ConferenceId, JObj) ->
             {<<"recording">>, [<<"stop ">>, MediaName]}
     end;
 
-get_conf_command(<<"tones">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"tones">>, _ConferenceId, JObj) ->
     case kapi_conference:tones_v(JObj) of
         'false' -> {'error', <<"conference tones failed to validate">>};
         'true' ->
@@ -111,7 +111,7 @@ get_conf_command(<<"tones">>, _Focus, _ConferenceId, JObj) ->
     end;
 
 %% The following conference commands can optionally specify a participant
-get_conf_command(<<"play">>, _Focus, ConferenceId, JObj) ->
+get_conf_command(<<"play">>, ConferenceId, JObj) ->
     case kapi_conference:play_v(JObj) of
         'false' ->
             {'error', <<"conference play failed to execute as JObj did not validate.">>};
@@ -125,14 +125,14 @@ get_conf_command(<<"play">>, _Focus, ConferenceId, JObj) ->
             {<<"play">>, Args}
     end;
 
-get_conf_command(<<"play_macro">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"play_macro">>, _ConferenceId, JObj) ->
     Participant = kz_json:get_binary_value(<<"Participant-ID">>, JObj, <<>>),
     Macro = kz_json:get_value(<<"Media-Macro">>, JObj, []),
     Paths = lists:map(fun ecallmgr_util:media_path/1, Macro),
     Media = list_to_binary(["'file_string://", kz_binary:join(Paths, <<"!">>), "'", " ", Participant]),
     {<<"play">>, Media};
 
-get_conf_command(<<"stop_play">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"stop_play">>, _ConferenceId, JObj) ->
     case kapi_conference:stop_play_v(JObj) of
         'false' ->
             {'error', <<"conference stop_play failed to execute as JObj did not validate.">>};
@@ -145,7 +145,7 @@ get_conf_command(<<"stop_play">>, _Focus, _ConferenceId, JObj) ->
             {<<"stop">>, Args}
     end;
 
-get_conf_command(Say, _Focus, _ConferenceId, JObj)
+get_conf_command(Say, _ConferenceId, JObj)
   when Say =:= <<"say">>;
        Say =:= <<"tts">> ->
     case kapi_conference:say_v(JObj) of
@@ -160,7 +160,7 @@ get_conf_command(Say, _Focus, _ConferenceId, JObj)
     end;
 
 %% The following conference commands require a participant
-get_conf_command(<<"kick">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"kick">>, _ConferenceId, JObj) ->
     case kapi_conference:kick_v(JObj) of
         'false' ->
             {'error', <<"conference kick failed to execute as JObj did not validate.">>};
@@ -168,7 +168,7 @@ get_conf_command(<<"kick">>, _Focus, _ConferenceId, JObj) ->
             {<<"hup">>, kz_json:get_binary_value(<<"Participant-ID">>, JObj, <<"last">>)}
     end;
 
-get_conf_command(<<"mute_participant">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"mute_participant">>, _ConferenceId, JObj) ->
     case kapi_conference:mute_participant_v(JObj) of
         'false' ->
             {'error', <<"conference mute_participant failed to execute as JObj did not validate.">>};
@@ -176,7 +176,7 @@ get_conf_command(<<"mute_participant">>, _Focus, _ConferenceId, JObj) ->
             {<<"mute">>, kz_json:get_binary_value(<<"Participant-ID">>, JObj, <<"last">>)}
     end;
 
-get_conf_command(<<"deaf_participant">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"deaf_participant">>, _ConferenceId, JObj) ->
     case kapi_conference:deaf_participant_v(JObj) of
         'false' ->
             {'error', <<"conference deaf_participant failed to execute as JObj did not validate.">>};
@@ -184,7 +184,7 @@ get_conf_command(<<"deaf_participant">>, _Focus, _ConferenceId, JObj) ->
             {<<"deaf">>, kz_json:get_binary_value(<<"Participant-ID">>, JObj)}
     end;
 
-get_conf_command(<<"participant_energy">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"participant_energy">>, _ConferenceId, JObj) ->
     case kapi_conference:participant_energy_v(JObj) of
         'false' ->
             {'error', <<"conference participant_energy failed to execute as JObj did not validate.">>};
@@ -195,7 +195,7 @@ get_conf_command(<<"participant_energy">>, _Focus, _ConferenceId, JObj) ->
             {<<"energy">>, Args}
     end;
 
-get_conf_command(<<"relate_participants">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"relate_participants">>, _ConferenceId, JObj) ->
     case kapi_conference:relate_participants_v(JObj) of
         'false' ->
             {'error', <<"conference relate_participants failed to execute as JObj did not validate.">>};
@@ -207,7 +207,7 @@ get_conf_command(<<"relate_participants">>, _Focus, _ConferenceId, JObj) ->
             {<<"relate">>, Args}
     end;
 
-get_conf_command(<<"set">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"set">>, _ConferenceId, JObj) ->
     case kapi_conference:set_v(JObj) of
         'false' ->
             {'error', <<"conference set failed to execute as JObj did not validate.">>};
@@ -218,7 +218,7 @@ get_conf_command(<<"set">>, _Focus, _ConferenceId, JObj) ->
             {<<"set">>, Args}
     end;
 
-get_conf_command(<<"undeaf_participant">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"undeaf_participant">>, _ConferenceId, JObj) ->
     case kapi_conference:undeaf_participant_v(JObj) of
         'false' ->
             {'error', <<"conference undeaf_participant failed to execute as JObj did not validate.">>};
@@ -226,7 +226,7 @@ get_conf_command(<<"undeaf_participant">>, _Focus, _ConferenceId, JObj) ->
             {<<"undeaf">>, kz_json:get_binary_value(<<"Participant-ID">>, JObj)}
     end;
 
-get_conf_command(<<"unmute_participant">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"unmute_participant">>, _ConferenceId, JObj) ->
     case kapi_conference:unmute_participant_v(JObj) of
         'false' ->
             {'error', <<"conference unmute failed to execute as JObj did not validate.">>};
@@ -234,7 +234,7 @@ get_conf_command(<<"unmute_participant">>, _Focus, _ConferenceId, JObj) ->
             {<<"unmute">>, kz_json:get_binary_value(<<"Participant-ID">>, JObj)}
     end;
 
-get_conf_command(<<"participant_volume_in">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"participant_volume_in">>, _ConferenceId, JObj) ->
     case kapi_conference:participant_volume_in_v(JObj) of
         'false' ->
             {'error', <<"conference participant_volume_in failed to execute as JObj did not validate.">>};
@@ -245,7 +245,7 @@ get_conf_command(<<"participant_volume_in">>, _Focus, _ConferenceId, JObj) ->
             {<<"volume_in">>, Args}
     end;
 
-get_conf_command(<<"participant_volume_out">>, _Focus, _ConferenceId, JObj) ->
+get_conf_command(<<"participant_volume_out">>, _ConferenceId, JObj) ->
     case kapi_conference:participant_volume_out_v(JObj) of
         'false' ->
             {'error', <<"conference participant_volume_out failed to execute as JObj did not validate.">>};
@@ -256,7 +256,7 @@ get_conf_command(<<"participant_volume_out">>, _Focus, _ConferenceId, JObj) ->
             {<<"volume_out">>, Args}
     end;
 
-get_conf_command(Cmd, _Focus, _ConferenceId, _JObj) ->
+get_conf_command(Cmd, _ConferenceId, _JObj) ->
     lager:debug("unknown conference command ~s", [Cmd]),
     {'error', list_to_binary([<<"unknown conference command: ">>, Cmd])}.
 

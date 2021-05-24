@@ -62,10 +62,7 @@
 
 -include("ecallmgr.hrl").
 
--define(TIMEOUT, 5 * ?MILLISECONDS_IN_SECOND).
-
 -define(FS_MODULE, (mod(Node))).
-
 
 -type fs_json_api_ok() :: {'ok', kz_json:object()}.
 -type fs_api_ok() :: {'ok', binary()}.

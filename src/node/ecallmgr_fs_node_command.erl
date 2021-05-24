@@ -15,8 +15,6 @@
 
 -include("ecallmgr.hrl").
 
--define(NODE_CMD_CONFIG, <<"node_commands">>).
-
 -spec handle_req(kz_json:object(), kz_term:proplist()) -> 'ok'.
 handle_req(JObj, Props) ->
     kz_log:put_callid(JObj),

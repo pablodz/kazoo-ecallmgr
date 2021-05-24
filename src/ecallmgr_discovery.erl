@@ -145,7 +145,7 @@ next_timeout(_Elapsed) -> ?MILLISECONDS_IN_MINUTE.
 sbc_acl_filter({_K, V}) ->
     kz_json:get_ne_binary_value(<<"network-list-name">>, V) =:= <<"authoritative">>.
 
-sbc_cidr(_, JObj, Acc) ->
+sbc_cidr(_Key, JObj, Acc) ->
     [{kz_json:get_value(<<"cidr">>, JObj), kz_json:get_value(<<"ports">>, JObj, [])} | Acc].
 
 sbc_cidrs(ACLs) ->

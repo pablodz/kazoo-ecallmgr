@@ -38,9 +38,6 @@
 -define(QUEUE_OPTIONS, [{'exclusive', 'false'}]).
 -define(CONSUME_OPTIONS, [{'exclusive', 'false'}]).
 
--define(LB_ALEG_PREFIX, "lb-aleg-").
-
-
 -type state() :: 'ok'.
 
 %%%=============================================================================

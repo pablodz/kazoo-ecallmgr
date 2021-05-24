@@ -27,14 +27,14 @@
 %% @end
 %%------------------------------------------------------------------------------
 -spec set(atom(), kz_term:api_ne_binary(), kz_term:proplist()) -> ecallmgr_util:send_cmd_ret().
-set(_, _, []) -> 'ok';
+set(_Node, _UUID, []) -> 'ok';
 set(_Node, 'undefined', _Props) ->
     lager:warning("no UUID for setting on node ~s: ~p", [_Node, _Props]);
 set(Node, UUID, Props) ->
     case maybe_export_vars(Node, UUID, Props) of
         [] -> 'ok';
         NewProps ->
-            AppArgs = ecallmgr_util:process_fs_kv(Node, UUID, NewProps, 'set'),
+            AppArgs = ecallmgr_util:process_fs_kv(UUID, NewProps, 'set'),
             api(Node, UUID, ?FS_CMD_SET_MULTIVAR, AppArgs)
     end.
 
@@ -43,14 +43,14 @@ set(Node, UUID, Props) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec bg_set(atom(), kz_term:api_ne_binary(), kz_term:proplist()) -> ecallmgr_util:send_cmd_ret().
-bg_set(_, _, []) -> 'ok';
+bg_set(_Node, _UUID, []) -> 'ok';
 bg_set(_Node, 'undefined', _Props) ->
     lager:warning("no UUID for setting on node ~s: ~p", [_Node, _Props]);
 bg_set(Node, UUID, Props) ->
     case maybe_export_vars(Node, UUID, Props) of
         [] -> 'ok';
         NewProps ->
-            AppArgs = ecallmgr_util:process_fs_kv(Node, UUID, NewProps, 'set'),
+            AppArgs = ecallmgr_util:process_fs_kv(UUID, NewProps, 'set'),
             bgapi(Node, UUID, ?FS_CMD_SET_MULTIVAR, AppArgs)
     end.
 
@@ -59,11 +59,11 @@ bg_set(Node, UUID, Props) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec unset(atom(), kz_term:api_ne_binary(), kz_term:proplist()) -> ecallmgr_util:send_cmd_ret().
-unset(_, _, []) -> 'ok';
+unset(_Node, _UUID, []) -> 'ok';
 unset(_Node, 'undefined', _Props) ->
     lager:warning("no UUID for unsetting on node ~s: ~p", [_Node, _Props]);
 unset(Node, UUID, Props) ->
-    AppArgs = ecallmgr_util:process_fs_kv(Node, UUID, Props, 'unset'),
+    AppArgs = ecallmgr_util:process_fs_kv(UUID, Props, 'unset'),
     api(Node, UUID, ?FS_CMD_SET_MULTIVAR, AppArgs).
 
 %%------------------------------------------------------------------------------
@@ -71,11 +71,11 @@ unset(Node, UUID, Props) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec bg_unset(atom(), kz_term:api_ne_binary(), kz_term:proplist()) -> ecallmgr_util:send_cmd_ret().
-bg_unset(_, _, []) -> 'ok';
+bg_unset(_Node, _UUID, []) -> 'ok';
 bg_unset(_Node, 'undefined', _Props) ->
     lager:warning("no UUID for unsetting on node ~s: ~p", [_Node, _Props]);
 bg_unset(Node, UUID, Props) ->
-    AppArgs = ecallmgr_util:process_fs_kv(Node, UUID, Props, 'unset'),
+    AppArgs = ecallmgr_util:process_fs_kv(UUID, Props, 'unset'),
     bgapi(Node, UUID, ?FS_CMD_SET_MULTIVAR, AppArgs).
 
 %%------------------------------------------------------------------------------
@@ -83,11 +83,11 @@ bg_unset(Node, UUID, Props) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec export(atom(), kz_term:api_ne_binary(), kz_term:proplist()) -> ecallmgr_util:send_cmd_ret().
-export(_, _, []) -> 'ok';
+export(_Node, _UUID, []) -> 'ok';
 export(_Node, 'undefined', _Props) ->
     lager:warning("no UUID for exporting on node ~s: ~p", [_Node, _Props]);
 export(Node, UUID, Props) ->
-    Exports = ecallmgr_util:process_fs_kv(Node, UUID, Props, 'export'),
+    Exports = ecallmgr_util:process_fs_kv(UUID, Props, 'export'),
     lager:debug("~p sendmsg export ~p ~p", [Node, UUID, Exports]),
     _ = freeswitch:sendmsg(Node, UUID, [{"call-command", "execute"}
                                        ,{"execute-app-name", "kz_export"}
@@ -100,16 +100,18 @@ export(Node, UUID, Props) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec bridge_export(atom(), kz_term:ne_binary(), kz_term:proplist()) -> ecallmgr_util:send_cmd_ret().
-bridge_export(_, _, []) -> 'ok';
+bridge_export(_Node, _UUID, []) -> 'ok';
 bridge_export(_Node, 'undefined', _Props) ->
     lager:warning("no UUID for bridge_export on node ~s: ~p", [_Node, _Props]);
 bridge_export(Node, UUID, Props) ->
-    Exports = ecallmgr_util:process_fs_kv(Node, UUID, Props, 'export'),
+    Exports = ecallmgr_util:process_fs_kv(UUID, Props, 'export'),
     lager:debug("~p sendmsg bridge_export ~p ~p", [Node, UUID, Exports]),
     _ = [freeswitch:sendmsg(Node, UUID, [{"call-command", "execute"}
                                         ,{"execute-app-name", "bridge_export"}
                                         ,{"execute-app-arg", AppArg}
-                                        ]) || AppArg <- Exports],
+                                        ])
+         || AppArg <- Exports
+        ],
     'ok'.
 
 -spec maybe_export_vars(atom(), kz_term:ne_binary(), kz_term:proplist()) -> kz_term:proplist().

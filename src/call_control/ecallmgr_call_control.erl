@@ -74,8 +74,6 @@
 
 -include("ecallmgr.hrl").
 
--define(SERVER, ?MODULE).
-
 -define(KEEP_ALIVE, 2 * ?MILLISECONDS_IN_SECOND).
 
 -type insert_at_options() :: 'now' | 'head' | 'tail' | 'flush'.
@@ -90,12 +88,10 @@
                ,is_node_up = 'true' :: boolean()
                ,keep_alive_ref :: kz_term:api_reference()
                ,other_legs = [] :: kz_term:ne_binaries()
-               ,last_removed_leg :: kz_term:api_ne_binary()
                ,sanity_check_tref :: kz_term:api_reference()
                ,msg_id :: kz_term:api_ne_binary()
                ,fetch_id :: kz_term:api_ne_binary()
                ,controller_q :: kz_term:api_ne_binary()
-               ,controller_p :: kz_term:api_pid()
                ,control_q :: kz_term:api_ne_binary()
                ,initial_ccvs :: kz_term:api_object()
                ,node_down_tref :: kz_term:api_reference()
@@ -106,10 +102,6 @@
 
 -type error() :: map().
 
--define(RESPONDERS, []).
--define(QUEUE_NAME, <<>>).
--define(QUEUE_OPTIONS, []).
--define(CONSUME_OPTIONS, []).
 
 %%%=============================================================================
 %%% API
@@ -310,10 +302,10 @@ handle_info({'event', _CallId, _JObj}, State) ->
     lager:debug("not handling ~s : ~s", [_CallId, kz_api:event_name(_JObj)]),
     {'noreply', State};
 handle_info({'call_control', JObj}, State) ->
-    handle_call_control(JObj, State),
+    handle_call_control(JObj),
     {'noreply', State};
 handle_info({'kapi', {{<<"callctl">>, _, _}, _, JObj}}, State) ->
-    handle_call_control(JObj, State),
+    handle_call_control(JObj),
     {'noreply', State};
 handle_info({'kapi', _}, State) ->
     {'noreply', State};
@@ -365,8 +357,8 @@ handle_info(_Msg, State) ->
 %% @doc Allows listener to pass options to handlers.
 %% @end
 %%------------------------------------------------------------------------------
--spec handle_call_control(kz_json:object(), state()) -> 'ok'.
-handle_call_control(JObj, _State) ->
+-spec handle_call_control(kz_json:object()) -> 'ok'.
+handle_call_control(JObj) ->
     case kz_api:event_type(JObj) of
         {<<"call">>, <<"command">>} -> handle_call_command(JObj);
         {<<"conference">>, <<"command">>} -> handle_conference_command(JObj);
@@ -859,7 +851,9 @@ get_module(Category, Name) ->
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec execute_control_request(kz_json:object(), state()) -> 'ok' | {'ok', kz_term:ne_binary()} | {'error', any()}.
+-spec execute_control_request(kz_json:object(), state()) ->
+          'ok' | {'ok', kz_term:ne_binary()} |
+          {'error', any()}.
 execute_control_request(Cmd, #state{node=Node
                                    ,call_id=CallId
                                    ,other_legs=OtherLegs
@@ -875,7 +869,7 @@ execute_control_request(Cmd, #state{node=Node
     CmdLeg = kz_api:call_id(Cmd),
     CallLeg = which_call_leg(CmdLeg, OtherLegs, CallId),
 
-    try Mod:exec_cmd(Node, CallLeg, Cmd, self())
+    try Mod:exec_cmd(Node, CallLeg, Cmd)
     catch
         'throw':{'error', 'baduuid'}:_ ->
             lager:debug("unable to execute command, baduuid"),

@@ -34,10 +34,6 @@
 
 -include("ecallmgr.hrl").
 
--define(NODE_CHILD_TYPE(Type), kz_json:from_list([{<<"type">>, Type}])).
--define(NODE_WORKER, ?NODE_CHILD_TYPE(<<"worker">>)).
--define(NODE_SUPERVISOR, ?NODE_CHILD_TYPE(<<"supervisor">>)).
-
 %%==============================================================================
 %% API functions
 %%==============================================================================

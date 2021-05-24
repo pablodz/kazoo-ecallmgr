@@ -35,9 +35,6 @@
 -define(QUEUE_OPTIONS, []).
 -define(CONSUME_OPTIONS, []).
 
--define(SERVER, ?MODULE).
-
-
 -type state() :: map().
 
 %%%=============================================================================

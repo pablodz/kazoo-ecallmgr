@@ -802,7 +802,7 @@ conference_from_jobj(JObj, Node, Conference) ->
 -spec switch_url(atom(), kz_json:object()) -> kz_term:ne_binary().
 switch_url(Node, JObj) ->
     case kz_conference_event:switch_url(JObj) of
-        undefined -> ecallmgr_fs_nodes:sip_url(Node);
+        'undefined' -> ecallmgr_fs_nodes:sip_url(Node);
         SwitchURL -> SwitchURL
     end.
 

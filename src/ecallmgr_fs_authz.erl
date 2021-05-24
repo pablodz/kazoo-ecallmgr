@@ -104,7 +104,7 @@ maybe_channel_recovering(Data, CallId, Node) ->
         'false' -> is_authz_enabled(Data, CallId, Node);
         'true' ->
             lager:info("channel is authorized because it is recovering"),
-            allow_call(Data, CallId, Node)
+            allow_call(Data)
     end.
 
 -spec is_authz_enabled(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> authz_reply().
@@ -113,7 +113,7 @@ is_authz_enabled(Data, CallId, Node) ->
         'true' -> is_global_resource(Data, CallId, Node);
         'false' ->
             lager:info("channel is authorized because config ecallmgr.authz is disabled"),
-            allow_call(Data, CallId, Node)
+            allow_call(Data)
     end.
 
 -spec is_global_resource(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> authz_reply().
@@ -124,7 +124,7 @@ is_global_resource(Data, CallId, Node) ->
         'true' -> is_consuming_resource(Data, CallId, Node);
         'false' ->
             lager:debug("channel is authorized because it is a local resource"),
-            allow_call(Data, CallId, Node)
+            allow_call(Data)
     end.
 
 -spec is_consuming_resource(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> authz_reply().
@@ -141,7 +141,7 @@ is_consuming_outbound_resource(Data, CallId, Node) ->
     case kzd_freeswitch:resource_id(Data) of
         'undefined' ->
             lager:debug("outbound channel is authorized because it is not consuming a resource"),
-            allow_call(Data, CallId, Node);
+            allow_call(Data);
         _ResourceId -> request_channel_authorization(Data, CallId, Node)
     end.
 
@@ -153,7 +153,7 @@ is_consuming_inbound_resource(Data, CallId, Node) ->
         'true' -> request_channel_authorization(Data, CallId, Node);
         'false' ->
             lager:debug("inbound channel is authorized because it is not consuming a resource"),
-            allow_call(Data, CallId, Node)
+            allow_call(Data)
     end.
 
 -spec request_channel_authorization(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) ->
@@ -169,7 +169,7 @@ request_channel_authorization(Data, CallId, Node) ->
         {'ok', JObj} -> authz_response(JObj, Data, CallId, Node);
         {'error', _R} ->
             lager:notice("authz request lookup failed: ~p", [_R]),
-            authz_default(Data, CallId, Node)
+            authz_default(Data, Node)
     end.
 
 -spec authz_response(kz_json:object(), kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> authz_reply().
@@ -177,13 +177,13 @@ authz_response(JObj, Data, CallId, Node) ->
     case kz_json:is_true(<<"Is-Authorized">>, JObj)
         orelse kz_json:is_true(<<"Soft-Limit">>, JObj)
     of
-        'true' -> authorize_account(JObj, Data, CallId, Node);
+        'true' -> authorize_account(JObj, Data, Node);
         'false' ->
             AccountBilling = kz_json:get_value(<<"Account-Billing">>, JObj),
             ResellerBilling = kz_json:get_value(<<"Reseller-Billing">>, JObj),
             lager:info("channel is unauthorized: ~s/~s" ,[AccountBilling, ResellerBilling]),
             case kapps_config:get_boolean(?APP_NAME, <<"authz_dry_run">>, 'false') of
-                'true' -> authorize_account(JObj, Data, CallId, Node);
+                'true' -> authorize_account(JObj, Data, Node);
                 'false' ->
                     %% Set the following CCVs so that we can see why the call was barred in CDRs
 
@@ -207,9 +207,9 @@ authz_response(JObj, Data, CallId, Node) ->
             end
     end.
 
--spec authorize_account(kz_json:object(), kzd_freeswitch:data(), kz_term:ne_binary(), atom()) ->
+-spec authorize_account(kz_json:object(), kzd_freeswitch:data(), atom()) ->
           authz_reply().
-authorize_account(JObj, Data, CallId, Node) ->
+authorize_account(JObj, Data, Node) ->
     AccountId = kz_json:get_value(<<"Account-ID">>, JObj),
     Type      = kz_json:get_value(<<"Account-Billing">>, JObj),
     ChanVars  = kz_json:get_value(<<"Custom-Channel-Vars">>, JObj, kz_json:new()),
@@ -220,7 +220,7 @@ authorize_account(JObj, Data, CallId, Node) ->
                                       | maybe_add_outbound_flags(ChanVars)
                                       ]),
 
-    authorize_reseller(JObj, P, CallId, Node).
+    authorize_reseller(JObj, P, Node).
 
 -spec maybe_add_outbound_flags(kz_json:object()) -> kz_term:proplist().
 maybe_add_outbound_flags(JObj) ->
@@ -229,24 +229,24 @@ maybe_add_outbound_flags(JObj) ->
         Flags -> [{<<"Outbound-Flags">>, Flags}]
     end.
 
--spec authorize_reseller(kz_json:object(), kzd_freeswitch:data(), kz_term:ne_binary(), atom()) ->
+-spec authorize_reseller(kz_json:object(), kzd_freeswitch:data(), atom()) ->
           authz_reply().
-authorize_reseller(JObj, Data, CallId, Node) ->
+authorize_reseller(JObj, Data, Node) ->
     AccountId = kzd_freeswitch:account_id(Data),
     case kz_json:get_value(<<"Reseller-ID">>, JObj, AccountId) of
-        AccountId -> set_ccv_trunk_usage(JObj, Data, CallId, Node);
+        AccountId -> set_ccv_trunk_usage(JObj, Data, Node);
         ResellerId ->
             Type = kz_json:get_value(<<"Reseller-Billing">>, JObj),
             lager:debug("channel is authorized by reseller ~s as ~s", [ResellerId, Type]),
             P = kzd_freeswitch:set_ccvs(Data, [{<<"Reseller-ID">>, ResellerId}
                                               ,{<<"Reseller-Billing">>, Type}
                                               ]),
-            set_ccv_trunk_usage(JObj, P, CallId, Node)
+            set_ccv_trunk_usage(JObj, P, Node)
     end.
 
--spec set_ccv_trunk_usage(kz_json:object(), kzd_freeswitch:data(), kz_term:ne_binary(), atom()) ->
+-spec set_ccv_trunk_usage(kz_json:object(), kzd_freeswitch:data(), atom()) ->
           authz_reply().
-set_ccv_trunk_usage(JObj, Data, CallId, Node) ->
+set_ccv_trunk_usage(JObj, Data, Node) ->
     Usage = [{Key, TrunkUsage}
              || Key <- [<<"Account-Trunk-Usage">>
                        ,<<"Reseller-Trunk-Usage">>
@@ -254,16 +254,16 @@ set_ccv_trunk_usage(JObj, Data, CallId, Node) ->
                 'undefined' =/= (TrunkUsage = kz_call_event:custom_channel_var(JObj, Key))
             ],
     P = kzd_freeswitch:set_ccvs(Data, props:filter_undefined(Usage)),
-    rate_call(P, CallId, Node).
+    rate_call(P, Node).
 
--spec rate_call(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> authz_reply().
-rate_call(Data, CallId, Node) ->
+-spec rate_call(kzd_freeswitch:data(), atom()) -> authz_reply().
+rate_call(Data, Node) ->
     _P = kz_process:spawn(fun rate_channel/2, [Data, Node]),
     lager:debug("rating call in ~p", [_P]),
-    allow_call(Data, CallId, Node).
+    allow_call(Data).
 
--spec allow_call(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> authz_reply().
-allow_call(Data, _CallId, _Node) ->
+-spec allow_call(kzd_freeswitch:data()) -> authz_reply().
+allow_call(Data) ->
     lager:debug("channel authorization succeeded, allowing call"),
     Vars = props:filter_undefined(
              [{<<"Account-ID">>, kzd_freeswitch:account_id(Data)}
@@ -316,14 +316,16 @@ maybe_kill_unrated_channel(Data, Node) ->
             kill_channel(Data, Node)
     end.
 
--spec authz_default(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> {'ok', kz_term:ne_binary()} | boolean().
+-spec authz_default(kzd_freeswitch:data(), atom()) ->
+          {'ok', kz_term:ne_binary()} |
+          boolean().
 %% TODO: fix use of authz_default
-authz_default(Data, CallId, Node) ->
+authz_default(Data, Node) ->
     case authz_default_action() of
         'allow' ->
-            rate_call(Data, CallId, Node);
+            rate_call(Data, Node);
         'dry_run' ->
-            rate_call(Data, CallId, Node);
+            rate_call(Data, Node);
         'deny' ->
             _ = kz_process:spawn(fun kill_channel/2, [Data, Node]),
             'false'

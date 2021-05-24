@@ -68,8 +68,6 @@
 -define(QUEUE_OPTIONS, [{'exclusive', 'false'}]).
 -define(CONSUME_OPTIONS, [{'exclusive', 'false'}]).
 
--define(EXPIRE_CHECK, 60 * ?MILLISECONDS_IN_SECOND).
-
 -type connect_strategy() :: 'ping' | 'heartbeat'.
 
 -record(node, {node :: atom()

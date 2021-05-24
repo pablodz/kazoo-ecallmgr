@@ -354,10 +354,6 @@ get_active_channel_status(UUID) ->
 -spec get_other_leg(kz_term:api_binary(), kz_term:proplist()) -> kz_term:api_binary().
 get_other_leg('undefined', _Props) -> 'undefined';
 get_other_leg(UUID, Props) ->
-    get_other_leg_name(UUID, Props, props:get_value(<<"Other-Leg-Channel-Name">>, Props)).
-
--spec get_other_leg_name(kz_term:ne_binary(), kz_term:proplist(), kz_term:ne_binary()) -> kz_term:api_binary().
-get_other_leg_name(UUID, Props, _ChannelName) ->
     get_other_leg(UUID
                  ,Props
                  ,props:get_first_defined([<<"Other-Leg-Unique-ID">>

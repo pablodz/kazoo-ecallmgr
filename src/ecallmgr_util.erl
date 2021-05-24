@@ -18,12 +18,12 @@
 -export([send_cmd/4, send_cmd/5, send_cmd/6, send_cmds/4]).
 -export([get_fs_kv/2, get_fs_kv/3, get_fs_key_and_value/3]).
 -export([get_fs_key/1]).
--export([process_fs_kv/4, format_fs_kv/4]).
+-export([process_fs_kv/3, format_fs_kv/4]).
 -export([fs_args_to_binary/1, fs_args_to_binary/2, fs_args_to_binary/3]).
 -export([fs_arg_encode/1, fs_arg_encode/2]).
+-export([multi_set_args/2, multi_unset_args/2]).
 -export([multi_set_args/3, multi_unset_args/3]).
 -export([multi_set_args/4, multi_unset_args/4]).
--export([multi_set_args/5, multi_unset_args/5]).
 
 -export([get_expires/1]).
 -export([get_interface_list/1, get_interface_properties/1, get_interface_properties/2]).
@@ -414,29 +414,29 @@ is_node_up(Node, UUID) ->
 %% @doc set channel and call variables in FreeSWITCH
 %% @end
 %%------------------------------------------------------------------------------
--spec multi_set_args(atom(), kz_term:ne_binary(), kz_term:proplist()) -> binary().
-multi_set_args(Node, UUID, KVs) ->
-    multi_set_args(Node, UUID, KVs, ?FS_MULTI_VAR_SEP).
+-spec multi_set_args(kz_term:ne_binary(), kz_term:proplist()) -> binary().
+multi_set_args(UUID, KVs) ->
+    multi_set_args(UUID, KVs, ?FS_MULTI_VAR_SEP).
 
--spec multi_set_args(atom(), kz_term:ne_binary(), kz_term:proplist(), kz_term:ne_binary()) -> binary().
-multi_set_args(Node, UUID, KVs, Separator) ->
-    multi_set_args(Node, UUID, KVs, Separator, ?FS_MULTI_VAR_SEP_PREFIX).
+-spec multi_set_args(kz_term:ne_binary(), kz_term:proplist(), kz_term:ne_binary()) -> binary().
+multi_set_args(UUID, KVs, Separator) ->
+    multi_set_args(UUID, KVs, Separator, ?FS_MULTI_VAR_SEP_PREFIX).
 
--spec multi_set_args(atom(), kz_term:ne_binary(), kz_term:proplist(), kz_term:ne_binary(), binary() | string()) -> binary().
-multi_set_args(Node, UUID, KVs, Separator, Prefix) ->
-    fs_args_to_binary(lists:reverse(process_fs_kv(Node, UUID, KVs, 'set')), Separator, Prefix).
+-spec multi_set_args(kz_term:ne_binary(), kz_term:proplist(), kz_term:ne_binary(), binary() | string()) -> binary().
+multi_set_args(UUID, KVs, Separator, Prefix) ->
+    fs_args_to_binary(lists:reverse(process_fs_kv(UUID, KVs, 'set')), Separator, Prefix).
 
--spec multi_unset_args(atom(), kz_term:ne_binary(), kz_term:proplist()) -> binary().
-multi_unset_args(Node, UUID, KVs) ->
-    multi_unset_args(Node, UUID, KVs, ?FS_MULTI_VAR_SEP).
+-spec multi_unset_args(kz_term:ne_binary(), kz_term:proplist()) -> binary().
+multi_unset_args(UUID, KVs) ->
+    multi_unset_args(UUID, KVs, ?FS_MULTI_VAR_SEP).
 
--spec multi_unset_args(atom(), kz_term:ne_binary(), kz_term:proplist(), kz_term:ne_binary()) -> binary().
-multi_unset_args(Node, UUID, KVs, Separator) ->
-    multi_unset_args(Node, UUID, KVs, Separator, ?FS_MULTI_VAR_SEP_PREFIX).
+-spec multi_unset_args(kz_term:ne_binary(), kz_term:proplist(), kz_term:ne_binary()) -> binary().
+multi_unset_args(UUID, KVs, Separator) ->
+    multi_unset_args(UUID, KVs, Separator, ?FS_MULTI_VAR_SEP_PREFIX).
 
--spec multi_unset_args(atom(), kz_term:ne_binary(), kz_term:proplist(), kz_term:ne_binary(), binary() | string()) -> binary().
-multi_unset_args(Node, UUID, KVs, Separator, Prefix) ->
-    fs_args_to_binary(lists:reverse(process_fs_kv(Node, UUID, KVs, 'unset')), Separator, Prefix).
+-spec multi_unset_args(kz_term:ne_binary(), kz_term:proplist(), kz_term:ne_binary(), binary() | string()) -> binary().
+multi_unset_args(UUID, KVs, Separator, Prefix) ->
+    fs_args_to_binary(lists:reverse(process_fs_kv(UUID, KVs, 'unset')), Separator, Prefix).
 
 -spec fs_args_to_binary(list()) -> binary().
 fs_args_to_binary([_]=Args) ->
@@ -496,29 +496,35 @@ fs_arg_encode_char(Char) ->
         ProperLen                -> list_to_binary(ProperLen)
     end.
 
--spec process_fs_kv(atom(), kz_term:ne_binary(), kz_term:proplist(), atom()) -> [binary()].
-process_fs_kv(_, _, [], _) -> [];
-process_fs_kv(Node, UUID, [{_K, 'undefined'} | KVs], Action) ->
-    process_fs_kv(Node, UUID, KVs, Action);
-process_fs_kv(Node, UUID, [{K, V}|KVs], Action) ->
+-spec process_fs_kv(kz_term:ne_binary(), kz_term:proplist(), atom()) -> [binary()].
+process_fs_kv(_, [], _) -> [];
+process_fs_kv(UUID, [{_K, 'undefined'} | KVs], Action) ->
+    process_fs_kv(UUID, KVs, Action);
+process_fs_kv(UUID, [{K, V}|KVs], Action) ->
     X1 = format_fs_kv(K, V, UUID, Action),
     lists:foldl(fun(Prop, Acc) ->
-                        process_fs_kv_fold(Node, UUID, Prop, Action, Acc)
-                end, X1, KVs);
-process_fs_kv(Node, UUID, [K|KVs], 'unset'=Action)
+                        process_fs_kv_fold(UUID, Prop, Action, Acc)
+                end
+               ,X1
+               ,KVs
+               );
+process_fs_kv(UUID, [K|KVs], 'unset'=Action)
   when is_binary(K) ->
     X1 = get_fs_key(K),
     lists:foldl(fun(Prop, Acc) ->
-                        process_fs_kv_fold(Node, UUID, Prop, Action, Acc)
-                end, [<<X1/binary, "=">>], KVs).
+                        process_fs_kv_fold(UUID, Prop, Action, Acc)
+                end
+               ,[<<X1/binary, "=">>]
+               ,KVs
+               ).
 
-process_fs_kv_fold(_Node, UUID, {K, V}, Action, Acc) ->
+process_fs_kv_fold(UUID, {K, V}, Action, Acc) ->
     [format_fs_kv(K, V, UUID, Action) | Acc];
-process_fs_kv_fold(_Node, _UUID, K, 'unset', Acc)
+process_fs_kv_fold(_UUID, K, 'unset', Acc)
   when is_binary(K) ->
     Key = get_fs_key(K),
     [<<Key/binary, "=">> | Acc];
-process_fs_kv_fold(_, _, _, _, Acc) ->
+process_fs_kv_fold(_UUID, _K, _Action, Acc) ->
     Acc.
 
 -spec format_fs_kv(kz_term:ne_binary(), binary(), kz_term:ne_binary(), atom()) -> [binary()].

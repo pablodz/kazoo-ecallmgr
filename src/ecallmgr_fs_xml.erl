@@ -48,8 +48,6 @@
 
 -include("ecallmgr.hrl").
 
--define(DEFAULT_USER_CACHE_TIME_IN_MS, ?MILLISECONDS_IN_HOUR). %% 1 hour
-
 -spec acl_xml(kz_json:object()) -> {'ok', iolist()}.
 acl_xml(AclsJObj) ->
     AclsFold = lists:foldl(fun arrange_acl_node/2, orddict:new(), kz_json:to_proplist(AclsJObj)),
@@ -833,11 +831,11 @@ codec_mappings(Codec) ->
 %% sign and the value wraped in single quotes.
 %% @end
 %%------------------------------------------------------------------------------
--spec encode_fs_val(kz_term:text(), kz_term:text()) -> kz_term:ne_binary().
+-spec encode_fs_val(kz_term:text(), kz_term:text() | integer()) -> kz_term:ne_binary().
 encode_fs_val(Prefix, V) ->
     list_to_binary([Prefix, "='", escape(V, $\'), "'"]).
 
--spec escape(kz_term:text(), char()) -> kz_term:ne_binary().
+-spec escape(kz_term:text() | integer(), char()) -> kz_term:ne_binary().
 escape(V, C) ->
     iolist_to_binary([encode(A, C) || <<A>> <= kz_term:to_binary(V)]).
 encode(C, C) -> [$\\, C];

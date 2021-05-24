@@ -38,7 +38,7 @@ maybe_store_recording('true', _, JObj, CallId, Node) ->
     case kz_recording:transfer_destination(JObj) of
         'undefined' -> 'ok';
         <<>> -> 'ok';
-        <<_/binary>> = Destination ->
+        <<Destination/binary>> ->
             kz_log:put_callid(CallId),
             lager:debug("no one is handling call recording, storing recording to ~s", [Destination]),
 
@@ -62,7 +62,7 @@ maybe_store_recording('true', _, JObj, CallId, Node) ->
                     ,{<<"Event-Name">>, <<"command">>}
                     | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
                     ]),
-            ecallmgr_call_command:exec_cmd(Node, CallId, Cmd, 'undefined')
+            ecallmgr_call_command:exec_cmd(Node, CallId, Cmd)
     end.
 
 -spec media_transfer_method(kz_json:object()) -> kz_term:ne_binary().

@@ -26,15 +26,6 @@
                               ,<<"undeaf-member">>
                               ]).
 
--define(CONFERENCE_EVENTS, [<<"conference-create">>
-                           ,<<"conference-destroy">>
-                           ,<<"lock">>
-                           ,<<"unlock">>
-                           ,<<"add-member">>
-                           ,<<"del-member">>
-                           | ?MEMBER_UPDATE_EVENTS
-                           ]).
-
 %%%=============================================================================
 %%% API
 %%%=============================================================================

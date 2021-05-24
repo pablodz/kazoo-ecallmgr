@@ -15,7 +15,6 @@
 -define(ECALLMGR_UTIL_CACHE, 'ecallmgr_util_cache').
 -define(ECALLMGR_AUTH_CACHE, 'ecallmgr_auth_cache').
 -define(ECALLMGR_CALL_CACHE, 'ecallmgr_call_cache').
--define(ECALLMGR_INTERACTION_CACHE, 'ecallmgr_interaction_cache').
 
 -define(CHANNELS_TBL, 'ecallmgr_channels').
 
@@ -32,7 +31,6 @@
 
 -define(SIP_INTERFACE, "sipinterface_1").
 -define(DEFAULT_FS_PROFILE, "sipinterface_1").
--define(DEFAULT_FS_TECHNOLOGY, "sofia").
 -define(DEFAULT_FS_DIALPLAN, "XML").
 
 -define(LOCAL_MEDIA_PATH, "/tmp/").
@@ -160,27 +158,12 @@
 
 -define(DEFAULT_REALM, kapps_config:get_ne_binary(?APP_NAME, <<"default_realm">>, <<"nodomain.com">>)).
 -define(MAX_TIMEOUT_FOR_NODE_RESTART, kapps_config:get_integer(?APP_NAME, <<"max_timeout_for_node_restart">>, 10 * ?MILLISECONDS_IN_SECOND)).
--define(MAX_NODE_RESTART_FAILURES, 3).
 
 -define(EXPIRES_DEVIATION_TIME
        ,kapps_config:get_integer(?APP_NAME, <<"expires_deviation_time">>, 180)
        ).
 
-%% list of dialplan Application-Names that can execute after a call has hung up
--define(POST_HANGUP_COMMANDS, [<<"store">>, <<"set">>, <<"presence">>
-                              ,<<"record">>, <<"store_fax">>, <<"receive_fax">>
-                              ]).
-
 -define(SANITY_CHECK_PERIOD, 300 * ?MILLISECONDS_IN_SECOND).
-
--define(STARTUP_FILE, [code:priv_dir(?APP), "/startup.config"]).
--define(SETTINGS_FILE, [code:priv_dir(?APP), "/settings.config"]).
-
--define(STARTUP_FILE_CONTENTS, <<"{'fs_nodes', []}.\n"
-                                 "{'fs_cmds', [{'load', \"mod_sofia\"}\n"
-                                 "            ,{'reloadacl', \"\"}\n"
-                                 "            ]}.\n"
-                               >>).
 
 %% We pass Application custom channel variables with our own prefix
 %% When an event occurs, we include all prefixed vars in the API
@@ -188,19 +171,14 @@
 -define(CHANNEL_VAR_PREFIX, "ecallmgr_").
 -define(APPLICATION_VAR_PREFIX, "cav_").
 -define(JSON_APPLICATION_VAR_PREFIX, "json_cav_").
--define(RECORD_VARS_PREFIX, "Recording-Variable-").
 
 -define(CCV(Key), <<?CHANNEL_VAR_PREFIX, Key/binary>>).
 -define(GET_CCV(Key), <<"variable_", ?CHANNEL_VAR_PREFIX, Key/binary>>).
 -define(SET_CCV(Key, Value), <<?CHANNEL_VAR_PREFIX, Key/binary, "=", Value/binary>>).
 -define(GET_CCV_HEADER(Key), <<"variable_sip_h_X-", ?CHANNEL_VAR_PREFIX, Key/binary>>).
--define(GET_CUSTOM_HEADER(Key), <<"variable_sip_h_X-", Key/binary>>).
--define(CUSTOM_HEADER(Key), <<"sip_h_X-", Key/binary>>).
--define(GET_VAR(Key), <<"variable_", Key/binary>>).
 
 -define(CAV(Key), <<?APPLICATION_VAR_PREFIX, Key/binary>>).
 -define(GET_CAV(Key), <<"variable_", ?APPLICATION_VAR_PREFIX, Key/binary>>).
--define(SET_CAV(Key, Value), <<?APPLICATION_VAR_PREFIX, Key/binary, "=", Value/binary>>).
 -define(GET_CAV_HEADER(Key), <<"variable_sip_h_X-", ?APPLICATION_VAR_PREFIX, Key/binary>>).
 
 -define(JSON_CAV(Key), <<?JSON_APPLICATION_VAR_PREFIX, Key/binary>>).
@@ -461,7 +439,6 @@
                                   ,'sofia::replaced'
                                   ,'sofia::intercepted'
                                   ]).
--define(IS_SOFIA_TRANSFER(N), lists:member(kz_term:to_atom(N, 'true'), ?FS_SOFIA_TRANSFER_EVENTS)).
 
 -define(FS_EVENTS, [{'channel', ['CHANNEL_CREATE', 'CHANNEL_ANSWER', 'CHANNEL_DESTROY']}
                    ,{'bridge', ['CHANNEL_BRIDGE', 'CHANNEL_UNBRIDGE']}
@@ -497,27 +474,6 @@
                              ,'ecallmgr_fs_fetch_location'
                              ]).
 
--define(FS_DEFAULT_HDRS, [<<"Event-Name">>, <<"Core-UUID">>, <<"FreeSWITCH-Hostname">>, <<"FreeSWITCH-Switchname">>
-                         ,<<"FreeSWITCH-IPv4">>, <<"FreeSWITCH-IPv6">>, <<"Event-Date-Local">>
-                         ,<<"Event-Date-GMT">>, <<"Event-Date-Timestamp">>, <<"Event-Calling-File">>
-                         ,<<"Event-Calling-Function">>, <<"Event-Calling-Line-Number">>, <<"Event-Sequence">>
-                         ]).
-
--define(FS_CHANNEL_STATES, [{<<"CS_NEW">>, <<"new">>}
-                           ,{<<"CS_INIT">>, <<"initialize">>}
-                           ,{<<"CS_ROUTING">>, <<"routing">>}
-                           ,{<<"CS_SOFT_EXECUTE">>, <<"soft_execute">>}
-                           ,{<<"CS_EXECUTE">>, <<"execute">>}
-                           ,{<<"CS_EXCHANGE_MEDIA">>, <<"exchange_media">>}
-                           ,{<<"CS_PARK">>, <<"park">>}
-                           ,{<<"CS_CONSUME_MEDIA">>, <<"consume_media">>}
-                           ,{<<"CS_HIBERNATE">>, <<"hibernate">>}
-                           ,{<<"CS_RESET">>, <<"reset">>}
-                           ,{<<"CS_HANGUP">>, <<"hangup">>}
-                           ,{<<"CS_REPORTING">>, <<"reporting">>}
-                           ,{<<"CS_DESTROY">>, <<"destroy">>}
-                           ]).
-
 -define(DEFAULT_RESPONSE_CODE, <<"488">>).
 
 -define(FS_CMD_SAFELIST, ["load", "set", "uuid_dump", "uuid_record"
@@ -526,71 +482,19 @@
                          ,"reloadacl"
                          ]).
 
--define(FS_CONFERNCE_ATTRS, [{'name', <<"Conference-ID">>}
-                            ,{'member-count', <<"Participant-Count">>}
-                            ,{'rate', <<"Rate">>}
-                            ,{'uuid', <<"UUID">>}
-                            ,{'locked', <<"Locked">>}
-                            ,{'run_time', <<"Run-Time">>}
-                            ,{'running', <<"Running">>}
-                            ,{'answered', <<"Answered">>}
-                            ,{'dynamic', <<"Dynamic">>}
-                            ]).
-
--define(FS_CONFERENCE_PARTICIPANT, [{'id', <<"Participant-ID">>}
-                                   ,{'uuid', <<"Call-ID">>}
-                                   ,{'caller_id_name', <<"Caller-ID-Name">>}
-                                   ,{'caller_id_number', <<"Caller-ID-Number">>}
-                                   ,{'join_time', <<"Join-Time">>}
-                                   ,{'last_talking', <<"Last-Talking-Time">>}
-                                   ,{'energy', <<"Energy-Level">>}
-                                   ,{'volume_in', <<"Volume-In-Level">>}
-                                   ,{'volume_out', <<"Volume-Out-Level">>}
-                                   ,{'output-volume', <<"Output-Volume-Level">>}
-                                   ,{'input-volume', <<"Input-Volume-Level">>}
-                                   ,{'auto-adjusted-input-volume', <<"Adjusted-Input-Volume-Level">>}
-                                   ]).
-
--define(FS_CONFERENCE_FLAGS, [{'can_hear', <<"Can-Hear">>}
-                             ,{'can_speak', <<"Can-Speak">>}
-                             ,{'mute_detect', <<"Mute-Detect">>}
-                             ,{'talking', <<"Talking">>}
-                             ,{'has_video', <<"Has-Video">>}
-                             ,{'had_floor', <<"Had-Floor">>}
-                             ,{'is_moderator', <<"Moderator">>}
-                             ,{'end_conference', <<"End-Conference">>}
-                             ]).
-
-
 -define(REGISTER_SUCCESS_REG, 'register_success').
 -define(REGISTER_SUCCESS_MSG(Node, Props), {Node, Props}).
-
--define(LOOPBACK_BOWOUT_REG(CallId), {'loopback_bowout', CallId}).
--define(LOOPBACK_BOWOUT_MSG(Node, Props), {Node, Props}).
 
 -define(FS_EVENT_REG_MSG_UUID(Node, EvtName), {'event', uuid, Node, EvtName}).
 -define(FS_EVENT_REG_MSG(Node, EvtName), {'event', Node, EvtName}).
 -define(FS_CALL_EVENT_REG_MSG(Node, EvtName), {'call_event', Node, EvtName}).
 -define(FS_CALL_EVENT_MSG(Node, EvtName, CallId), {'call_event', Node, EvtName, CallId}).
--define(FS_CALL_EVENTS_PROCESS_REG(Node, CallId), {'n', 'l', {'call_events_process', Node, CallId}}).
 
 -define(FS_CONFERENCE_ALL_REG_MSG(Node), {'conference', Node}).
 -define(FS_CONFERENCE_ALL_EVENT_REG_MSG(Node, EvtName), {'conference', Node, 'all', EvtName}).
 -define(FS_CONFERENCE_EVENT_ALL_REG_MSG(Node, ConferenceId), {'conference', Node, ConferenceId, 'all'}).
 -define(FS_CONFERENCE_EVENT_REG_MSG(Node, ConferenceId, EvtName), {'conference', Node, ConferenceId, EvtName}).
 -define(FS_CONFERENCE_EVENT_MSG(ConferenceId, EvtName, JObj), {'conference', ConferenceId, EvtName, JObj}).
-
--define(FS_ROUTE_MSG(Node, Section, Context), {'route', Node, Section, Context}).
-
--define(FS_OPTION_MSG(Node), {'option', Node}).
-
--define(FS_NODE_GRACE_PERIOD_REG, 'fs_node_grace_period').
--define(FS_NODE_GRACE_PERIOD_MSG(Node), {'fs_node_grace_period', Node}).
--define(FS_NODEDOWN_REG, 'fs_node_down').
--define(FS_NODEDOWN_MSG(Node, Options), {'fs_node_down', Node, Options}).
--define(FS_NODEDOWN(Node), {'fs_node_down', Node}).
--define(FS_NODEUP_REG, 'fs_node_up').
--define(FS_NODEUP_MSG(Node, Options), {'fs_node_up', Node, Options}).
 
 -define(ROUTE_WINNER_EVENT, <<"ROUTE_WINNER">>).
 
@@ -600,8 +504,6 @@
 -define(SEPARATOR_ENTERPRISE, <<":_:">>).
 -define(SEPARATOR_SIMULTANEOUS, <<",">>).
 -define(SEPARATOR_SINGLE, <<"|">>).
-
--define(CHANNEL_VARS_EXT, "Execute-Extension-Original-").
 
 -define(CONFERENCE_VARS, [<<"variable_conference_moderator">>
                          ,<<"Floor">>
@@ -630,33 +532,6 @@
                             ,{<<"Member-ID">>, fun kz_term:to_integer/1}
                             ,{<<"Member-Ghost">>, fun kz_term:to_boolean/1}
                             ]).
-
--define(EXTRA_VARS, [<<"Routing-Queue">>
-                    ,<<"Request-From-PID">>
-                    ,<<"Reply-To-PID">>
-                    ,<<"Controller-Queue">>
-                    ,<<"Controller-PID">>
-                    ,<<"Fetch-UUID">>
-                    ,<<"Fetch-Winning-PID">>
-                    ,<<"Event-Category">>
-                    ,<<"Call-Control-Queue">>
-                    ,<<"Call-Control-PID">>
-                    ,<<"Call-Control-Node">>
-                    ,<<"Application-UUID">>
-                    ,<<"app_uuid">>
-                    ,<<"variable_app_uuid">>
-                    ,<<"caller-unique-id">>
-                    ]).
-
--define(FS_EVENT_FILTERS,
-        lists:usort(
-          ?FS_GENERATED_EVENT_FILTERS
-          ++ ?CONFERENCE_VARS
-          ++ ?FS_MOD_KAZOO_EVENT_FILTERS
-          ++ ?FS_PRESERVED_EVENT_FILTERS
-          ++ ?EXTRA_VARS
-         )
-       ).
 
 -define(NODE_MODULES_KEY(R), [<<"configuration">>
                              ,R

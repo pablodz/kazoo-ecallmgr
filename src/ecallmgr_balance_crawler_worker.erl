@@ -17,7 +17,6 @@
 
 -include("ecallmgr.hrl").
 
--define(SERVER, ?MODULE).
 -define(INTERACCOUNT_DELAY_MS, kapps_config:get_integer(?APP_NAME, <<"balance_crawler_interaccount_delay_ms">>, 10)).
 -define(FETCH_TIMEOUT_MS, kapps_config:get_integer(?APP_NAME, <<"balance_crawler_fetch_timeout_ms">>, 10000)).
 

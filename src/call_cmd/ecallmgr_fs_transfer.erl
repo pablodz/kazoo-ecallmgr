@@ -13,7 +13,7 @@
 -module(ecallmgr_fs_transfer).
 
 -export([attended/3
-        ,blind/3
+        ,blind/2
         ]).
 
 -include("ecallmgr.hrl").
@@ -47,11 +47,11 @@ attended(Node, UUID, JObj) ->
            ,{<<"Timeout">>, kz_json:get_integer_value(<<"Timeout">>, JObj)}
            ],
     Props = transfer_vars(JObj, Vars),
-    Arg = kz_binary:join(ecallmgr_util:process_fs_kv(Node, UUID, Props, 'set'), <<",">>),
+    Arg = kz_binary:join(ecallmgr_util:process_fs_kv(UUID, Props, 'set'), <<",">>),
 
     TransferContext = transfer_context(JObj),
     To = <<TransferTo/binary, "@", Realm/binary>>,
-    KeyVars = transfer_keys(Node, UUID, JObj),
+    KeyVars = transfer_keys(UUID, JObj),
     lager:info("transferring to (~s) ~s @ ~s on context ~s", [To, TransferTo, Realm, TransferContext]),
 
     {<<"kz_att_xfer">>
@@ -60,8 +60,8 @@ attended(Node, UUID, JObj) ->
     ,[{"hold-bleg", "true"}]
     }.
 
--spec blind(atom(), kz_term:ne_binary(), kz_json:object()) -> blind_resp().
-blind(Node, UUID, JObj) ->
+-spec blind(kz_term:ne_binary(), kz_json:object()) -> blind_resp().
+blind(UUID, JObj) ->
     TransferTo = kz_json:get_ne_binary_value(<<"Transfer-To">>, JObj),
 
     Realm = transfer_realm(UUID, JObj),
@@ -74,16 +74,16 @@ blind(Node, UUID, JObj) ->
           ,{<<"SIP-Referred-By">>, transfer_referred(UUID, TransferLeg)}
           ,{<<"Signal-Bridge-To">>, UUID}
           ],
-    AppArgs = ecallmgr_util:multi_set_args(Node, TargetUUID, props:filter_undefined(KVs)),
+    AppArgs = ecallmgr_util:multi_set_args(TargetUUID, props:filter_undefined(KVs)),
     [{<<"kz_uuid_multiset_encoded">>, list_to_binary([TargetUUID, " ", AppArgs])}
     ,{<<"blind_xfer">>, list_to_binary([TransferLeg, " ", TransferTo, <<" XML ">>, transfer_context(JObj)])}
     ].
 
--spec transfer_keys(atom(), kz_term:ne_binary(), kz_json:object()) -> binary().
-transfer_keys(Node, UUID, JObj) ->
+-spec transfer_keys(kz_term:ne_binary(), kz_json:object()) -> binary().
+transfer_keys(UUID, JObj) ->
     TransferKeys = kz_json:get_json_value(<<"Attended-Transfer-Keys">>, JObj, kz_json:new()),
     TransferVars = kz_json:foldl(fun add_transfer_key/3, [], TransferKeys),
-    case ecallmgr_util:process_fs_kv(Node, UUID, TransferVars, 'set') of
+    case ecallmgr_util:process_fs_kv(UUID, TransferVars, 'set') of
         [] -> <<>>;
         Exports -> list_to_binary(["%^[", kz_binary:join(Exports, <<"^">>), "]"])
     end.

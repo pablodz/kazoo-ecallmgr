@@ -465,8 +465,8 @@ handling_locally(Node, _X) ->
 %% @doc for CHANNEL_CREATE, insert new record
 -spec new(atom(), kz_term:ne_binary(), kz_json:object()) -> 'ok'.
 new(Node, UUID, JObj) ->
-    InteractionId = kz_json:get_ne_binary_value([<<"Custom-Channel-Vars">>, <<"Call-Interaction-ID">>], JObj),
-    case kz_json:get_ne_binary_value(<<"Other-Leg-Call-ID">>, JObj) of
+    InteractionId = kzd_freeswitch:ccv(JObj, <<"Call-Interaction-ID">>),
+    case kzd_freeswitch:other_leg_call_id(JObj) of
         'undefined' ->
             lager:info("adding new channel ~s with interaction id ~s", [UUID, InteractionId]);
         OtherLegId ->

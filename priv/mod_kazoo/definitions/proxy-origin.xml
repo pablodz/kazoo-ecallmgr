@@ -1,7 +1,7 @@
 <definition name="proxy-origin">
-	<field name="Originating-Proxy" type="expand" value="sip:${variable_sip_network_ip}:${variable_sip_network_port}">
+	<field name="Originating-Proxy" type="expand" value="sip:${variable_sip_via_host}:${variable_sip_via_port};transport=${first-of(variable_sip_via_protocol|#udp)}">
 		<filters>
-            <filter name="variable_sip_network_ip" type="include" compare="exists" />
+			<filter name="variable_sip_via_host" type="include" compare="exists" />
 		</filters>
 	</field>
 </definition>

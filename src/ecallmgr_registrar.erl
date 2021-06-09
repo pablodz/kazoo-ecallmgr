@@ -917,7 +917,7 @@ augment_registration(Reg, JObj) ->
     CCVs = kz_json:get_json_value(<<"Custom-Channel-Vars">>, JObj, kz_json:new()),
     EndpointInfo = kz_json:get_json_value(<<"Endpoint-Info">>, CCVs, kz_json:new()),
 
-    FindFun = fun(Key, Default) -> kz_json:find(Key, [JObj, CCVs], Default) end,
+    FindFun = fun(Key, Default) -> kz_json:find(Key, [JObj, CCVs, EndpointInfo], Default) end,
 
     AccountId = FindFun(<<"Account-ID">>, Reg#registration.account_id),
 

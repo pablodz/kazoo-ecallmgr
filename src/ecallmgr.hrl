@@ -326,6 +326,7 @@
                               ,{<<"Record-Sample-Rate">>, <<"record_sample_rate">>}
                               ,{<<"Request-URI">>, <<"sip_req_uri">>}
                               ,{<<"Signal-Bridge-To">>, <<"signal_bridge_to">>}
+                              ,{<<"SIP-Invite-Parameters">>, <<"sip_invite_params">>}
                               ,{<<"SIP-Invite-Contact-User">>, <<"sip_contact_user">>}
                               ,{<<"SIP-Invite-Domain">>, <<"sip_invite_domain">>}
                               ,{<<"SIP-Invite-To-URI">>, <<"sip_invite_to_uri">>}

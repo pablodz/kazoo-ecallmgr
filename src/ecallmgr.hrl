@@ -331,6 +331,7 @@
                               ,{<<"SIP-Invite-Domain">>, <<"sip_invite_domain">>}
                               ,{<<"SIP-Invite-To-URI">>, <<"sip_invite_to_uri">>}
                               ,{<<"SIP-Invite-Request-URI">>, <<"sip_invite_req_uri">>}
+                              ,{<<"SIP-Invite-URI">>, <<"sip_invite_uri">>}
                               ,{<<"SIP-Refer-To">>, <<"sip_refer_to">>}
                               ,{<<"SIP-Referred-By">>, <<"sip_h_Referred-By">>}
                               ,{<<"Secure-RTP">>, <<"rtp_secure_media">>}

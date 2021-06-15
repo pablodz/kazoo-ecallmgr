@@ -893,6 +893,11 @@ get_channel_params_fold(Key, Val) ->
 get_custom_sip_headers(JObj) ->
     kz_json:to_proplist(kz_json:get_json_value(<<"Custom-SIP-Headers">>, JObj, kz_json:new())).
 
+-spec get_custom_routing_vars(kz_json:object()) -> kz_json:json_proplist().
+get_custom_routing_vars(JObj) ->
+    Props = kz_json:to_proplist(<<"Custom-Routing-Vars">>, JObj),
+    get_channel_params(Props).
+
 -spec arrange_acl_node({kz_term:ne_binary(), kz_json:object()}, orddict:orddict()) -> orddict:orddict().
 arrange_acl_node({_, JObj}, Dict) ->
     AclList = kz_json:get_value(<<"network-list-name">>, JObj),
@@ -1597,6 +1602,8 @@ directory_resp_device_xml(Endpoint, JObj) ->
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
 
+    CRVs = get_custom_routing_vars(Endpoint),
+    CRVsEl = [param_el(<<"dial-var-", K/binary>>, V) || {K, V} <- CRVs],
     SIPHeaders = get_custom_sip_headers(Endpoint),
     SIPHeadersEl = [param_el(<<"dial-var-sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
     Params = [{<<"endpoint-dial-string">>, dial_string(Endpoint, Id)}
@@ -1605,7 +1612,7 @@ directory_resp_device_xml(Endpoint, JObj) ->
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
              ],
     ParamsEl = [param_el(K,V) || {K,V} <- Params],
-    ParamsEls = params_el(ParamsEl ++ SIPHeadersEl),
+    ParamsEls = params_el(ParamsEl ++ SIPHeadersEl ++ CRVsEl),
 
     UserEl = user_el(UserProps, [VariablesEl, ProfileVariablesEl, ParamsEls, callfwd_el(Endpoint)]),
     DomainEl = domain_el(DomainName, UserEl),
@@ -1643,7 +1650,10 @@ directory_resp_user_xml(Endpoint, JObj) ->
     ParamsEl = [param_el(K,V) || {K,V} <- Params],
     SIPHeaders = get_custom_sip_headers(Endpoint),
     SIPHeadersEl = [param_el(<<"dial-var-sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
-    ParamsEls = params_el(ParamsEl ++ SIPHeadersEl),
+    CRVs = get_custom_routing_vars(Endpoint),
+    CRVsEl = [param_el(<<"dial-var-", K/binary>>, V) || {K, V} <- CRVs],
+
+    ParamsEls = params_el(ParamsEl ++ SIPHeadersEl ++ CRVsEl),
 
     UserEl = user_el(UserProps, [VariablesEl, ProfileVariablesEl, ParamsEls, callfwd_el(Endpoint)]),
     DomainEl = domain_el(DomainName, UserEl),

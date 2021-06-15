@@ -304,6 +304,7 @@
                               ,{<<"Media-Files-Separator">>, <<"playback_delimiter">>}
                               ,{<<"Media-Group-ID">>, <<"media_group_id">>}
                               ,{<<"Media-Webrtc">>, <<"media_webrtc">>}
+                              ,{<<"Media-ICE">>, <<"add_ice_candidates">>}
                               ,{<<"Application-Other-Leg-UUID">>, <<"Application-Other-Leg-UUID">>}
                               ,{<<"Origination-Call-ID">>, <<"sip_origination_call_uuid">>}
                               ,{<<"Origination-UUID">>, <<"origination_uuid">>}
@@ -320,6 +321,7 @@
                               ,{<<"RTP-Secure-Media">>, <<"rtp_secure_media">>}
                               ,{<<"RTP-Secure-Media-Confirmed">>, <<"rtp_secure_media_confirmed">>}
                               ,{<<"RTP-Secure-Video-Confirmed">>, <<"rtp_secure_media_confirmed_video">>}
+                              ,{<<"RTP-DTLS">>, <<"rtp_use_dtls">>}
                               ,{<<"Record-Min-Sec">>, <<"record_min_sec">>}
                               ,{<<"Record-Sample-Rate">>, <<"record_sample_rate">>}
                               ,{<<"Request-URI">>, <<"sip_req_uri">>}

@@ -1524,7 +1524,12 @@ directory_resp_group_id(Endpoint, JObj) ->
     end.
 
 dial_string(Endpoint, Id) ->
-    Uri = kz_json:get_ne_binary_value(<<"SIP-Invite-Route-URI">>, Endpoint),
+    URILookup = [<<"SIP-Invite-URI">>
+                ,<<"SIP-Invite-Route-URI">>
+                ,[<<"Custom-Channel-Vars">>, <<"SIP-Invite-URI">>]
+                ,[<<"Custom-Channel-Vars">>, <<"SIP-Invite-Route-URI">>]
+                ],
+    Uri = kz_json:get_first_defined(URILookup, Endpoint),
     SIPInterface = kz_json:get_ne_binary_value(<<"SIP-Interface">>, Endpoint, ?DEFAULT_FS_PROFILE),
     dial_string(Uri, Id, SIPInterface).
 

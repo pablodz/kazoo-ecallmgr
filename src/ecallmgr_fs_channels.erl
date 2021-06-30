@@ -42,6 +42,7 @@
 -export([handle_query_account_channels/2]).
 -export([handle_query_channels/2]).
 -export([handle_channel_status/2]).
+-export([api_status/1]).
 
 -export([has_channels_for_owner/1]).
 
@@ -353,35 +354,41 @@ handle_channel_status(JObj, _Props) ->
     _ = kz_log:put_callid(JObj),
     CallId = kz_api:call_id(JObj),
     lager:debug("channel status request received"),
-    case ecallmgr_fs_channel:fetch(CallId) of
-        {'error', 'not_found'} ->
+    case api_status(CallId) of
+        {'error', _Reason} ->
             maybe_send_empty_channel_resp(CallId, JObj);
+        {'ok', Status} ->
+            Resp = [{<<"Msg-ID">>, kz_api:msg_id(JObj)} | Status],
+            kapi_call:publish_channel_status_resp(kz_api:server_id(JObj), Resp)
+    end.
+
+-spec api_status(kz_term:ne_binary()) -> {'ok', kz_term:proplist()} | {'error', _}.
+api_status(CallId) ->
+    case ecallmgr_fs_channel:fetch(CallId, 'api') of
+        {'error', _} = Error -> Error;
         {'ok', Channel} ->
-            Node = kz_json:get_binary_value(<<"node">>, Channel),
+            Node = kz_json:get_binary_value(<<"Media-Node">>, Channel),
             Hostname = case binary:split(Node, <<"@">>) of
                            [_, Host] -> Host;
                            Other -> Other
                        end,
             Profile = kz_json:get_binary_value(<<"profile">>, Channel),
             lager:debug("channel is on ~s", [Hostname]),
-            Resp =
-                props:filter_undefined(
-                  [{<<"Call-ID">>, CallId}
-                  ,{<<"Status">>, <<"active">>}
-                  ,{<<"Switch-Hostname">>, Hostname}
-                  ,{<<"Switch-Nodename">>, kz_term:to_binary(Node)}
-                  ,{<<"Switch-URL">>, kz_json:get_ne_binary_value(<<"switch_url">>, Channel, ecallmgr_fs_nodes:sip_url(Node, Profile))}
-                  ,{<<"Other-Leg-Call-ID">>, kz_json:get_value(<<"other_leg">>, Channel)}
-                  ,{<<"Realm">>, kz_json:get_value(<<"realm">>, Channel)}
-                  ,{<<"Username">>, kz_json:get_value(<<"username">>, Channel)}
-                  ,{<<"Custom-Channel-Vars">>, kz_json:from_list(ecallmgr_fs_channel:channel_ccvs(Channel))}
-                  ,{<<"Custom-Application-Vars">>, kz_json:from_list(ecallmgr_fs_channel:channel_cavs(Channel))}
-                  ,{<<"Custom-SIP-Headers">>, kz_json:from_list(ecallmgr_fs_channel:channel_cshs(Channel))}
-                  ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
-                  | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
-                  ]
-                 ),
-            kapi_call:publish_channel_status_resp(kz_api:server_id(JObj), Resp)
+            Resp = props:filter_undefined(
+                     [{<<"Call-ID">>, CallId}
+                     ,{<<"Status">>, <<"active">>}
+                     ,{<<"Switch-Hostname">>, Hostname}
+                     ,{<<"Switch-Nodename">>, kz_term:to_binary(Node)}
+                     ,{<<"Switch-URL">>, kz_json:get_ne_binary_value(<<"Switch-URL">>, Channel, ecallmgr_fs_nodes:sip_url(Node, Profile))}
+                     ,{<<"Realm">>, kz_json:get_value(<<"Realm">>, Channel)}
+                     ,{<<"Username">>, kz_json:get_value(<<"Username">>, Channel)}
+                     ,{<<"Custom-Channel-Vars">>, kz_json:from_list(ecallmgr_fs_channel:channel_ccvs(Channel))}
+                     ,{<<"Custom-Application-Vars">>, kz_json:from_list(ecallmgr_fs_channel:channel_cavs(Channel))}
+                     ,{<<"Custom-SIP-Headers">>, kz_json:from_list(ecallmgr_fs_channel:channel_cshs(Channel))}
+                     | [{Key, kz_json:get_ne_value(Key, Channel)} || Key <- kapi_call:channel_status_extended_headers()]
+                     ]
+                    ),
+            {'ok', Resp ++ kz_api:default_headers(?APP_NAME, ?APP_VERSION)}
     end.
 
 -spec maybe_send_empty_channel_resp(kz_term:ne_binary(), kz_json:object()) -> 'ok'.

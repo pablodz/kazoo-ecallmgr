@@ -95,6 +95,11 @@ enforce_privacy(Node, UUID, JObj) ->
           fs_app() | fs_apps() |
           {'return', 'error' | kz_term:ne_binary()} |
           {'error', kz_term:ne_binary()}.
+get_fs_app(_Node, _UUID, JObj, <<"wait_for_answer">>) ->
+    case kapi_dialplan:wait_for_answer_v(JObj) of
+        'false' -> {'error', <<"wait for answer failed to execute as JObj did not validate">>};
+        'true' -> {<<"wait_for_answer">>, kz_api:msg_id(JObj)}
+    end;
 get_fs_app(_Node, _UUID, JObj, <<"noop">>) ->
     case kapi_dialplan:noop_v(JObj) of
         'false' -> {'error', <<"noop failed to execute as JObj did not validate">>};
@@ -155,10 +160,10 @@ get_fs_app(_Node, UUID, JObj, <<"play_and_collect_digits">>) ->
     case kapi_dialplan:play_and_collect_digits_v(JObj) of
         'false' -> {'error', <<"play_and_collect_digits failed to execute as JObj did not validate">>};
         'true' ->
-            Min = kz_json:get_value(<<"Minimum-Digits">>, JObj),
-            Max = kz_json:get_value(<<"Maximum-Digits">>, JObj),
-            Timeout = kz_json:get_value(<<"Timeout">>, JObj),
-            Terminators = kz_json:get_value(<<"Terminators">>, JObj),
+            Min = kz_json:get_ne_binary_value(<<"Minimum-Digits">>, JObj),
+            Max = kz_json:get_ne_binary_value(<<"Maximum-Digits">>, JObj),
+            Timeout = kz_json:get_ne_binary_value(<<"Timeout">>, JObj),
+            Terminators = kz_json:get_ne_binary_value(<<"Terminators">>, JObj),
             Media = <<$', (ecallmgr_util:media_path(kz_json:get_ne_binary_value(<<"Media-Name">>, JObj), 'new', UUID, JObj))/binary, $'>>,
             InvalidMedia = <<$', (ecallmgr_util:media_path(kz_json:get_ne_binary_value(<<"Failed-Media-Name">>, JObj), 'new', UUID, JObj))/binary, $'>>,
             Tries = kz_json:get_ne_binary_value(<<"Media-Tries">>, JObj),

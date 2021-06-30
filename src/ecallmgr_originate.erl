@@ -24,6 +24,7 @@
         ,terminate/2
         ,code_change/3
         ]).
+-export([originate_execute/3]).
 
 -include("ecallmgr.hrl").
 
@@ -114,7 +115,7 @@ handle_originate_execute(JObj, Props) ->
     lager:debug("recv originate_execute for ~s", [UUID]),
     _ = case kz_api:queue_id(JObj) of
             'undefined' -> 'ok';
-            ServerId -> gen_listener:cast(Srv, {'update_server_id', ServerId})
+            QueueId -> gen_listener:cast(Srv, {'update_server_id', QueueId})
         end,
     kz_cache:store_local(?ECALLMGR_UTIL_CACHE, {UUID, 'start_listener'}, 'true'),
     gen_listener:cast(Srv, {'originate_execute'}).
@@ -278,12 +279,10 @@ handle_cast({'originate_execute'}, #state{dialstrings=Dialstrings
             {'stop', 'normal', State#state{control_pid='undefined'}};
         {'ok', WinningUUID} when is_pid(CtrlPid) ->
             lager:debug("originate completed for other UUID: ~s (not ~s)", [WinningUUID, UUID]),
-            _ = publish_originate_resp(ServerId, JObj, WinningUUID),
-            CtrlPids = ecallmgr_call_control:control_procs(WinningUUID),
-            _ = case lists:member(CtrlPid, CtrlPids) of
-                    'true' -> 'ok';
-                    'false' -> ecallmgr_call_control:stop(CtrlPid)
-                end,
+            [NewCtrlPid] = ecallmgr_call_control:control_procs(WinningUUID),
+            CtrlQ = ecallmgr_call_control:queue_name(NewCtrlPid),
+            _ = publish_originate_resp(ServerId, JObj, WinningUUID, CtrlQ),
+            ecallmgr_call_control:stop(CtrlPid),
             {'stop', 'normal', State#state{control_pid='undefined'}};
         {'ok', CallId} when ControlDisabled ->
             lager:debug("originate completed for: ~s with no control pid", [CallId]),
@@ -397,12 +396,12 @@ cache_fax_file(File, Node) ->
     Self = self(),
     Fun = fun(Res, Reply) ->
                   lager:debug("cache fax file result : ~p", [{Res, Reply}]),
-                  Self ! {cache_fax_file, {Res, Reply}}
+                  Self ! {'cache_fax_file', {Res, Reply}}
           end,
-    {ok, JobId} = freeswitch:bgapi(Node, 'http_get', <<"{prefetch=true}", File/binary>>, Fun),
+    {'ok', JobId} = freeswitch:bgapi(Node, 'http_get', <<"{prefetch=true}", File/binary>>, Fun),
     lager:debug("waiting for cache fax file result ~s", [JobId]),
     receive
-        {cache_fax_file, Reply} -> Reply
+        {'cache_fax_file', Reply} -> Reply
     end.
 
 -spec get_originate_action(kz_term:ne_binary(), kz_json:object(), node()) -> kz_term:ne_binary().
@@ -591,7 +590,6 @@ update_uuid(OldUUID, NewUUID) ->
     bind_to_call_events(NewUUID),
     'ok'.
 
-
 -spec create_uuid(atom()) -> created_uuid().
 create_uuid(_Node) -> {'fs', kz_binary:rand_hex(18)}.
 
@@ -711,6 +709,21 @@ publish_originate_resp(ServerId, JObj, UUID) ->
                               ,{<<"Application-Response">>, <<"SUCCESS">>}
                               ,{<<"Event-Name">>, <<"originate_resp">>}
                               ,{<<"Call-ID">>, UUID}
+                              | get_extended_data(UUID)
+                              ]
+                             ,JObj
+                             ),
+    kapi_resource:publish_originate_resp(ServerId, Resp).
+
+-spec publish_originate_resp(kz_term:api_binary(), kz_json:object(), kz_term:ne_binary(), kz_term:ne_binary()) -> 'ok'.
+publish_originate_resp('undefined', _JObj, _UUID, _CtrlQ) -> 'ok';
+publish_originate_resp(ServerId, JObj, UUID, CtrlQ) ->
+    Resp = kz_json:set_values([{<<"Event-Category">>, <<"resource">>}
+                              ,{<<"Application-Response">>, <<"SUCCESS">>}
+                              ,{<<"Event-Name">>, <<"originate_resp">>}
+                              ,{<<"Call-ID">>, UUID}
+                              ,{<<"Control-Queue">>, CtrlQ}
+                              | get_extended_data(UUID)
                               ]
                              ,JObj
                              ),
@@ -738,6 +751,13 @@ publish_originate_uuid(ServerId, UUID, JObj, CtrlQueue) ->
              ]),
     lager:debug("sent originate_uuid to ~s", [ServerId]),
     kapi_resource:publish_originate_uuid(ServerId, Resp).
+
+-spec get_extended_data(kz_term:ne_binary()) -> kz_term:proplist().
+get_extended_data(UUID) ->
+    case ecallmgr_fs_channels:api_status(UUID) of
+        {'error', _} -> [];
+        {'ok', Data} -> Data
+    end.
 
 -spec maybe_send_originate_uuid(created_uuid(), pid(), state()) -> 'ok'.
 maybe_send_originate_uuid({_, UUID}, Pid, #state{server_id=ServerId

@@ -202,6 +202,7 @@ to_props(Channel) ->
       ,{<<"custom_channel_vars">>, Channel#channel.ccvs}
       ,{<<"custom_sip_headers">>, Channel#channel.cshs}
       ,{<<"destination">>, Channel#channel.destination}
+      ,{<<"request">>, Channel#channel.request}
       ,{<<"dialplan">>, Channel#channel.dialplan}
       ,{<<"direction">>, Channel#channel.direction}
       ,{<<"elapsed_s">>, kz_time:elapsed_s(Channel#channel.timestamp)}
@@ -257,6 +258,7 @@ to_api_props(#channel{}=Channel) ->
       ,{<<"Custom-Channel-Vars">>, Channel#channel.ccvs}
       ,{<<"Custom-SIP-Headers">>, Channel#channel.cshs}
       ,{<<"Destination">>, Channel#channel.destination}
+      ,{<<"Request">>, Channel#channel.request}
       ,{<<"Dialplan">>, Channel#channel.dialplan}
       ,{<<"Elapsed-Seconds">>, kz_time:elapsed_s(Channel#channel.timestamp)}
       ,{<<"Fetch-ID">>, Channel#channel.fetch_id}
@@ -401,8 +403,10 @@ jobj_to_updates(Node, UUID, JObj) ->
     CSHs = kz_json:get_json_value(<<"Custom-SIP-Headers">>, JObj, kz_json:new()),
     OtherLeg = kz_json:get_ne_binary_value(<<"Other-Leg-Call-ID">>, JObj),
     Profile = kz_json:get_ne_binary_value(<<"Caller-Profile">>, JObj, ?DEFAULT_FS_PROFILE),
+
     props:filter_undefined([{#channel.uuid, UUID}
                            ,{#channel.destination, kz_json:get_ne_binary_value(<<"Caller-Destination-Number">>, JObj)}
+                           ,{#channel.request, kz_json:get_ne_binary_value(<<"Request">>, JObj)}
                            ,{#channel.direction, kzd_freeswitch:original_call_direction(JObj)}
 
                            ,{#channel.account_id, kz_json:get_ne_binary_value(<<"Account-ID">>, CCVs)}

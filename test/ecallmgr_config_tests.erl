@@ -80,9 +80,6 @@ filter_endpoints_10722() ->
                    ,_Device3Id = <<"Authorizing-ID='2fee5aa5a89193f63822d09019dca1d7'">>
                    ,_Device4Id = <<"Authorizing-ID='e192d667e3abd732d802353b70c26248'">>
                    ],
-    UnregedNeedles = [_Device1Id = <<"Authorizing-ID='14b279cdaef7d55cff7235ba2a5010e9'">>
-                     ,_Failover = <<"loopback/+18887776666">>
-                     ],
 
     [Endpoint | EPs] = kz_endpoints:by_owner_id(UserId, kz_json:new(), new_call(AccountId)),
     UnregedEndpoint = kz_json:set_values([{<<"To-User">>, <<"unregistered">>}
@@ -97,10 +94,9 @@ filter_endpoints_10722() ->
     UnregedEndpoints = [UnregedEndpoint],
     FailoverChannels = build_channels(UnregedEndpoints),
 
-    [?_assertEqual(1, length(FailoverChannels))
+    [?_assertEqual(0, length(FailoverChannels))
     ,?_assertEqual(4, length(Channels))
     | find_needles(RegedNeedles, Channels)
-     ++ find_needles(UnregedNeedles, FailoverChannels)
     ].
 
 find_needles(Needles, Channels) ->

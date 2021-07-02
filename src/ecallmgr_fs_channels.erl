@@ -232,8 +232,23 @@ remove_unneeded(Updates) ->
 -spec format_updates(kz_term:proplist()) -> kz_term:ne_binary().
 format_updates(Updates) ->
     Fields = record_info('fields', 'channel'),
-    Out = [io_lib:format("~s=~p", [lists:nth(Field - 1, Fields), V]) || {Field, V} <- Updates],
+    Out = [format_update(lists:nth(Field - 1, Fields), V) || {Field, V} <- Updates],
     kz_binary:join(Out, <<",">>).
+
+-spec format_update(kz_term:ne_binary(), term()) -> kz_term:ne_binary().
+format_update(Key, Value) ->
+    case kz_json:is_json_object(Value) of
+        true -> format_json_update(Key, Value);
+        false when is_binary(Value) ->
+            io_lib:format("~s=~p", [Key, binary_to_list(Value)]);
+        false ->
+            io_lib:format("~s=~p", [Key, Value])
+    end.
+
+-spec format_json_update(kz_term:ne_binary(), kz_json:object()) -> kz_term:ne_binary().
+format_json_update(Key, Value) ->
+    Out = [format_update(K, V) || {K, V} <- kz_json:to_proplist(Value)],
+    io_lib:format("~s={~s}", [Key, kz_binary:join(Out, <<",">>)]).
 
 -spec count() -> non_neg_integer().
 count() -> ets:info(?CHANNELS_TBL, 'size').

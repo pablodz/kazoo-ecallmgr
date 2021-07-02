@@ -291,7 +291,6 @@ handle_cast({'originate_execute'}, #state{dialstrings=Dialstrings
         {'ok', CallId} ->
             kz_log:put_callid(CallId),
             lager:debug("originate is executing, waiting for completion"),
-            erlang:monitor_node(Node, 'true'),
             bind_to_call_events(CallId),
             CtrlQ = ecallmgr_call_control:queue_name(CtrlPid),
             _ = publish_originate_started(ServerId, CallId, JObj, CtrlQ),
@@ -567,7 +566,7 @@ add_loopback('false') ->
           {'error', kz_term:ne_binary() | 'timeout' | 'crash'}.
 originate_execute(Node, Dialstrings, _Timeout) ->
     lager:debug("executing originate on ~s: ~s", [Node, Dialstrings]),
-    freeswitch:async_api(Node, 'originate', Dialstrings).
+    freeswitch:async_api(Node, 'kz_originate', Dialstrings).
 
 -spec bind_to_call_events(kz_term:ne_binary()) -> 'ok'.
 bind_to_call_events(CallId) ->
@@ -749,7 +748,7 @@ publish_originate_uuid(ServerId, UUID, JObj, CtrlQueue) ->
              ,{<<"Outbound-Call-Control-Queue">>, CtrlQueue}
              | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
              ]),
-    lager:debug("sent originate_uuid to ~s", [ServerId]),
+    lager:debug("sent originate_uuid ~s to ~s", [UUID, ServerId]),
     kapi_resource:publish_originate_uuid(ServerId, Resp).
 
 -spec get_extended_data(kz_term:ne_binary()) -> kz_term:proplist().

@@ -83,7 +83,7 @@ When this flag is enabled, the provided SIP endpoints are checked for active reg
 
 ### User callflow
 
-When a user has one or more SIP endpoints and has also configured failover (by setting `"call_forward.failover":true` plus the call forwarding details), a bridge command will be sent to ecallmgr with the SIP device(s) and the failover endpoint. When ecallmgr goes to build the bridge string for FreeSWITCH, the SIP endpoint statuses will be checked; if all SIP endpoints are missing registrations, the failover endpoint will be used. If any SIP endpoint is registered, the failover endpoint is omitted from the bridge string.
+When a user has one or more SIP endpoints and has also configured failover (by setting `"call_failover.enabled":true` plus the call failover details), a bridge command will be sent to ecallmgr with the failover endpoint. When ecallmgr goes to build the bridge string for FreeSWITCH, the SIP endpoint statuses will be checked; if all SIP endpoints are missing registrations, the failover endpoint will be used. If any SIP endpoint is registered, the failover endpoint is omitted from the bridge string.
 
 ### Ring Group callflow
 

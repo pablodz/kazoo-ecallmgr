@@ -17,6 +17,7 @@
 
 -export([notify_call_event/1
         ,notify_conference_event/1
+        ,notify_originate_event/1
         ]).
 
 -include("ecallmgr.hrl").
@@ -33,6 +34,7 @@
 init() ->
     _ = kazoo_bindings:bind(<<"event_stream.registered.call_event.*">>, ?MODULE, 'notify_call_event'),
     _ = kazoo_bindings:bind(<<"event_stream.registered.conference.event">>, ?MODULE, 'notify_conference_event'),
+    _ = kazoo_bindings:bind(<<"event_stream.registered.originate.*">>, ?MODULE, 'notify_originate_event'),
     'ok'.
 
 -spec notify_call_event(map()) -> any().
@@ -57,3 +59,11 @@ notify_conference_event(#{node := Node, payload := JObj}) ->
     gproc:send({'p', 'l', ?FS_CONFERENCE_EVENT_ALL_REG_MSG(Node, ConferenceId)}, {'conference', ConferenceId, Event, JObj}),
     gproc:send({'p', 'l', ?FS_CONFERENCE_ALL_EVENT_REG_MSG(Node, Event)}, {'conference', ConferenceId, Event, JObj}),
     gproc:send({'p', 'l', ?FS_CONFERENCE_ALL_REG_MSG(Node)}, {'conference', ConferenceId, Event, JObj}).
+
+-spec notify_originate_event(map()) -> any().
+notify_originate_event(#{node := Node, call_id := UUID, event := Event, payload := JObj}) ->
+    kz_log:put_callid(JObj),
+    gproc:send({'p', 'l', ?FS_EVENT_ORIGINATE_MSG(Node)}, {'originate', Node, Event, UUID, JObj}),
+    gproc:send({'p', 'l', ?FS_EVENT_ORIGINATE_MSG_EVT(Node, Event)}, {'originate', Node, Event, UUID, JObj}),
+    gproc:send({'p', 'l', ?FS_EVENT_ORIGINATE_MSG_EVT_UUID(Node, Event, UUID)}, {'originate', Node, Event, UUID, JObj}),
+    gproc:send({'p', 'l', ?FS_EVENT_ORIGINATE_MSG_UUID(Node, UUID)}, {'originate', Node, Event, UUID, JObj}).

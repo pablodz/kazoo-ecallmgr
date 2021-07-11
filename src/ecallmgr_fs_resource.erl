@@ -24,25 +24,38 @@
         ,code_change/3
         ]).
 
--include("ecallmgr.hrl").
-
--define(SERVER, ?MODULE).
-
 -record(state, {node :: atom()
                ,options :: kz_term:proplist()
+               ,self :: kz_term:api_ne_binary()
+               ,node_queue :: kz_term:ne_binary()
+               ,shared_queue :: kz_term:ne_binary()
                }).
 -type state() :: #state{}.
 
--define(BINDINGS, [{'resource', [{'restrict_to', ['originate']}]}
-                  ,{'self', []}
-                  ]).
--define(RESPONDERS, [{{?MODULE, 'handle_originate_req'}
-                     ,[{<<"resource">>, <<"originate_req">>}]
-                     }
-                    ]).
--define(QUEUE_NAME, <<"ecallmgr_fs_resource">>).
--define(QUEUE_OPTIONS, [{'exclusive', 'false'}]).
--define(CONSUME_OPTIONS, [{'exclusive', 'false'}]).
+-define(SHARED_BINDINGS, [{'resource', [{'restrict_to', ['originate']}]}]).
+-define(NODE_BINDINGS(N), [{'resource', [{'restrict_to', ['originate']}, {'node', N}, federate]}]).
+-define(SELF_BINDINGS, [{self, []}]).
+
+-define(RESPONDERS, [{{?MODULE, 'handle_originate_req'}, [{<<"resource">>, <<"originate_req">>}]}]).
+
+
+-define(SHARED_QUEUE_NAME, <<"ecallmgr_fs_resource">>).
+-define(SHARED_QUEUE_OPTIONS, [{'exclusive', 'false'}]).
+-define(SHARED_QUEUE_CONSUME_OPTIONS, [{'exclusive', 'false'}]).
+-define(SHARED_QUEUE_PARAMS, [{queue_options, ?SHARED_QUEUE_OPTIONS}
+                             ,{consume_options, ?SHARED_QUEUE_CONSUME_OPTIONS}
+                             ]).
+
+-define(NODE_QUEUE_NAME(N), <<"ecallmgr_fs_resource_", (kz_term:to_binary(N))/binary>>).
+-define(NODE_QUEUE_OPTIONS, [{'exclusive', 'false'}]).
+-define(NODE_QUEUE_CONSUME_OPTIONS, [{'exclusive', 'false'}]).
+-define(NODE_QUEUE_PARAMS, [{queue_options, ?NODE_QUEUE_OPTIONS}
+                           ,{consume_options, ?NODE_QUEUE_CONSUME_OPTIONS}
+                           ]).
+
+-define(SELF_QUEUE_NAME, <<>>).
+-define(SELF_QUEUE_OPTIONS, []).
+-define(SELF_QUEUE_CONSUME_OPTIONS, []).
 
 %%%=============================================================================
 %%% API
@@ -58,12 +71,12 @@ start_link(Node) -> start_link(Node, []).
 
 -spec start_link(atom(), kz_term:proplist()) -> kz_types:startlink_ret().
 start_link(Node, Options) ->
-    gen_listener:start_link(?SERVER
-                           ,[{'bindings', ?BINDINGS}
+    gen_listener:start_link(?MODULE
+                           ,[{'bindings', ?SELF_BINDINGS}
                             ,{'responders', ?RESPONDERS}
-                            ,{'queue_name', ?QUEUE_NAME}
-                            ,{'queue_options', ?QUEUE_OPTIONS}
-                            ,{'consume_options', ?CONSUME_OPTIONS}
+                            ,{'queue_name', ?SELF_QUEUE_NAME}
+                            ,{'queue_options', ?SELF_QUEUE_OPTIONS}
+                            ,{'consume_options', ?SELF_QUEUE_CONSUME_OPTIONS}
                             ],
                             [Node, Options]
                            ).
@@ -71,8 +84,12 @@ start_link(Node, Options) ->
 -spec handle_originate_req(kz_json:object(), kz_term:proplist()) -> kz_types:sup_startchild_ret().
 handle_originate_req(JObj, Props) ->
     _ = kz_log:put_callid(JObj),
-    Node = props:get_value('node', Props),
-    ecallmgr_originate_sup:start_originate_proc(Node, JObj).
+    Arg = #{node => props:get_value('node', Props)
+           ,queue => props:get_value('self', Props)
+           ,payload => JObj
+           ,channel => kz_amqp_channel:consumer_channel()
+           },
+    ecallmgr_originate_sup:start_originate_proc(Arg).
 
 %%%=============================================================================
 %%% gen_server callbacks
@@ -87,7 +104,12 @@ init([Node, Options]) ->
     process_flag('trap_exit', 'true'),
     kz_log:put_callid(Node),
     lager:info("starting new fs resource listener for ~s", [Node]),
-    {'ok', #state{node=Node, options=Options}}.
+    {'ok', #state{node = Node
+                 ,options = Options
+                 ,node_queue = ?NODE_QUEUE_NAME(Node)
+                 ,shared_queue = ?SHARED_QUEUE_NAME
+                 }
+    }.
 
 %%------------------------------------------------------------------------------
 %% @doc Handling call messages.
@@ -102,8 +124,20 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec handle_cast(any(), state()) -> kz_types:handle_cast_ret_state(state()).
+handle_cast({gen_listener, {'created_queue', Q}}, #state{shared_queue=Q} = State) ->
+    lager:debug("started shared queue ~s", [Q]),
+    {'noreply', State};
+handle_cast({gen_listener, {'created_queue', Q}}, #state{node_queue=Q} = State) ->
+    lager:debug("started node shared queue ~s", [Q]),
+    gen_server:cast(self(), {'add_queue', ?SHARED_QUEUE_NAME, ?SHARED_QUEUE_PARAMS, ?SHARED_BINDINGS}),
+    {'noreply', State};
+handle_cast({gen_listener, {'created_queue', Q}}, #state{node=Node} = State) ->
+    lager:debug("started self queue ~s", [Q]),
+    gen_server:cast(self(), {'add_queue', ?NODE_QUEUE_NAME(Node), ?NODE_QUEUE_PARAMS, ?NODE_BINDINGS(Node)}),
+    {'noreply', State#state{self = Q}};
 handle_cast(_Msg, State) ->
     {'noreply', State}.
+
 
 %%------------------------------------------------------------------------------
 %% @doc Handling all non call/cast messages.
@@ -124,8 +158,11 @@ handle_info(_Info, State) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec handle_event(kz_json:object(), state()) -> gen_listener:handle_event_return().
-handle_event(_JObj, #state{node=Node}) ->
-    {'reply', [{'node', Node}]}.
+handle_event(_JObj, #state{node=Node, self=Self}) ->
+    {'reply', [{'node', Node}
+              ,{'self', Self}
+              ]
+    }.
 
 %%------------------------------------------------------------------------------
 %% @doc This function is called by a `gen_server' when it is about to

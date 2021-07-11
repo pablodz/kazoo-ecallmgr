@@ -12,7 +12,7 @@
 -behaviour(supervisor).
 
 -export([start_link/0]).
--export([start_originate_proc/2]).
+-export([start_originate_proc/1]).
 -export([init/1]).
 
 -include("ecallmgr.hrl").
@@ -33,9 +33,9 @@
 start_link() ->
     supervisor:start_link({'local', ?SERVER}, ?MODULE, []).
 
--spec start_originate_proc(atom(), kz_json:object()) -> kz_types:sup_startchild_ret().
-start_originate_proc(Node, JObj) ->
-    supervisor:start_child(?SERVER, [Node, JObj]).
+-spec start_originate_proc(map()) -> kz_types:sup_startchild_ret().
+start_originate_proc(Arg) ->
+    supervisor:start_child(?SERVER, [Arg]).
 
 %%%=============================================================================
 %%% Supervisor callbacks

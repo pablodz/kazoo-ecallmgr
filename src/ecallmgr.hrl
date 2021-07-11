@@ -454,6 +454,7 @@
                    ,{'transfer', ?FS_SOFIA_TRANSFER_EVENTS}
                    ,{'loopback', ['loopback::bowout', 'loopback::direct']}
                    ,{'cdr', ['KZ_CDR']}
+                   ,{'originate', ['KZ_ORIGINATE_START', 'KZ_ORIGINATE_EXECUTE', 'KZ_ORIGINATE_COMPLETE']}
                    ]).
 
 -define(FS_FETCH_SECTIONS, ['configuration'
@@ -495,6 +496,11 @@
 -define(FS_CONFERENCE_EVENT_ALL_REG_MSG(Node, ConferenceId), {'conference', Node, ConferenceId, 'all'}).
 -define(FS_CONFERENCE_EVENT_REG_MSG(Node, ConferenceId, EvtName), {'conference', Node, ConferenceId, EvtName}).
 -define(FS_CONFERENCE_EVENT_MSG(ConferenceId, EvtName, JObj), {'conference', ConferenceId, EvtName, JObj}).
+
+-define(FS_EVENT_ORIGINATE_MSG(Node), {'originate', Node, event, uuid}).
+-define(FS_EVENT_ORIGINATE_MSG_EVT(Node, EvtName), {'originate', Node, EvtName, uuid}).
+-define(FS_EVENT_ORIGINATE_MSG_EVT_UUID(Node, EvtName, UUID), {'originate', Node, EvtName, UUID}).
+-define(FS_EVENT_ORIGINATE_MSG_UUID(Node, UUID), {'originate', Node, event, UUID}).
 
 -define(ROUTE_WINNER_EVENT, <<"ROUTE_WINNER">>).
 

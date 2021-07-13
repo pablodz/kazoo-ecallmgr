@@ -496,7 +496,7 @@ publish_error(_, _, _, 'undefined') -> 'ok';
 publish_error(Error, UUID, Request, ServerId) ->
     lager:debug("originate error: ~s", [Error]),
     E = [{<<"Msg-ID">>, kz_api:msg_id(Request)}
-        ,{<<"Originate-UUID">>, UUID}
+        ,{<<"Call-ID">>, UUID}
         ,{<<"Request">>, Request}
         ,{<<"Error-Message">>, cleanup_error(Error)}
         | kz_api:default_headers(<<"error">>, <<"originate_resp">>, ?APP_NAME, ?APP_VERSION)

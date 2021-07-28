@@ -396,16 +396,8 @@ get_channel_vars(JObj) ->
 -spec add_ccvs(kz_json:object(), kz_term:proplist()) -> kz_term:proplist().
 add_ccvs(JObj, Props) ->
     Routines = [fun maybe_add_loopback/2
-               ,fun maybe_add_origination_uuid/2
                ],
     lists:foldl(fun(Fun, Acc) -> Fun(JObj, Acc) end, Props, Routines).
-
--spec maybe_add_origination_uuid(kz_json:object(), kz_term:proplist()) -> kz_term:proplist().
-maybe_add_origination_uuid(JObj, Props) ->
-    case kz_json:get_ne_binary_value(<<"Outbound-Call-ID">>, JObj) of
-        'undefined' -> Props;
-        CallId -> [{<<"Origination-Call-ID">>, CallId} | Props]
-    end.
 
 -spec maybe_add_loopback(kz_json:object(), kz_term:proplist()) -> kz_term:proplist().
 maybe_add_loopback(JObj, Props) ->
@@ -509,7 +501,7 @@ cleanup_error(E) -> E.
 
 -spec publish_originate_ready(kz_term:ne_binary(), kz_json:object(), kz_term:ne_binary(), kz_term:api_binary()) -> 'ok'.
 publish_originate_ready(UUID, Request, Q, ServerId) ->
-    lager:debug("originate command is ready, waiting for originate_execute"),
+    lager:debug("sending originate_ready to ~s", [ServerId]),
     Props = [{<<"Msg-ID">>, kz_api:msg_id(Request, UUID)}
             ,{<<"Originate-UUID">>, UUID}
             ,{<<"Originate-Queue">>, Q}
@@ -518,8 +510,10 @@ publish_originate_ready(UUID, Request, Q, ServerId) ->
     kapi_dialplan:publish_originate_ready(ServerId, Props).
 
 -spec publish_originate_resp(kz_term:api_binary(), kz_json:object(), kz_term:ne_binary(), kz_term:ne_binary()) -> 'ok'.
-publish_originate_resp('undefined', _JObj, _OriginateUUID, _UUID) -> 'ok';
+publish_originate_resp('undefined', _JObj, _OriginateUUID, _UUID) ->
+    lager:debug("not sending originate_resp server_id=undefined, originate_uuid=~s, uuid=~s", [_OriginateUUID, _UUID]);
 publish_originate_resp(ServerId, JObj, OriginateUUID, UUID) ->
+    lager:debug("sending originate_resp to server_id=~s, originate_uuid=~s, uuid=~s", [ServerId, OriginateUUID, UUID]),
     Resp = kz_json:set_values([{<<"Event-Category">>, <<"resource">>}
                               ,{<<"Application-Response">>, <<"SUCCESS">>}
                               ,{<<"Event-Name">>, <<"originate_resp">>}
@@ -533,8 +527,9 @@ publish_originate_resp(ServerId, JObj, OriginateUUID, UUID) ->
 
 -spec publish_originate_resp(kz_term:api_binary(), kz_json:object(), kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binary()) -> 'ok'.
 publish_originate_resp('undefined', _JObj, _OriginateUUID, _UUID, _CtrlQ) ->
-    lager:debug("no server-id, not publishing reply");
+    lager:debug("not sending originate_resp server_id=undefined, originate_uuid=~s uuid=~s control_queue=~s", [_OriginateUUID, _UUID, _CtrlQ]);
 publish_originate_resp(ServerId, JObj, OriginateUUID, UUID, CtrlQ) ->
+    lager:debug("sending originate_resp server_id=~s, originate_uuid=~s uuid=~s control_queue=~s", [ServerId, OriginateUUID, UUID, CtrlQ]),
     Resp = kz_json:set_values([{<<"Event-Category">>, <<"resource">>}
                               ,{<<"Application-Response">>, <<"SUCCESS">>}
                               ,{<<"Event-Name">>, <<"originate_resp">>}

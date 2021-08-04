@@ -231,17 +231,16 @@ format_updates(Updates) ->
     Out = [format_update(lists:nth(Field - 1, Fields), V) || {Field, V} <- Updates],
     kz_binary:join(Out, <<",">>).
 
--spec format_update(kz_term:ne_binary(), term()) -> kz_term:ne_binary().
+-spec format_update(kz_term:text(), term()) -> iodata().
+format_update(Key, <<Value/binary>>) ->
+    io_lib:format("~s=~p", [Key, binary_to_list(Value)]);
 format_update(Key, Value) ->
     case kz_json:is_json_object(Value) of
-        true -> format_json_update(Key, Value);
-        false when is_binary(Value) ->
-            io_lib:format("~s=~p", [Key, binary_to_list(Value)]);
-        false ->
-            io_lib:format("~s=~p", [Key, Value])
+        'true' ->  format_json_update(Key, Value);
+        'false' -> io_lib:format("~s=~p", [Key, Value])
     end.
 
--spec format_json_update(kz_term:ne_binary(), kz_json:object()) -> kz_term:ne_binary().
+-spec format_json_update(kz_term:text(), kz_json:object()) -> iodata().
 format_json_update(Key, Value) ->
     Out = [format_update(K, V) || {K, V} <- kz_json:to_proplist(Value)],
     io_lib:format("~s={~s}", [Key, kz_binary:join(Out, <<",">>)]).

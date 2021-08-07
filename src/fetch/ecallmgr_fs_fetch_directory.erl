@@ -120,7 +120,7 @@ lookup_registrar(#{payload := JObj}=Context) ->
                     ).
 
 lookup_registrar(Context, EndpointId, AccountId) ->
-    lager:debug("lookup registration for endpoint: ~s", [EndpointId]),
+    lager:debug("lookup registration for endpoint: ~s / ~s", [EndpointId, AccountId]),
     case ecallmgr_registrar:lookup_endpoint(EndpointId, AccountId) of
         {'error', 'not_found'} ->
             lookup_directory(Context);
@@ -148,14 +148,14 @@ fetch_options(#{payload := JObj}) ->
 fetch_directory(EndpointId, AccountId, Context) ->
     fetch_directory(EndpointId, AccountId, Context, []).
 
-fetch_directory(EndpointId, AccountId, #{payload := JObj, fetch_id := FetchId} = Context, Options) ->
+fetch_directory(EndpointId, AccountId, #{payload := JObj, node := Node, fetch_id := FetchId} = Context, Options) ->
     Opts = props:set_values(Options, fetch_options(Context)),
     lager:debug("fetching directory for ~s : ~s for request ~s"
                ,[EndpointId, AccountId, FetchId]
                ),
     case kz_directory:lookup(EndpointId, AccountId, Opts) of
         {'ok', Endpoint} ->
-            {'ok', Xml} = ecallmgr_fs_xml:directory_resp_endpoint_xml(Endpoint, JObj),
+            {'ok', Xml} = ecallmgr_fs_xml:directory_resp_endpoint_xml(Node, Endpoint, JObj),
             send_reply(Context#{reply => iolist_to_binary(Xml)});
         {'error', _Err} ->
             lager:debug("error getting profile for ~s@~s for request ~s : ~p"

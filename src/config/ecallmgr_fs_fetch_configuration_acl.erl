@@ -46,7 +46,6 @@ acl(#{node := Node, fetch_id := Id}=Ctx) ->
     freeswitch:fetch_reply(Ctx#{reply => ConfigXML}).
 
 -spec generate_acl_xml(kz_json:object()) -> kz_term:ne_binary().
-generate_acl_xml(SysconfResp) ->
-    'false' = kz_json:is_empty(SysconfResp),
-    {'ok', ConfigXml} = ecallmgr_fs_xml:acl_xml(SysconfResp),
+generate_acl_xml(ACLs) ->
+    {'ok', ConfigXml} = ecallmgr_fs_xml:acl_xml(ACLs),
     erlang:iolist_to_binary(ConfigXml).

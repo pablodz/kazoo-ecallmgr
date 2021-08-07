@@ -14,8 +14,8 @@
 -module(ecallmgr_fs_xml).
 
 -export([route_resp_xml/3 ,authn_resp_xml/1, reverse_authn_resp_xml/1
-        ,directory_resp_endpoint_xml/2
-        ,directory_resp_group_xml/2
+        ,directory_resp_endpoint_xml/3
+        ,directory_resp_group_xml/3
         ,acl_xml/1, empty_response/0
         ,not_found/0, not_found/1
         ,sip_profiles_xml/1, sofia_gateways_xml_to_json/1
@@ -1521,14 +1521,14 @@ directory_resp_group_id(Endpoint, JObj) ->
         GroupID -> GroupID
     end.
 
-dial_string(Endpoint, Id) ->
+dial_string(Node, Endpoint, Id) ->
     Uri = kz_json:get_ne_binary_value(<<"SIP-Invite-Route-URI">>, Endpoint),
     SIPInterface = kz_json:get_ne_binary_value(<<"SIP-Interface">>, Endpoint, ?DEFAULT_FS_PROFILE),
-    dial_string(Uri, Id, SIPInterface).
+    dial_string(Uri, Node, Id, SIPInterface).
 
-dial_string(undefined, Id, _SIPInterface) ->
-    list_to_binary(["${kz_contact(", Id, ")}"]);
-dial_string(Uri, _Id, SIPInterface) ->
+dial_string(undefined, Node, Id, _SIPInterface) ->
+    list_to_binary(["${", freeswitch:contact_api(Node), "(", Id, ")}"]);
+dial_string(Uri, _Node, _Id, SIPInterface) ->
     list_to_binary(["sofia/", SIPInterface, "/", Uri]).
 
 route_uri(Endpoint) ->
@@ -1546,25 +1546,25 @@ route_uri_els(Endpoint) ->
         RouteEl -> [RouteEl]
     end.
 
--spec directory_resp_endpoint_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
-directory_resp_endpoint_xml(Endpoint, JObj) ->
+-spec directory_resp_endpoint_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
+directory_resp_endpoint_xml(Node, Endpoint, JObj) ->
     Type = kz_json:get_ne_binary_value(<<"Endpoint-Type">>, Endpoint, <<"device">>),
-    directory_resp_endpoint_xml(Type, Endpoint, JObj).
+    directory_resp_endpoint_xml(Type, Node, Endpoint, JObj).
 
--spec directory_resp_endpoint_xml(binary(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
-directory_resp_endpoint_xml(<<"resource">>, Endpoint, JObj) ->
-    directory_resp_resource_xml(Endpoint, JObj);
-directory_resp_endpoint_xml(<<"group">>, Endpoint, JObj) ->
-    directory_resp_group_ep_xml(Endpoint, JObj);
-directory_resp_endpoint_xml(<<"user">>, Endpoint, JObj) ->
-    directory_resp_user_xml(Endpoint, JObj);
-directory_resp_endpoint_xml(<<"device">>, Endpoint, JObj) ->
-    directory_resp_device_xml(Endpoint, JObj);
-directory_resp_endpoint_xml(<<"sys_info">>, Endpoint, JObj) ->
-    directory_resp_device_xml(Endpoint, JObj).
+-spec directory_resp_endpoint_xml(binary(), atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
+directory_resp_endpoint_xml(<<"resource">>, Node, Endpoint, JObj) ->
+    directory_resp_resource_xml(Node, Endpoint, JObj);
+directory_resp_endpoint_xml(<<"group">>, Node, Endpoint, JObj) ->
+    directory_resp_group_ep_xml(Node, Endpoint, JObj);
+directory_resp_endpoint_xml(<<"user">>, Node, Endpoint, JObj) ->
+    directory_resp_user_xml(Node, Endpoint, JObj);
+directory_resp_endpoint_xml(<<"device">>, Node, Endpoint, JObj) ->
+    directory_resp_device_xml(Node, Endpoint, JObj);
+directory_resp_endpoint_xml(<<"sys_info">>, Node, Endpoint, JObj) ->
+    directory_resp_device_xml(Node, Endpoint, JObj).
 
--spec directory_resp_resource_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
-directory_resp_resource_xml(Endpoint, JObj) ->
+-spec directory_resp_resource_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
+directory_resp_resource_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
 
@@ -1581,8 +1581,8 @@ directory_resp_resource_xml(Endpoint, JObj) ->
     SectionEl = section_el(<<"directory">>, DomainEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
 
--spec directory_resp_device_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
-directory_resp_device_xml(Endpoint, JObj) ->
+-spec directory_resp_device_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
+directory_resp_device_xml(Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
     Id = <<UserId/binary, "@", DomainName/binary>>,
@@ -1604,7 +1604,7 @@ directory_resp_device_xml(Endpoint, JObj) ->
     CRVsEl = [param_el(<<"dial-var-", K/binary>>, V) || {K, V} <- CRVs],
     SIPHeaders = get_custom_sip_headers(Endpoint),
     SIPHeadersEl = [param_el(<<"dial-var-sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
-    Params = [{<<"endpoint-dial-string">>, dial_string(Endpoint, Id)}
+    Params = [{<<"endpoint-dial-string">>, dial_string(Node, Endpoint, Id)}
              ,{<<"endpoint-separator">>, kz_endpoint_separator()}
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
@@ -1624,8 +1624,8 @@ user_dial_string(Ids, AccountId) ->
     kz_binary:join([list_to_binary(["kz/", M, "@", AccountId]) || M <- Ids], kz_endpoint_separator()).
 
 
--spec directory_resp_user_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
-directory_resp_user_xml(Endpoint, JObj) ->
+-spec directory_resp_user_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
+directory_resp_user_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
     Id = <<UserId/binary, "@", DomainName/binary>>,
@@ -1658,8 +1658,8 @@ directory_resp_user_xml(Endpoint, JObj) ->
     SectionEl = section_el(<<"directory">>, DomainEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
 
--spec directory_resp_group_ep_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
-directory_resp_group_ep_xml(Endpoint, JObj) ->
+-spec directory_resp_group_ep_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
+directory_resp_group_ep_xml(_Node, Endpoint, JObj) ->
     lager:warning_unsafe("GROUP => ~s", [kz_json:encode(Endpoint, [pretty])]),
     DomainName = directory_resp_domain(Endpoint, JObj),
     GroupId = directory_resp_user_id(Endpoint, JObj),
@@ -1685,8 +1685,8 @@ directory_resp_group_ep_xml(Endpoint, JObj) ->
     SectionEl = section_el(<<"directory">>, DomainEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
 
--spec directory_resp_group_xml(kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
-directory_resp_group_xml(Endpoint, JObj) ->
+-spec directory_resp_group_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
+directory_resp_group_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     GroupId = directory_resp_group_id(Endpoint, JObj),
     GroupProps = [{<<"name">>, GroupId}],

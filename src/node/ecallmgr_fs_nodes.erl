@@ -822,7 +822,7 @@ start_preconfigured_servers(Try) ->
 get_configured_nodes() ->
     case kapps_config:get(?APP_NAME, <<"fs_nodes">>) of
         [] ->
-            lager:info("no preconfigured servers available. Is the sysconf whapp running?");
+            lager:info("no preconfigured servers available.");
         Nodes when is_list(Nodes) ->
             lager:info("successfully retrieved FreeSWITCH nodes to connect with, doing so..."),
             Nodes;
@@ -844,13 +844,32 @@ default_fs_host() ->
 default_fs_node() ->
     erlang:list_to_atom("freeswitch" ++ default_fs_host()).
 
+-spec default_fs_nodename() -> string().
+default_fs_nodename() -> "freeswitch".
+
+-spec registered_names() -> [string()].
+registered_names() ->
+    Mod = net_kernel:epmd_module(),
+    case Mod:names() of
+        {ok, Names} -> lists:map(fun({K,_V}) -> K end, Names);
+        _Else -> []
+    end.
+
 -spec try_connect_to_default_fs() -> 'skip' | 'ok' | {'error', 'no_connection'}.
 try_connect_to_default_fs() ->
-    Node = default_fs_node(),
-    lager:info("attempting to connect default freeswitch node ~p", [Node]),
+    case proplists:is_defined(default_fs_nodename(), registered_names()) of
+        true -> try_connect_to_default_fs(default_fs_node());
+        false -> skip
+    end.
+
+-spec try_connect_to_default_fs(atom()) -> 'skip' | 'ok' | {'error', 'no_connection'}.
+try_connect_to_default_fs(Node) ->
     case net_adm:ping(Node) of
-        'pong' -> add(Node);
-        _ -> 'skip'
+        'pong' ->
+            lager:info("connected to default freeswitch node ~p", [Node]),
+            add(Node);
+        _ ->
+            'skip'
     end.
 
 -spec start_node_from_config(kz_json:object()|atom()) -> 'ok' | 'error' | {'error', 'no_connection'}.

@@ -55,6 +55,8 @@
 
 -export([async_api/3]).
 
+-export([contact_api/0]).
+
 -include("ecallmgr.hrl").
 
 -define(TIMEOUT, 5 * ?MILLISECONDS_IN_SECOND).
@@ -520,3 +522,6 @@ async_api(Node, Cmd, Args) ->
                 {'bgerror', JobId, Error} -> api_result('error', Error)
             end
     end.
+
+-spec contact_api() -> binary().
+contact_api() -> <<"kz_contact">>.

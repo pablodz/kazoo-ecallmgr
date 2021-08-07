@@ -18,8 +18,6 @@
         ]).
 -export([stop/1]).
 
--export([freeswitch_node_modules/0]).
-
 %% Application callbacks
 
 %% @doc Implement the application start behaviour.
@@ -29,7 +27,6 @@ start(_StartType, _StartArgs) ->
     _ = node_bindings(),
     _ = event_stream_bind(),
     _ = fetch_handlers_bind(),
-    _ = freeswitch_nodesup_bind(),
     'ok' = build_mod_kazoo_config(),
     ecallmgr_sup:start_link().
 
@@ -68,7 +65,6 @@ node_info(Server, Started) ->
 stop(_State) ->
     _ = event_stream_unbind(),
     _ = fetch_handlers_unbind(),
-    _ = freeswitch_nodesup_unbind(),
     _ = kz_nodes_bindings:unbind('ecallmgr', ?MODULE),
     'ok'.
 
@@ -95,20 +91,6 @@ declare_exchanges() ->
 node_bindings() ->
     _ = kz_nodes_bindings:bind('ecallmgr', ?MODULE),
     'ok'.
-
--spec freeswitch_nodesup_bind() -> 'ok'.
-freeswitch_nodesup_bind() ->
-    _ = kazoo_bindings:bind(<<"freeswitch.node.modules">>, ?MODULE, 'freeswitch_node_modules'),
-    'ok'.
-
--spec freeswitch_nodesup_unbind() -> 'ok'.
-freeswitch_nodesup_unbind() ->
-    _ = kazoo_bindings:unbind(<<"freeswitch.node.modules">>, ?MODULE, 'freeswitch_node_modules'),
-    'ok'.
-
--spec freeswitch_node_modules() -> kz_term:ne_binaries().
-freeswitch_node_modules() ->
-    application:get_env(?APP, 'node_modules', ?NODE_MODULES).
 
 -spec event_stream_bind() -> 'ok'.
 event_stream_bind() ->

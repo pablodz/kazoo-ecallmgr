@@ -847,17 +847,18 @@ default_fs_node() ->
 -spec default_fs_nodename() -> string().
 default_fs_nodename() -> "freeswitch".
 
--spec registered_names() -> [string()].
+-spec registered_names() -> [atom()].
 registered_names() ->
     Mod = net_kernel:epmd_module(),
     case Mod:names() of
-        {ok, Names} -> lists:map(fun({K,_V}) -> K end, Names);
+        {ok, Names} -> lists:map(fun({K,_V}) -> erlang:list_to_atom(K) end, Names);
         _Else -> []
     end.
 
 -spec try_connect_to_default_fs() -> 'skip' | 'ok' | {'error', 'no_connection'}.
 try_connect_to_default_fs() ->
-    case proplists:is_defined(default_fs_nodename(), registered_names()) of
+    FSNode = erlang:list_to_atom(default_fs_nodename()),
+    case proplists:is_defined(FSNode, registered_names()) of
         true -> try_connect_to_default_fs(default_fs_node());
         false -> skip
     end.

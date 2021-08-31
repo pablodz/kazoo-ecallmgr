@@ -557,6 +557,8 @@ handle_channel_destroyed(#state{sanity_check_tref=SCTRef
             andalso EventUUID =:= 'undefined'
         of
             'true' -> 'ok';
+            'false' when CurrentApp =:= <<"bridge">> ->
+                self() ! {'force_queue_advance', CallId};
             'false' ->
                 send_error_resp(Node, CallId, CurrentCmd, 'DOWN'),
                 self() ! {'force_queue_advance', CallId}

@@ -47,9 +47,10 @@ fetch_directory(#{node := Node, fetch_id := FetchId, payload := JObj}=Context) -
                ),
 
     case kzd_fetch:fetch_action(JObj, <<"sip_auth">>) of
-        <<"sip_auth">> -> lookup_registrar(Context);
-        <<"jsonrpc-authenticate">> -> validate_token(Context);
-        <<"user_call">> -> lookup_registrar(Context);
+        <<"sip_auth">> -> lookup_directory(Context);
+        <<"sip_auth_token">> -> validate_token(Context);
+        <<"jsonrpc-authenticate">> -> validate_rpc_token(Context);
+        <<"user_call">> -> maybe_lookup_registrar(Context);
         <<"group_call">> -> lookup_directory(kzd_fetch:fetch_group(JObj), Context);
         _Other ->
             lager:debug("unhandled action '~s' in request ~s"
@@ -86,7 +87,7 @@ directory_not_found(#{node := Node, fetch_id := FetchId} = Context) ->
 
 -spec validate_token(map()) -> fs_handlecall_ret().
 validate_token(#{payload := JObj}=Context) ->
-    case kz_json:get_ne_binary_value(<<"X-Auth-Token">>, JObj) of
+    case kz_json:get_ne_binary_value(<<"JWT-Token">>, kzd_fetch:cauth(JObj)) of
         'undefined' -> directory_not_found(Context);
         Token -> validate_token(Context, kz_auth:validate_token(Token))
     end.
@@ -100,33 +101,64 @@ validate_token(#{fetch_id := FetchId}=Context, {error, Error}) ->
                  ),
     directory_not_found(Context);
 validate_token(#{payload := JObj} = Context, {'ok', Claims}) ->
+    KVs = [{<<"Requested-Domain-Name">>, kzd_fetch:fetch_key_value(JObj)}
+          ,{<<"Requested-User-ID">>, kzd_fetch:fetch_user(JObj)}
+          ],
+    Ctx = Context#{claims => Claims
+                  ,payload => kz_json:set_values(KVs, JObj)
+                  },
+    validate_token_claims(Ctx).
+
+-spec validate_token_claims(map()) -> fs_handlecall_ret().
+validate_token_claims(#{claims := Claims} = Context) ->
+    Sub = kz_json:get_ne_binary_value(<<"sub">>, Claims),
+    [EndpointId, AccountId] = binary:split(Sub, <<"@">>, ['global']),
+    Ctx = Context#{endpoint_id => EndpointId
+                  ,account_id => AccountId
+                  },
+    Endpoint = to_endpoint(EndpointId, AccountId, Claims),
+    Options = [{'claims', Claims}
+              ,{'endpoint', Endpoint}
+              ],
+    fetch_directory(EndpointId, AccountId, Ctx, Options).
+
+to_endpoint(EndpointId, AccountId, Claims) ->
+    SIPInfo = kz_json:normalize(kz_json:get_json_value(<<"SIP-Info">>, Claims)),
+    kz_json:from_list(
+      props:filter_undefined(
+        [{<<"_id">>, EndpointId}
+        ,{<<"_rev">>, kz_auth_claims:identity_sig(Claims)}
+        ,{<<"pvt_account_id">>, AccountId}
+        ,{<<"pvt_account_db">>, AccountId}
+        ,{<<"pvt_type">>, <<"device">>}
+        ,{<<"device_type">>, <<"smartphone">>}
+        ,{<<"owner_id">>, kz_auth_claims:owner_id(Claims)}
+        ,{<<"sip">>, kz_json:from_list(kz_json:to_proplist(<<"user_agent">>, SIPInfo))}
+        | kz_json:to_proplist(kz_json:normalize(kz_json:delete_keys([<<"user_agent">>], SIPInfo)))
+        ])).
+
+-spec validate_rpc_token(map()) -> fs_handlecall_ret().
+validate_rpc_token(#{payload := JObj}=Context) ->
+    case kz_json:get_ne_binary_value(<<"X-Auth-Token">>, JObj) of
+        'undefined' -> directory_not_found(Context);
+        Token -> validate_rpc_token(Context, kz_auth:validate_token(Token))
+    end.
+
+-type validate_rpc_token_result() :: {'ok', kz_json:object()} | {'error', any()}.
+
+-spec validate_rpc_token(map(), validate_rpc_token_result()) -> fs_handlecall_ret().
+validate_rpc_token(#{fetch_id := FetchId}=Context, {error, Error}) ->
+    lager:warning("fetch request ~s has an invalid token : ~s"
+                 ,[FetchId, Error]
+                 ),
+    directory_not_found(Context);
+validate_rpc_token(#{payload := JObj} = Context, {'ok', Claims}) ->
     AccountId = kz_json:get_ne_binary_value(<<"account_id">>, Claims),
     OwnerId = kz_json:get_ne_binary_value(<<"owner_id">>, Claims),
     KVs = [{<<"Requested-Domain-Name">>, kzd_fetch:fetch_key_value(JObj)}
           ,{<<"Requested-User-ID">>, kzd_fetch:fetch_user(JObj)}
           ],
     lookup_directory(OwnerId, AccountId, Context#{payload => kz_json:set_values(KVs, JObj)}).
-
--spec lookup_registrar(map()) -> fs_handlecall_ret().
-lookup_registrar(#{payload := JObj}=Context) ->
-    EndpointId = kzd_fetch:fetch_user(JObj),
-    AccountId = kzd_fetch:fetch_key_value(JObj),
-    KVs = [{<<"Requested-User-ID">>, EndpointId}
-          ,{<<"Requested-Domain-Name">>, AccountId}
-          ],
-    lookup_registrar(Context#{payload => kz_json:set_values(KVs, JObj)}
-                    ,EndpointId
-                    ,AccountId
-                    ).
-
-lookup_registrar(Context, EndpointId, AccountId) ->
-    lager:debug("lookup registration for endpoint: ~s / ~s", [EndpointId, AccountId]),
-    case ecallmgr_registrar:lookup_endpoint(EndpointId, AccountId) of
-        {'error', 'not_found'} ->
-            lookup_directory(Context);
-        {'ok', Endpoint} ->
-            fetch_directory(EndpointId, AccountId, Context, [{'endpoint', kz_json:from_list(Endpoint)}])
-    end.
 
 -spec fetch_direction(kz_json:object()) -> kz_term:ne_binary().
 fetch_direction(JObj) ->
@@ -169,3 +201,35 @@ send_reply(#{node := Node, fetch_id := FetchId} = Context) ->
                ,[Node, FetchId]
                ),
     freeswitch:fetch_reply(Context).
+
+-spec maybe_lookup_registrar(map()) -> fs_handlecall_ret().
+maybe_lookup_registrar(#{payload := JObj} = Context) ->
+    case kz_json:is_true(<<"endpoint_is_ephemeral">>, JObj, false)
+        andalso not kz_app_config:get_boolean(?APP, <<"use_proxy_contact_api">>, false)
+    of
+        true ->
+            lookup_registrar(Context);
+        false ->
+            lookup_directory(Context)
+    end.
+
+-spec lookup_registrar(map()) -> fs_handlecall_ret().
+lookup_registrar(#{payload := JObj}=Context) ->
+    EndpointId = kzd_fetch:fetch_user(JObj),
+    AccountId = kzd_fetch:fetch_key_value(JObj),
+    KVs = [{<<"Requested-User-ID">>, EndpointId}
+          ,{<<"Requested-Domain-Name">>, AccountId}
+          ],
+    lookup_registrar(Context#{payload => kz_json:set_values(KVs, JObj)}
+                    ,EndpointId
+                    ,AccountId
+                    ).
+
+lookup_registrar(Context, EndpointId, AccountId) ->
+    lager:debug("lookup registration for endpoint: ~s / ~s", [EndpointId, AccountId]),
+    case ecallmgr_registrar:lookup_endpoint(EndpointId, AccountId) of
+        {'error', 'not_found'} ->
+            lookup_directory(Context);
+        {'ok', Endpoint} ->
+            fetch_directory(EndpointId, AccountId, Context, [{'endpoint', kz_json:from_list(Endpoint)}])
+    end.

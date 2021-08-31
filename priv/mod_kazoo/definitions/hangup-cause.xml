@@ -48,4 +48,6 @@
 		</filters>
 	</field>
 
+	<field name="Hangup-Cause" type="first-of" value="Hangup-Cause|variable_hangup_cause"/>
+
 </definition>

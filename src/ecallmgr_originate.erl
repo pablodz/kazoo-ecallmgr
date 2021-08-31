@@ -389,6 +389,7 @@ get_channel_vars(JObj) ->
     InteractionId = kz_json:get_value([<<"Custom-Channel-Vars">>, <<?CALL_INTERACTION_ID>>], JObj, ?CALL_INTERACTION_DEFAULT),
     CCVs = [{<<"Ecallmgr-Node">>, kz_term:to_binary(node())}
            ,{<<?CALL_INTERACTION_ID>>, InteractionId}
+           ,{<<"Call-Flag-NO-Flip">>, true}
            ],
     J = kz_json:from_list_recursive([{<<"Custom-Channel-Vars">>, add_ccvs(JObj, CCVs)}]),
     ecallmgr_fs_xml:get_channel_vars(kz_json:merge(JObj, J)).

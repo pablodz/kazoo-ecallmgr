@@ -360,6 +360,11 @@
                               ,{<<"CDR-URI-Request">>, <<"cdr_uri_request">>}
                               ,{<<?CALL_INTERACTION_ID>>, <<?CALL_INTERACTION_ID>>}
                               ,{<<"Existing-Call-ID">>, <<"kz_originate_aleg_uuid">>}
+                              ,{<<"Relay-ID">>, <<"relay_id">>}
+                              ,{<<"Relay-Cookie-ID">>, <<"event_channel_cookie">>}
+                              ,{<<"Call-Flag-NO-Flip">>, <<"no_flip">>}
+                              ,{<<"Endpoint-Is-Ephemeral">>, <<"endpoint_is_ephemeral">>}
+                              ,{<<"KAZOO-AOR">>, <<"sip_h_X-KAZOO-AOR">>}
                               ]).
 
 -define(CALLER_PROFILE_VARS, [{<<"Caller-ID-Name">>, <<"caller_id_name">>}

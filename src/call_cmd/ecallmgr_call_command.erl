@@ -1410,7 +1410,7 @@ get_page_app(Node, UUID, JObj, Endpoints) ->
     PageId = <<"page_", (kz_binary:rand_hex(8))/binary>>,
     ConferenceName = list_to_binary([PageId, "@page"]),
 
-    Routines = [fun add_page_exports/1
+    Routines = [fun(DP) -> add_page_exports(DP, UUID) end
                ,fun(DP) -> set_page_conference_vars(DP, PageId) end
                ,fun(DP) -> maybe_set_page_two_way_audio(DP, JObj) end
                ,fun(DP) -> set_page_caller_id(DP, JObj) end
@@ -1482,15 +1482,22 @@ add_page_conference_app(Dialplan, ConferenceName) ->
     | Dialplan
     ].
 
--spec add_page_exports(kz_term:proplist()) -> kz_term:proplist().
-add_page_exports(DP) ->
-    Exports = [{<<"sip_redirect_context">>, <<"context_2">>}
-              ,{<<"ecallmgr_Ecallmgr-Node">>, <<"${ecallmgr_Ecallmgr-Node}">>}
+-spec add_page_exports(kz_term:proplist(), kz_term:ne_binary()) -> kz_term:proplist().
+add_page_exports(DP, UUID) ->
+    Exports = [<<"sip_redirect_context">>
+              ,<<"ecallmgr_Ecallmgr-Node">>
+              ,<<?CALL_INTERACTION_ID>>
+              ,{<<"kz_originate_aleg_uuid">>, UUID}
+              ,{<<"no_flip">>, <<"true">>}
               ],
-    ExportVars = kz_binary:join([K || {K, _V} <- Exports], <<",">>),
+    ExportVars = kz_binary:join([add_page_export(Export) || Export <- Exports], <<",">>),
     [{"set", <<"conference_auto_outcall_export_vars=", ExportVars/binary>>}
     |DP
     ].
+
+add_page_export({AsVar,FromVar}) ->
+    list_to_binary([AsVar, "=", FromVar]);
+add_page_export(Var) -> Var.
 
 -type ep_actions() :: kz_term:ne_binaries().
 

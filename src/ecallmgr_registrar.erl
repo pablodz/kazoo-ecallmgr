@@ -203,7 +203,7 @@ lookup_endpoint(<<>>, _AccountId) -> {'error', 'not_found'};
 lookup_endpoint(_EndpointId, <<>>) -> {'error', 'not_found'};
 lookup_endpoint(<<EndpointId/binary>>, <<AccountId/binary>>) ->
     MatchSpec = #registration{account_id = AccountId
-                             ,id = {EndpointId, '_'}
+                             ,authorizing_id = EndpointId
                              ,_ = '_'
                              },
 
@@ -230,7 +230,7 @@ lookup_proxy_path(<<Realm/binary>>, <<Username/binary>>) ->
             {'ok', 'undefined', []};
         [#registration{}=Reg] ->
             {'ok', proxy_with_transport(Reg), contact_vars(to_props(Reg))}
-        end.
+    end.
 
 -spec proxy_with_transport(registration()) -> binary().
 proxy_with_transport(#registration{proxy = Proxy, proxy_proto = Proto}) ->
@@ -281,6 +281,11 @@ contact_vars_fold({<<"Original-Contact">>, Contact}, Props) ->
         'undefined' -> Props;
         Transport -> contact_vars_fold({<<"Proxy-Protocol">>, Transport}, Props)
     end;
+contact_vars_fold({<<"AOR">>, AOR}, Props) ->
+    [{<<"SIP-Invite-To-URI">>, AOR}
+    ,{<<"KAZOO-AOR">>, AOR}
+    | Props
+    ];
 contact_vars_fold(_ , Props) -> Props.
 
 -spec lookup_original_contact(kz_term:ne_binary(), kz_term:ne_binary()) ->
@@ -1225,14 +1230,15 @@ registration_notify(#registration{contact=Contact
 
 -spec to_endpoint(registration()) -> kz_term:proplist().
 to_endpoint(Reg) ->
+    EndpointInfo = kz_json:normalize(Reg#registration.endpoint_info),
     props:filter_undefined(
       [{<<"pvt_account_id">>, Reg#registration.account_id}
       ,{<<"id">>, Reg#registration.authorizing_id}
       ,{<<"pvt_type">>, Reg#registration.authorizing_type}
       ,{<<"owner_id">>, Reg#registration.owner_id}
       ,{<<"presence_id">>, Reg#registration.presence_id}
-      ,{<<"sip">>, kz_json:from_list([{<<"username">>, Reg#registration.username}])}
-      | kz_json:to_proplist(kz_json:normalize(Reg#registration.endpoint_info))
+      ,{<<"sip">>, kz_json:get_json_value(<<"user_agent">>, EndpointInfo)}
+      | kz_json:to_proplist(kz_json:delete_keys([<<"user_agent">>], EndpointInfo))
       ]
      ).
 
@@ -1276,6 +1282,8 @@ to_props(Reg) ->
       ,{<<"To-User">>, Reg#registration.to_user}
       ,{<<"User-Agent">>, Reg#registration.user_agent}
       ,{<<"Username">>, Reg#registration.username}
+      ,{<<"Endpoint-Info">>, Reg#registration.endpoint_info}
+      ,{<<"AOR">>, list_to_binary(["sip:", Reg#registration.username, "@", Reg#registration.realm])}
       ]
      ).
 

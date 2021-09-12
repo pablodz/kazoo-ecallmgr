@@ -1,5 +1,5 @@
 <event name="CALL_UPDATE">
-	<fields verbose="true">
+	<fields>
 		<field name="call_event" type="reference" />
 	</fields>
 </event>

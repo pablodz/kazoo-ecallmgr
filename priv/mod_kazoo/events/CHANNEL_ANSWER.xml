@@ -1,5 +1,5 @@
 <event name="CHANNEL_ANSWER">
-	<fields verbose="false">
+	<fields>
 		<field name="call_event" type="reference" />
 		<field name="from-to" type="reference" />
 	</fields>

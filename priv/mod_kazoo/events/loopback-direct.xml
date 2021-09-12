@@ -1,5 +1,5 @@
 <event name="loopback::direct">
-	<fields verbose="true">
+	<fields>
 		<field name="call_event" type="reference" />
 		<field name="Event-Name" type="static" value="CHANNEL_DIRECT" />
 		<field name="Resigning-UUID" as="Call-ID" />

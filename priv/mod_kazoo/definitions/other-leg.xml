@@ -6,7 +6,7 @@
 	<field name="Other-Leg-Call-ID" type="first-of"
 		value="Other-Leg-Unique-ID|Other-Leg-Call-ID|variable_origination_uuid|ent_originate_aleg_uuid|variable_ent_originate_aleg_uuid|kz_originate_aleg_uuid|variable_kz_originate_aleg_uuid" />
     <field name="Other-Leg" type="static" serialize-as="object">
-	    <fields verbose="false">
+	    <fields>
 			<field name="Direction" />
 			<field name="Caller-ID-Name" />
 			<field name="Caller-ID-Number" />

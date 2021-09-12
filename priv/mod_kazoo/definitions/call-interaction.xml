@@ -1,6 +1,6 @@
 <definition name="call-interaction">
     <field name="Call-Interaction" type="static" serialize-as="object">
-       <fields verbose="false">
+       <fields>
             <field name="variable_Call-Interaction-ID" as="Id" />
             <field name="Key" type="expand" value="${regex(${variable_Call-Interaction-ID}|([^-]*)-(.*)|%2)}" />
             <field name="Timestamp" type="expand" value="${regex(${variable_Call-Interaction-ID}|([^-]*)-(.*)|%1)}" serialize-as="number"/>

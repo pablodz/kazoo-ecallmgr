@@ -1,5 +1,5 @@
 <event name="RECORD_START">
-	<fields verbose="false">
+	<fields>
 		<field name="call_event" type="reference" />
 		<field name="recording" type="reference" />
 

@@ -1,6 +1,6 @@
 <profile name="configuration">
 
-	<fields verbose="true">
+	<fields>
 		<field name="fetch-info" type="reference" />
 	</fields>
 

@@ -1,5 +1,5 @@
 <event name="CALL_SECURE">
-	<fields verbose="false">
+	<fields>
 		<field name="call_event" type="reference" />
 		<field name="Custom-Channel-Vars" type="reference" />
 		<field name="Custom-Application-Vars" type="reference" />

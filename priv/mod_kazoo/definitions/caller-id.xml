@@ -4,7 +4,7 @@
 			<filter name="Call-Direction" type="include" compare="value" value="inbound" />
 			<!--<filter name="Caller-Endpoint-ID" type="include" compare="exists" />-->
 		</filters>
-		<fields verbose="false">
+		<fields>
 			<field name="Caller-ID-Number" type="first-of"	value="KZ-Caller-ID-Number|variable_origination_caller_id_number|variable_effective_caller_id_number|Caller-Caller-ID-Number" />
 			<field name="Caller-ID-Name" type="first-of" value="KZ-Caller-ID-Name|variable_origination_caller_id_name|variable_effective_caller_id_name|Caller-Caller-ID-Name" />
 			<field name="Callee-ID-Number" type="first-of" value="KZ-Callee-ID-Number|variable_effective_callee_id_number|Caller-Callee-ID-Number|Other-Leg-Caller-ID-Number" />
@@ -14,7 +14,7 @@
 		<filters>
 			<filter name="Call-Direction" type="include" compare="value" value="outbound" />
 		</filters>
-		<fields verbose="false">
+		<fields>
 			<field name="Caller-ID-Number" type="first-of"	value="KZ-Origination-Caller-ID-Number|KZ-Caller-ID-Number|variable_origination_caller_id_number|variable_effective_caller_id_number|Caller-Caller-ID-Number" />
 			<field name="Caller-ID-Name" type="first-of" value="KZ-Origination-Caller-ID-Name|KZ-Caller-ID-Name|variable_origination_caller_id_name|variable_effective_caller_id_name|Caller-Caller-ID-Name" />
 			<field name="Callee-ID-Number" type="first-of" value="KZ-Callee-ID-Number|variable_origination_callee_id_number|variable_effective_callee_id_number|Caller-Callee-ID-Number|Other-Leg-Caller-ID-Number" />
@@ -26,7 +26,7 @@
 			<filter name="Call-Direction" type="include" compare="value" value="outbound" />
 			<filter name="Channel-Flags" type="include" compare="contains" value="DIALPLAN" />
 		</filters>
-		<fields verbose="false">
+		<fields>
 			<field name="Caller-ID-Number" type="first-of"	value="KZ-Caller-ID-Number|KZ-Caller-ID-Number|variable_origination_caller_id_number|variable_effective_caller_id_number|Caller-Caller-ID-Number" />
 			<field name="Caller-ID-Name" type="first-of" value="KZ-Caller-ID-Name|KZ-Caller-ID-Name|variable_origination_caller_id_name|variable_effective_caller_id_name|Caller-Caller-ID-Name" />
 			<field name="Callee-ID-Number" type="first-of" value="KZ-Callee-ID-Number|variable_origination_callee_id_number|variable_effective_callee_id_number|Caller-Callee-ID-Number|Other-Leg-Caller-ID-Number" />

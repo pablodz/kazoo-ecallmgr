@@ -3,7 +3,7 @@
 		<filters>
 			<filter name="ecallmgr" type="include" compare="prefix" value="variable_cav_" />
 		</filters>
-		<fields verbose="false">
+		<fields>
 			<field name="variable_cav_" type="prefix" exclude-prefix="true" />
 		</fields>
 	</field>

@@ -19,7 +19,7 @@
 		<filter name="Application" value="bridge" />
 	</filters>
 
-	<fields verbose="false">
+	<fields>
 		<field name="call_event" type="reference" />
 		<field name="application-uuid" type="reference" />
 

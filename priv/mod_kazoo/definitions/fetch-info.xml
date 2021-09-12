@@ -1,8 +1,10 @@
 <definition name="fetch-info">
 	<field name="Event-Category" type="static" value="fetch" />
+	<field name="Event-Name" />
 	<field name="App-Name" type="static" value="freeswitch" />
 	<field name="App-Version" type="static" value="1.0" />
 	<field name="Switch-Nodename" as="Node" />
+	<field name="Core-UUID" />
 	<field name="Fetch-UUID" />
 	<field name="Fetch-UUID" as="Msg-ID" />
 	<field name="Call-ID" as="Fetch-Call-UUID" />
@@ -10,14 +12,38 @@
 	<field name="Fetch-Section" />
 	<field name="Fetch-Timeout" serialize-as="number" />
 	<field name="Fetch-Timestamp-Micro" serialize-as="number" />
+	<field name="Fetch-Key-Name"/>
+	<field name="Fetch-Key-Value"/>
+	<field name="Fetch-Tag"/>
+
 	<field name="Kazoo-Bundle" as="Fetch-Version" />
-	<field name="fetch-info-csh" type="reference" />
+	<!--
+	<field name="Kazoo-Version"/>
+	<field name="Kazoo-Bundle"/>
+	<field name="Kazoo-Release"/>
+	-->
+
+	<!--<field name="fetch-info-csh" type="reference" />-->
 	<field name="Custom-Channel-Vars" type="reference" />
 	<field name="Custom-Application-Vars" type="reference" />
 	<field name="freeswitch-url" type="reference" />
 	<field name="Control" type="reference" />
 	<field name="hunt-privacy" type="reference" />
+	<field name="Custom-SIP-Headers" type="reference" />
 	<field name="Custom-AUTH-Headers" type="reference" />
 	<field name="debug-call" type="reference" />
-	<field name="proxy-origin"  type="reference" />
 </definition>
+
+<!--
+
+    kz_json:get_binary_value(<<"Fetch-Winning-PID">>, JObj).
+    kz_json:get_ne_binary_value(<<"Controller-Queue">>, JObj).
+    kz_json:get_ne_binary_value(<<"Controller-PID">>, JObj).
+
+    kz_json:get_ne_binary_value(<<"Expires">>, JObj).
+    kz_json:get_ne_binary_value(<<"Auth-Nonce">>, JObj).
+    kz_json:get_ne_binary_value(<<"Auth-Response">>, JObj).
+    kz_json:get_ne_binary_value(<<"Auth-From">>, JObj).
+    kz_json:get_ne_binary_value(<<"Auth-To">>, JObj).
+    kz_json:get_json_value(<<"Resource">>, JObj, Default).
+-->

@@ -1,5 +1,5 @@
 <event name="RECORD_STOP">
-	<fields verbose="false">
+	<fields>
 		<field name="call_event" type="reference" />
 		<field name="recording" type="reference" />
 		<field name="variable_playback_terminator_used" as="Terminator" />

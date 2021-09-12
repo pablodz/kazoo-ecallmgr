@@ -1,5 +1,5 @@
 <event name="CHANNEL_SYNC">
-	<fields verbose="true">
+	<fields>
 		<field name="call_event" type="reference" />
 	</fields>
 </event>

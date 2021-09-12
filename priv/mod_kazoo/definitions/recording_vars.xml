@@ -1,6 +1,6 @@
 <definition name="recording_vars">
 	<field name="Recording" type="static" serialize-as="object">
-		<fields verbose="false">
+		<fields>
 			<field name="Recording-Variable-" type="prefix" exclude-prefix="true" />
 			<field name="variable_record_file_size" as="File-Size"
 				serialize-as="number" />

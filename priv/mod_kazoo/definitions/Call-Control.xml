@@ -4,7 +4,7 @@
 			<filter name="ecallmgr" type="include" compare="prefix"
 				value="variable_Call-Control-" />
 		</filters>
-		<fields verbose="false">
+		<fields>
 			<field name="variable_Call-Control-" type="prefix"
 				exclude-prefix="true" />
 		</fields>

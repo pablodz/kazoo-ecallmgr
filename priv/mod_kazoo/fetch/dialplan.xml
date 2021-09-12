@@ -1,8 +1,7 @@
 <profile name="dialplan" profile-type="fetch">
 
-	<fields verbose="false">
-		<field name="voice_dialplan" type="reference" />
-		<field name="debug-call" type="reference" />
+	<fields>
+		<field name="fetch-dialplan" type="reference" />
 	</fields>
 
 	<params>

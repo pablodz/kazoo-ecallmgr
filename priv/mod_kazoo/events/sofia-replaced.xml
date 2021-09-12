@@ -1,5 +1,5 @@
 <event name="sofia::replaced">
-	<fields verbose="false">
+	<fields>
 		<field name="call_event" type="reference" />
 		<field name="Event-Name" type="static" value="CHANNEL_REPLACED" />
 		<field name="att_xfer_replaced_by" type="first-of" as="Replaced-By"

@@ -1,5 +1,5 @@
 <event name="kazoo::noop">
-	<fields verbose="false">
+	<fields>
 		<field name="call_event" type="reference" />
 		<field name="application-uuid" type="reference" />
 		<field name="Application-Name" type="static" value="noop" />

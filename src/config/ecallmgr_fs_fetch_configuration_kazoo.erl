@@ -122,8 +122,10 @@ fs_defs(XmlEl, Acc) ->
 
 -spec fs_xml(file:filename_all()) -> kz_types:xml_el().
 fs_xml(File) ->
-    {Xml, _} = xmerl_scan:file(re:replace(File, "::", "-", ['global'])),
-    Xml.
+    case xmerl_scan:file(re:replace(File, "::", "-", ['global'])) of
+        {error, _Err} -> throw({invalid_configuration, lists:flatten(io_lib:format("error reading file : ~s : ~p", [File, _Err]))});
+        {Xml, _} -> Xml
+    end.
 
 -spec fs_def_filename(kz_types:xml_attrib() | string()) -> file:filename_all().
 fs_def_filename(#xmlAttribute{name='name', value=Name}) ->

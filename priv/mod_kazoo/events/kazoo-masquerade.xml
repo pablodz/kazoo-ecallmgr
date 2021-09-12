@@ -1,5 +1,5 @@
 <event name="kazoo::masquerade">
-	<fields verbose="false">
+	<fields>
 		<field name="call_event" type="reference" />
 		<field name="application-uuid" type="reference" />
 		<field name="Application-Response" type="first-of"

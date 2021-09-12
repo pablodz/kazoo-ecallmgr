@@ -1,6 +1,6 @@
 <definition name="cdr-extended-data">
     <field name="Extended-Data" type="static" serialize-as="object">
-        <fields verbose="false">
+        <fields>
             <field name="_json_channel_stats" as="Channel-Stats" serialize-as="raw"/>
             <field name="_json_callflow" as="Channel-CallFlow" serialize-as="raw">
                 <filters>

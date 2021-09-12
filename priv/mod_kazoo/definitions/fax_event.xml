@@ -2,7 +2,7 @@
 	<field name="call_event_headers" type="reference" />
 	<field name="Event-Name" type="static" value="CHANNEL_FAX_STATUS" />
 	<field name="Application-Data" type="static" serialize-as="object">
-		<fields verbose="false">
+		<fields>
 			<field name="fax_data" type="reference" />
 		</fields>
 	</field>

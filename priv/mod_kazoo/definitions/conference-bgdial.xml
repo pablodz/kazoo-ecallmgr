@@ -3,7 +3,7 @@
 		<filters>
 			<filter name="Action" type="include" compare="value" value="bgdial-result" />
 		</filters>
-		<fields verbose="false">
+		<fields>
 			<field name="Result" />
 			<field name="Job-UUID" />
 			<field name="Peer-UUID" />

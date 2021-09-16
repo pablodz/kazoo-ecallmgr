@@ -139,7 +139,7 @@ to_endpoint(EndpointId, AccountId, Claims) ->
 
 -spec validate_rpc_token(map()) -> fs_handlecall_ret().
 validate_rpc_token(#{payload := JObj}=Context) ->
-    case kz_json:get_ne_binary_value(<<"X-Auth-Token">>, JObj) of
+    case kz_json:get_ne_binary_value(<<"Token">>, kzd_fetch:cauth(JObj)) of
         'undefined' -> directory_not_found(Context);
         Token -> validate_rpc_token(Context, kz_auth:validate_token(Token))
     end.

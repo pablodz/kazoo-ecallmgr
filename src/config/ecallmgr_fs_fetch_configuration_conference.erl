@@ -46,7 +46,7 @@ fetch_conference_config(Node, <<"COMMAND">>, JObj, Ctx) ->
     maybe_fetch_conference_profile(Node, Profile, Conference, AccountId, Ctx);
 fetch_conference_config(Node, <<"REQUEST_PARAMS">>, JObj, Ctx) ->
     Action = kz_json:get_ne_binary_value([<<"Conference-Config-Request">>, <<"Action">>], JObj),
-    ConfName = kz_json:get_ne_binary([<<"Conference-Config-Request">>, <<"Conference-ID">>], JObj),
+    ConfName = kz_json:get_ne_binary_value([<<"Conference-Config-Request">>, <<"Conference-ID">>], JObj),
     lager:debug("request conference:~p params:~p", [ConfName, Action]),
     fetch_conference_params(Node, Action, ConfName, JObj, Ctx).
 

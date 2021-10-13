@@ -40,19 +40,19 @@ conference(#{node := Node, fetch_id := Id, payload := JObj}=Ctx) ->
 
 -spec fetch_conference_config(atom(), kz_term:ne_binary(), kz_json:object(), map()) -> fs_sendmsg_ret().
 fetch_conference_config(Node, <<"COMMAND">>, JObj, Ctx) ->
-    Profile = kz_json:get_value(<<"profile_name">>, JObj),
-    Conference = kz_json:get_value(<<"conference_name">>, JObj),
+    Profile = kz_json:get_ne_binary_value([<<"Conference-Config-Request">>, <<"Profile-ID">>], JObj),
+    Conference = kz_json:get_ne_binary_value([<<"Conference-Config-Request">>, <<"Conference-ID">>], JObj),
     AccountId = kzd_fetch:account_id(JObj),
     maybe_fetch_conference_profile(Node, Profile, Conference, AccountId, Ctx);
 fetch_conference_config(Node, <<"REQUEST_PARAMS">>, JObj, Ctx) ->
-    Action = kz_json:get_value(<<"Action">>, JObj),
-    ConfName = kz_json:get_value(<<"Conf-Name">>, JObj),
+    Action = kz_json:get_ne_binary_value([<<"Conference-Config-Request">>, <<"Action">>], JObj),
+    ConfName = kz_json:get_ne_binary([<<"Conference-Config-Request">>, <<"Conference-ID">>], JObj),
     lager:debug("request conference:~p params:~p", [ConfName, Action]),
     fetch_conference_params(Node, Action, ConfName, JObj, Ctx).
 
 fetch_conference_params(Node, <<"request-controls">>, ConfName, JObj, Ctx) ->
-    Controls = kz_json:get_value(<<"Controls">>, JObj),
-    Profile = kz_json:get_value(<<"Conf-Profile">>, JObj),
+    Controls = kz_json:get_ne_binary_value([<<"Conference-Config-Request">>, <<"Controls">>], JObj),
+    Profile = kz_json:get_ne_binary_value([<<"Conference-Config-Request">>, <<"Profile-ID">>], JObj),
     lager:debug("request controls:~p for profile: ~p", [Controls, Profile]),
 
     Cmd = [{<<"Request">>, <<"Controls">>}

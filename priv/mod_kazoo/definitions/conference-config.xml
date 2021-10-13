@@ -1,0 +1,18 @@
+<definition name="conference-config">
+	<field name="Conference-Config-Request" type="static" serialize-as="object">
+		<fields>
+			<!-- request for conference profile -->
+			<field name="profile_name" as="Profile-ID" />
+			<field name="conference_name" as="Conference-ID" />
+
+			<!-- request for conference profile params -->
+			<field name="Conf-Profile" as="Profile-ID" />
+			<field name="Conf-Name" as="Conference-ID" />
+			<field name="Action" />
+			<field name="Controls" />
+		</fields>
+		<filters>
+			<filter name="Fetch-Key-Value" type="include" value="conference.conf"/>
+		</filters>
+	</field>
+</definition>

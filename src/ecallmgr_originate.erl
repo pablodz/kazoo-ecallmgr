@@ -418,16 +418,17 @@ add_loopback('false') ->
     ].
 
 -spec originate_execute(atom(), kz_term:ne_binary(), kz_term:ne_binary()) ->
-          {'ok', kz_term:ne_binary()} |
-          {'error', kz_term:ne_binary()}.
+          kz_term:pid_ref().
 originate_execute(Node, UUID, Dialstrings) ->
     lager:debug("executing originate on ~s / ~s ~s", [Node, UUID, Dialstrings]),
     kz_process:spawn_monitor(fun originate_execute_async/4, [self(), Node, UUID, Dialstrings]).
 
+-spec originate_execute_async(pid(), atom(), kz_term:ne_binary(), kz_term:ne_binary()) ->
+          {'originate_result', freeswitch:fs_api_return()}.
 originate_execute_async(Pid, Node, UUID, Dialstrings) ->
     Arg = list_to_binary([UUID, " ", Dialstrings]),
     Res = freeswitch:async_api(Node, 'kz_originate', Arg),
-    Pid ! {originate_result, Res}.
+    Pid ! {'originate_result', Res}.
 
 -spec get_unset_vars(kz_json:object()) -> iolist().
 get_unset_vars(JObj) ->
@@ -579,4 +580,4 @@ start_control_process(#state{originate_req=JObj
 
 -spec start_abandon_timer() -> reference().
 start_abandon_timer() ->
-    erlang:send_after(?REPLY_TIMEOUT, self(), abandon_originate).
+    erlang:send_after(?REPLY_TIMEOUT, self(), 'abandon_originate').

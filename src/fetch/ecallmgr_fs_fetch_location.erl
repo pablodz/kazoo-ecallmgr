@@ -97,10 +97,7 @@ fetch_from_registrar(#{fetch_id := FetchId, node := Node, payload := JObj}=Conte
 
 -spec fetch_from_proxy(map(), kz_term:ne_binary(), kz_term:ne_binary()) -> fs_handlecall_ret().
 fetch_from_proxy(#{fetch_id := FetchId, node := Node, payload := JObj}=Context, AccountId, EndpointId) ->
-    Req = [{"Token-ID", list_to_binary([EndpointId, "@", AccountId])}
-          ,{"Search-Type", <<"token">>}
-          | kz_api:default_headers(?APP, ?APP_VERSION)
-          ],
+    Req = build_search_req(EndpointId, AccountId),
     case kz_amqp_worker:call(Req, fun kapi_registration:publish_search_req/1) of
         {'ok', RegObj} ->
             AOR = kz_json:get_json_value(<<"AOR">>, RegObj),
@@ -114,6 +111,12 @@ fetch_from_proxy(#{fetch_id := FetchId, node := Node, payload := JObj}=Context, 
         _Else ->
             location_not_found(Context)
     end.
+
+build_search_req(EndpointId, AccountId) ->
+    [{<<"Token-ID">>, list_to_binary([EndpointId, "@", AccountId])}
+    ,{<<"Search-Type">>, <<"token">>}
+    | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+    ].
 
 -spec proxy_props(kz_json:object()) -> kz_term:proplist().
 proxy_props(JObj) ->
@@ -134,8 +137,8 @@ proxy_add_aor(JObj, Props) ->
 proxy_check_protocol(JObj, Props) ->
     case kz_json:get_ne_binary_value(<<"Proxy-Protocol">>, JObj) of
         <<"ws", _/binary>> ->
-            [{<<"Media-Webrtc">>, true}
-            ,{<<"RTCP-MUX">>, true}
+            [{<<"Media-Webrtc">>, 'true'}
+            ,{<<"RTCP-MUX">>, 'true'}
             | Props
             ];
         _Else -> Props

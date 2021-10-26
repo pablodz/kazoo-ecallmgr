@@ -212,8 +212,17 @@ send_reply(#{node := Node, fetch_id := FetchId, reply := #{payload := Reply}}=Co
 
 -spec wait_for_route_winner(dialplan_context()) -> {'ok', dialplan_context()}.
 wait_for_route_winner(#{fetch_id := FetchId}=Context) ->
+    StartTime = kz_time:start_time(),
     receive
-        {'kapi', {_, {'dialplan', 'ROUTE_WINNER'}, JObj}} ->
+        {'kapi', {{_, _, {Basic, _}}, {'dialplan', 'ROUTE_WINNER'}, JObj}} ->
+            CreatedUnix = kz_json:get_integer_value(<<"Timestamp-Unix">>, JObj),
+            Created = kz_time:unix_us_to_gregorian_us(CreatedUnix),
+            PublishedUnix = kz_amqp_basic:timestamp(Basic),
+            Published = kz_time:unix_us_to_gregorian_us(PublishedUnix),
+            Elapsed = kz_time:elapsed_us(StartTime),
+            Delayed = kz_time:elapsed_us(Published),
+            Fired = kz_time:elapsed_us(Created),
+            lager:debug("route_win received after ~bμ , delayed by ~bμ, created ~bμ", [Elapsed, Delayed, Fired]),
             activate_call_control(Context#{winner => #{payload => JObj}});
         {'route_winner', JObj, _Props} ->
             activate_call_control(Context#{winner => #{payload => JObj}})

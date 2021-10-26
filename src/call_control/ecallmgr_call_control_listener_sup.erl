@@ -27,11 +27,8 @@
 %%------------------------------------------------------------------------------
 -spec start_link() -> kz_types:startlink_ret().
 start_link() ->
-    {'ok', Pid} = supervisor:start_link({'local', ?MODULE}
-                                       ,?MODULE
-                                       ,[]
-                                       ),
-    Workers = kapps_config:get_integer(?APP_NAME, <<"call_control_listeners">>, 5),
+    {'ok', Pid} = supervisor:start_link({'local', ?MODULE}, ?MODULE, []),
+    Workers = kz_app_config:get_integer(?APP, [<<"call_control">>, <<"listeners">>], 5),
     _ = kz_process:spawn(fun() -> [begin
                                        _ = supervisor:start_child(Pid, []),
                                        timer:sleep(250)

@@ -46,6 +46,10 @@
 
 -export([has_channels_for_owner/1]).
 
+-export([set_channels_update_default_strategy/0
+        ,set_channels_update_strategy/1
+        ]).
+
 -export([init/1
         ,handle_call/3
         ,handle_cast/2
@@ -200,11 +204,12 @@ flush_node(Node) ->
 
 -spec new(channel()) -> 'ok'.
 new(#channel{}=Channel) ->
-    gen_server:call(?SERVER, {'new_channel', Channel}).
+    do_channel_insert('new_channel', Channel).
 
 -spec new_or_update(channel()) -> 'ok'.
-new_or_update(#channel{}=Channel) ->
-    gen_server:call(?SERVER, {'new_or_update', Channel}).
+new_or_update(#channel{uuid=UUID}=Channel) ->
+    'true' = do_channel_insert('new_or_update', Channel),
+    lager:debug("channel ~s added/updated", [UUID]).
 
 -spec destroy(kz_term:ne_binary(), atom()) -> 'ok'.
 destroy(UUID, Node) ->
@@ -212,11 +217,11 @@ destroy(UUID, Node) ->
 
 -spec update(kz_term:ne_binary(), pos_integer(), any()) -> 'ok'.
 update(UUID, Key, Value) ->
-    gen_server:cast(?SERVER, {'channel_updates', UUID, [{Key, Value}]}).
+    do_update(UUID, [{Key, Value}]).
 
 -spec updates(kz_term:ne_binary(), channel_updates()) -> 'ok'.
 updates(UUID, Updates) ->
-    gen_server:cast(?SERVER, {'channel_updates', UUID, remove_unneeded(Updates)}).
+    do_update(UUID, remove_unneeded(Updates)).
 
 -spec remove_unneeded(channel_updates()) -> channel_updates().
 remove_unneeded(Updates) ->
@@ -432,10 +437,11 @@ init([]) ->
     process_flag('trap_exit', 'true'),
     lager:debug("starting new fs channels"),
     _ = ets:new(?CHANNELS_TBL, ['set'
-                               ,'protected'
+                               ,'public'
                                ,'named_table'
                                ,{'keypos', #channel.uuid}
                                ,{'read_concurrency', 'true'}
+                               ,{'write_concurrency', 'true'}
                                ]),
     {'ok', #state{max_channel_cleanup_ref=start_cleanup_ref()}}.
 
@@ -461,10 +467,9 @@ handle_call({'new_channel', #channel{uuid=UUID}=Channel}, _, State) ->
             lager:debug("channel ~s already exists", [UUID]),
             {'reply', {'error', 'channel_exists'}, State}
     end;
-handle_call({'new_or_update', #channel{uuid=UUID}=Channel}, _, State) ->
-    'true' = ets:insert(?CHANNELS_TBL, Channel),
-    lager:debug("channel ~s added/updated", [UUID]),
-    {'reply', 'ok', State};
+handle_call({'new_or_update', #channel{}=Channel}, _, State) ->
+    Result = ets:insert(?CHANNELS_TBL, Channel),
+    {'reply', Result, State};
 handle_call(_, _, State) ->
     {'reply', {'error', 'not_implemented'}, State}.
 
@@ -941,3 +946,43 @@ delete_and_maybe_disconnect(Node, UUID, [_Channel]) ->
     ets:delete(?CHANNELS_TBL, UUID);
 delete_and_maybe_disconnect(Node, UUID, []) ->
     lager:debug("channel ~s not found during sync delete with ~s", [UUID, Node]).
+
+do_update(UUID, Updates) ->
+    Strategy = persistent_term:get('channels_update_strategy', 'server'),
+    do_update(Strategy, UUID, Updates).
+
+do_update('concurrency', UUID, Updates) ->
+    WasUpdated = ets:update_element(?CHANNELS_TBL, UUID, Updates),
+    maybe_log_updates(WasUpdated, UUID, Updates);
+do_update('server', UUID, Updates) ->
+    gen_server:cast(?SERVER, {'channel_updates', UUID, Updates});
+do_update(_Other, UUID, Updates) ->
+    gen_server:cast(?SERVER, {'channel_updates', UUID, Updates}).
+
+do_channel_insert(Action, Channel) ->
+    Strategy = persistent_term:get('channels_update_strategy', 'server'),
+    do_channel_insert(Strategy, Action, Channel).
+
+do_channel_insert('concurrency', 'new_channel', #channel{uuid=UUID}=Channel) ->
+    case ets:insert_new(?CHANNELS_TBL, Channel) of
+        'true'-> lager:debug("channel ~s added", [UUID]);
+        'false' -> lager:debug("channel ~s already exists", [UUID])
+    end;
+do_channel_insert('concurrency', 'new_or_update', Channel) ->
+    ets:insert(?CHANNELS_TBL, Channel);
+do_channel_insert('server', Action, Channel) ->
+    gen_server:call(?SERVER, {Action, Channel});
+do_channel_insert(_Other, Action, Channel) ->
+    gen_server:call(?SERVER, {Action, Channel}).
+
+-spec set_channels_update_default_strategy() -> 'ok'.
+set_channels_update_default_strategy() ->
+    Strategy = kz_app_config:get_atom(?APP, [<<"channels">>, <<"update_strategy">>], 'server'),
+    set_channels_update_strategy(Strategy).
+
+-spec set_channels_update_strategy(term()) -> 'ok'.
+set_channels_update_strategy(Strategy)
+  when not is_atom(Strategy) ->
+    set_channels_update_strategy(kz_term:to_atom(Strategy, 'true'));
+set_channels_update_strategy(Strategy) ->
+    persistent_term:put('channels_update_strategy', Strategy).

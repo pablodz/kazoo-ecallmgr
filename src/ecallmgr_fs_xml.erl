@@ -423,7 +423,8 @@ route_resp_fire_route_win(JObj, #{'control_q' := ControlQ
              ,{<<"Fetch-UUID">>, FetchId}
              ],
     Args = [<<K/binary, "=", V/binary>> || {K, V} <- Params, kz_term:is_not_empty(V)],
-    action_el(<<"event">>, kz_binary:join(Args, <<",">>)).
+    EventApp = kz_app_config:get_ne_binary(?APP, [<<"dialplan">>, <<"apps">>, <<"event">>], <<"kz_deliver_event">>),
+    action_el(EventApp, kz_binary:join(Args, <<",">>)).
 
 -spec route_resp_ringback(kz_json:object()) -> kz_types:xml_el().
 route_resp_ringback(JObj) ->

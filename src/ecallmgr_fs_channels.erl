@@ -64,19 +64,19 @@
 -define(SERVER, ?MODULE).
 
 -define(RESPONDERS, [{{?MODULE, 'handle_query_auth_id'}
-                     ,[{<<"call_event">>, <<"query_auth_id_req">>}]
+                     ,[{<<"channel">>, <<"query_auth_id_req">>}]
                      }
                     ,{{?MODULE, 'handle_query_user_channels'}
-                     ,[{<<"call_event">>, <<"query_user_channels_req">>}]
+                     ,[{<<"channel">>, <<"query_user_channels_req">>}]
                      }
                     ,{{?MODULE, 'handle_query_account_channels'}
-                     ,[{<<"call_event">>, <<"query_account_channels_req">>}]
+                     ,[{<<"channel">>, <<"query_account_channels_req">>}]
                      }
                     ,{{?MODULE, 'handle_query_channels'}
-                     ,[{<<"call_event">>, <<"query_channels_req">>}]
+                     ,[{<<"channel">>, <<"query_channels_req">>}]
                      }
                     ,{{?MODULE, 'handle_channel_status'}
-                     ,[{<<"call_event">>, <<"channel_status_req">>}]
+                     ,[{<<"channel">>, <<"channel_status_req">>}]
                      }
                     ]).
 -define(BINDINGS, [{'call', [{'restrict_to', ['status_req']}
@@ -374,6 +374,7 @@ handle_channel_status(JObj, _Props) ->
             maybe_send_empty_channel_resp(CallId, JObj);
         {'ok', Status} ->
             Resp = [{<<"Msg-ID">>, kz_api:msg_id(JObj)} | Status],
+            lager:debug("sending back channel data to ~s", [kz_api:server_id(JObj)]),
             kapi_call:publish_channel_status_resp(kz_api:server_id(JObj), Resp)
     end.
 
@@ -421,6 +422,7 @@ send_empty_channel_resp(CallId, JObj) ->
            ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
            | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
            ],
+    lager:debug("sending back empty channel data to ~s", [kz_api:server_id(JObj)]),
     kapi_call:publish_channel_status_resp(kz_api:server_id(JObj), Resp).
 
 %%%=============================================================================

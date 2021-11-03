@@ -613,7 +613,8 @@ eavesdrop(Node, UUID, JObj) ->
 call_pickup(Node, UUID, JObj) ->
     case prepare_app(Node, UUID, JObj) of
         {'execute', AppNode, AppUUID, AppJObj, AppTarget} ->
-            get_call_pickup_app(AppNode, AppUUID, AppJObj, AppTarget, <<"intercept">>);
+            InterceptApp = kz_app_config:get_ne_binary(?APP, [<<"dialplan">>, <<"apps">>, <<"intercept">>], <<"kz_intercept">>),
+            get_call_pickup_app(AppNode, AppUUID, AppJObj, AppTarget, InterceptApp);
         Other ->
             Other
     end.

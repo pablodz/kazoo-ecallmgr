@@ -591,11 +591,11 @@ handle_execute_complete(_AppName, EventUUID, _JObj, #state{current_cmd_uuid='und
             lager:debug("execute complete not handled : ~s:~s", [_AppName, EventUUID]),
             State
     end;
-handle_execute_complete(AppName, EventUUID, _, #state{current_app=AppName
-                                                     ,current_cmd_uuid=EventUUID
-                                                     }=State) ->
+handle_execute_complete(AppName, EventUUID, JObj, #state{current_app=AppName
+                                                        ,current_cmd_uuid=EventUUID
+                                                        }=State) ->
     lager:debug("~s execute complete, advancing control queue : ~s", [AppName, EventUUID]),
-    forward_queue(State);
+    handle_execute_complete(JObj, State);
 handle_execute_complete(AppName, EventUUID, JObj, #state{current_app=CurrApp
                                                         ,current_cmd_uuid=EventUUID
                                                         }=State) ->
@@ -611,6 +611,52 @@ handle_execute_complete(AppName, EventUUID, JObj, #state{current_app=CurrApp
 handle_execute_complete(_AppName, _EventUUID, _JObj, #state{current_app=_CurrApp
                                                            ,current_cmd_uuid=__EventUUID
                                                            }=State) ->
+    State.
+
+handle_execute_complete(JObj, State) ->
+    Routines = [fun handle_execute_complete_error/2
+               ,fun forward_queue/1
+               ],
+    lists:foldl(handle_execute_complete_fun(JObj), State, Routines).
+
+handle_execute_complete_fun(JObj) ->
+    fun(F, State) when is_function(F, 1) ->
+            F(State);
+       (F, State) when is_function(F, 2) ->
+            F(JObj, State)
+    end.
+
+execute_complete_error_message(JObj) ->
+    kz_call_event:application_error_message(JObj, <<"unspecified error">>).
+
+execute_complete_error(JObj, #state{current_cmd=Cmd
+                                   ,call_id = CallId
+                                   }) ->
+    AppName = kapi_dialplan:application_name(Cmd),
+    Msg = <<"Could not execute dialplan action: ", AppName/binary>>,
+    Error = execute_complete_error_message(JObj),
+    ChannelState = kz_call_event:channel_state(JObj),
+    CallState = kz_call_event:channel_call_state(JObj),
+    #{cmd => Cmd
+     ,msg => Msg
+     ,error => Error
+     ,call_state => CallState
+     ,channel_state => ChannelState
+     ,call_id => CallId
+     }.
+
+execute_complete_has_error(JObj) ->
+    kz_call_event:application_response(JObj) =:= <<"ERROR">>
+        orelse kz_call_event:application_error_message(JObj) =/= undefined.
+
+handle_execute_complete_error(JObj, State) ->
+    handle_execute_complete_error(execute_complete_has_error(JObj), JObj, State).
+
+handle_execute_complete_error(true, JObj, State) ->
+    Reply = execute_complete_error(JObj, State),
+    publish_error_resp(Reply),
+    State;
+handle_execute_complete_error(false, _JObj, State) ->
     State.
 
 %%------------------------------------------------------------------------------
@@ -1151,7 +1197,7 @@ publish_error_resp(#{cmd := Cmd
            ,{<<"Channel-Call-State">>, CallState}
            ,{<<"Request">>, kz_api:remove_defaults(Cmd)}
            ,{<<"Call-ID">>, CallId}
-           | kz_api:default_headers(<<>>, <<"error">>, <<"dialplan">>, ?APP_NAME, ?APP_VERSION)
+           | kz_api:default_headers(<<"error">>, <<"dialplan">>, ?APP_NAME, ?APP_VERSION)
            ],
     lager:debug("sending execution error: ~p", [Resp]),
     kapi_dialplan:publish_error(CallId, Resp).

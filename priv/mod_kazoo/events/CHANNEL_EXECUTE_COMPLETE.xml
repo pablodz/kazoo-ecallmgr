@@ -22,6 +22,8 @@
 	<fields>
 		<field name="call_event" type="reference" />
 		<field name="application-uuid" type="reference" />
+		<field name="Application-Error-Code"/>
+		<field name="Application-Error-Msg"/>
 
 		<field name="Application-Response" type="first-of"
 			value="Application-Response|variable_originate_disposition|variable_endpoint_disposition|#NONE" />

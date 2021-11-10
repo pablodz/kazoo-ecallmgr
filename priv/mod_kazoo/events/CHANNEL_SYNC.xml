@@ -1,5 +1,7 @@
 <event name="CHANNEL_SYNC">
 	<fields>
 		<field name="call_event" type="reference" />
+		<field name="Event-Node" />
+		<field name="Event-PID" />
 	</fields>
 </event>

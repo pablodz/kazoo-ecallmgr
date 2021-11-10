@@ -240,7 +240,7 @@ conference_profile_param({K, V}, Acc) ->
 
 conference_profile_elem({K, JObj}, Acc) ->
     Children = lists:foldl(fun conference_profile_param/2, [], kz_json:to_proplist(JObj)),
-    [named_el(kz_term:to_atom(K, true), Children) | Acc].
+    [named_el(kz_term:to_atom(K, 'true'), Children) | Acc].
 
 -spec route_resp_xml(atom(), kz_term:api_terms(), dialplan_context()) -> {'ok', iolist()}.
 route_resp_xml(Section, [_|_]=RespProp, DialplanContext) ->
@@ -424,7 +424,7 @@ route_resp_fire_route_win(JObj, #{'control_q' := ControlQ
              ],
     Args = [<<K/binary, "=", V/binary>> || {K, V} <- Params, kz_term:is_not_empty(V)],
     EventApp = kz_app_config:get_ne_binary(?APP, [<<"dialplan">>, <<"apps">>, <<"event">>], <<"kz_deliver_event">>),
-    action_el(EventApp, kz_binary:join(Args, <<",">>)).
+    action_el(EventApp, kz_binary:join(Args, <<",">>), 'true').
 
 -spec route_resp_ringback(kz_json:object()) -> kz_types:xml_el().
 route_resp_ringback(JObj) ->
@@ -438,20 +438,23 @@ route_resp_ringback(JObj) ->
             action_el(<<"set">>, <<"ringback=", (kz_term:to_binary(Stream))/binary>>)
     end.
 
+no_channel_data_updates(Bin) ->
+    list_to_binary(["%^[No-Channel-Data=true]", Bin]).
+
 -spec route_resp_ccvs(kz_json:object()) -> kz_types:xml_el().
 route_resp_ccvs(JObj) ->
     CCVs = [{<<"Application-Name">>, kz_json:get_value(<<"App-Name">>, JObj)}
            ,{<<"Application-Node">>, kz_json:get_value(<<"Node">>, JObj)}
            | kz_json:to_proplist(<<"Custom-Channel-Vars">>, JObj)
            ],
-    action_el(<<"kz_multiset_encoded">>, route_ccvs_list(CCVs)).
+    action_el(<<"kz_multiset_encoded">>, no_channel_data_updates(route_ccvs_list(CCVs))).
 
 -spec route_resp_cavs(kz_json:object()) -> kz_types:xml_el() | 'undefined'.
 route_resp_cavs(JObj) ->
     CAVs = kz_json:get_json_value(<<"Custom-Application-Vars">>, JObj, kz_json:new()),
     case kz_json:to_proplist(CAVs) of
         [] -> 'undefined';
-        Props -> action_el(<<"kz_multiset_encoded">>, route_cavs_list(Props))
+        Props -> action_el(<<"kz_multiset_encoded">>, no_channel_data_updates(route_cavs_list(Props)))
     end.
 
 -spec route_ccvs_list(kz_term:proplist()) -> kz_term:ne_binary().
@@ -1070,7 +1073,7 @@ user_el(Props, Children) ->
                                            props:filter_undefined(Props)
                                           )
                            ]
-               ,content=[ C || C <- Children, C =/= 'undefined']
+               ,content=[C || C <- Children, C =/= 'undefined']
                }.
 
 -spec user_el_props(kz_term:api_ne_binary(), kz_term:ne_binary()) -> kz_term:proplist().
@@ -1466,22 +1469,23 @@ event_filters_el(Filters) ->
 
 -spec route_resp_park_xml(kz_json:object(), dialplan_context()) -> kz_types:xml_els().
 route_resp_park_xml(JObj, DialplanContext) ->
-    Exten = [route_resp_log_winning_node()
-            ,route_resp_set_winning_node()
-            ,route_resp_bridge_id()
-            ,route_resp_ringback(JObj)
+    Inline = [route_resp_fire_route_win(JObj, DialplanContext)
+             ,route_resp_set_control_info(DialplanContext)
+             ,route_resp_bridge_id()
+             ],
+    Exten = [route_resp_ringback(JObj)
             ,route_resp_transfer_ringback(JObj)
-            ,route_resp_pre_park_action(JObj)
             ,maybe_start_dtmf_action(DialplanContext)
+            ,route_resp_pre_park_action(JObj)
+            ,route_resp_log_winning_node()
+            ,route_resp_set_winning_node()
             ,route_resp_ccvs(JObj)
             ,route_resp_cavs(JObj)
             ,unset_custom_sip_headers()
             ,route_resp_set_originating_proxy(DialplanContext)
-            ,route_resp_set_control_info(DialplanContext)
-            ,route_resp_fire_route_win(JObj, DialplanContext)
             ,route_resp_park()
             ],
-    [E || E <- Exten, E =/= 'undefined'].
+    [E || E <- Inline ++ Exten, E =/= 'undefined'].
 
 -spec route_resp_set_control_info(dialplan_context()) -> kz_types:xml_el().
 route_resp_set_control_info(#{control_q := ControlQ
@@ -1502,7 +1506,7 @@ route_resp_set_control_info(#{control_q := ControlQ
                          ,";Fetch-UUID="
                          ,FetchId
                          ]),
-    action_el(App, Arg).
+    action_el(App, no_channel_data_updates(Arg), 'true').
 
 directory_resp_domain(Endpoint, JObj) ->
     case kz_json:get_ne_binary_value(<<"Requested-Domain-Name">>, JObj) of
@@ -1527,7 +1531,7 @@ dial_string(Node, Endpoint, Id) ->
     SIPInterface = kz_json:get_ne_binary_value(<<"SIP-Interface">>, Endpoint, ?DEFAULT_FS_PROFILE),
     dial_string(Uri, Node, Id, SIPInterface).
 
-dial_string(undefined, Node, Id, _SIPInterface) ->
+dial_string('undefined', Node, Id, _SIPInterface) ->
     list_to_binary(["${", freeswitch:contact_api(Node), "(", Id, ")}"]);
 dial_string(Uri, _Node, _Id, SIPInterface) ->
     list_to_binary(["sofia/", SIPInterface, "/", Uri]).
@@ -1537,13 +1541,13 @@ route_uri(Endpoint) ->
 
 route_uri_el(Endpoint) ->
     case route_uri(Endpoint) of
-        undefined -> undefined;
+        'undefined' -> 'undefined';
         Route -> variable_el(<<"sip_route_uri">>, Route)
     end.
 
 route_uri_els(Endpoint) ->
     case route_uri_el(Endpoint) of
-        undefined -> [];
+        'undefined' -> [];
         RouteEl -> [RouteEl]
     end.
 
@@ -1730,8 +1734,7 @@ callfwd_property(_, Value) -> kz_term:to_binary(Value).
 
 callfwd_properties(Endpoint) ->
     case kz_json:get_json_value(<<"CallForward">>, Endpoint) of
-        undefined ->
-            [];
+        'undefined' -> [];
         CallForward ->
             DialString = call_forward_dial_string(CallForward),
             URI = kz_json:get_ne_binary_value(<<"Call-Forward-Request-URI">>, CallForward),
@@ -1758,8 +1761,7 @@ failover_el(Endpoint) ->
 
 failover_properties(Endpoint) ->
     case kz_json:get_json_value(<<"Failover">>, Endpoint) of
-        undefined ->
-            [];
+        'undefined' -> [];
         Failover ->
             DialString = call_forward_dial_string(Failover),
             URI = kz_json:get_ne_binary_value(<<"Call-Forward-Request-URI">>, Failover),
@@ -1842,10 +1844,10 @@ get_directory_variables_fold(Key, Value) ->
     case kz_json:is_json_object(Value)
         andalso not lists:member(Key, ?EXCLUDE_VARIABLE_GROUPS)
     of
-        true ->
-            K = kz_term:to_atom(kz_json:normalize_key(Key), true),
+        'true' ->
+            K = kz_term:to_atom(kz_json:normalize_key(Key), 'true'),
             variables_el(K, get_directory_variables(Value, []));
-        false ->
+        'false' ->
             get_directory_variable(Key, Value)
     end.
 

@@ -213,7 +213,7 @@ new_or_update(#channel{uuid=UUID}=Channel) ->
 
 -spec destroy(kz_term:ne_binary(), atom()) -> 'ok'.
 destroy(UUID, Node) ->
-    gen_server:cast(?SERVER, {'destroy_channel', UUID, Node}).
+    do_channel_destroy(UUID, Node).
 
 -spec update(kz_term:ne_binary(), pos_integer(), any()) -> 'ok'.
 update(UUID, Key, Value) ->
@@ -490,12 +490,7 @@ handle_cast({'channel_updates', UUID, Updates}, State) ->
     maybe_log_updates(WasUpdated, UUID, Updates),
     {'noreply', State};
 handle_cast({'destroy_channel', UUID, Node}, State) ->
-    MatchSpec = [{#channel{uuid='$1', node='$2', _ = '_'}
-                 ,[{'andalso', {'=:=', '$2', {'const', Node}}
-                   ,{'=:=', '$1', UUID}}
-                  ],
-                  ['true']
-                 }],
+    MatchSpec = channel_match_for_delete(UUID, Node),
     N = ets:select_delete(?CHANNELS_TBL, MatchSpec),
     lager:debug("removed ~p channel(s) with call-id ~s on ~s", [N, UUID, Node]),
     {'noreply', State, 'hibernate'};
@@ -977,6 +972,19 @@ do_channel_insert('server', Action, Channel) ->
 do_channel_insert(_Other, Action, Channel) ->
     gen_server:call(?SERVER, {Action, Channel}).
 
+do_channel_destroy(UUID, Node) ->
+    Strategy = persistent_term:get('channels_update_strategy', 'server'),
+    do_channel_destroy(UUID, Node, Strategy).
+
+do_channel_destroy(UUID, Node, 'concurrency') ->
+    MatchSpec = channel_match_for_delete(UUID, Node),
+    N = ets:select_delete(?CHANNELS_TBL, MatchSpec),
+    lager:debug("removed ~p channel(s) with call-id ~s on ~s", [N, UUID, Node]);
+do_channel_destroy(UUID, Node, 'server') ->
+    gen_server:cast(?SERVER, {'destroy_channel', UUID, Node});
+do_channel_destroy(UUID, Node, _Other) ->
+    gen_server:cast(?SERVER, {'destroy_channel', UUID, Node}).
+
 -spec set_channels_update_default_strategy() -> 'ok'.
 set_channels_update_default_strategy() ->
     Strategy = kz_app_config:get_atom(?APP, [<<"channels">>, <<"update_strategy">>], 'server'),
@@ -988,3 +996,11 @@ set_channels_update_strategy(Strategy)
     set_channels_update_strategy(kz_term:to_atom(Strategy, 'true'));
 set_channels_update_strategy(Strategy) ->
     persistent_term:put('channels_update_strategy', Strategy).
+
+channel_match_for_delete(UUID, Node) ->
+    [{#channel{uuid='$1', node='$2', _ = '_'}
+     ,[{'andalso', {'=:=', '$2', {'const', Node}}
+       ,{'=:=', '$1', UUID}}
+      ],
+      ['true']
+     }].

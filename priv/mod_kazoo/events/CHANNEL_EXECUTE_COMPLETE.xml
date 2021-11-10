@@ -13,6 +13,7 @@
 		<filter name="Application" value="kz_multiunset" />
 		<filter name="Application" value="kz_prefix_unset" />
 		<filter name="Application" value="kz_export" />
+		<filter name="Application" value="kz_deliver_event"/>
 		<filter name="Application" value="ring_ready" />
 		<filter name="Application" value="log" />
 		<filter name="Application" value="execute_extension" />

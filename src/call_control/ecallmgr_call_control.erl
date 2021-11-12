@@ -259,6 +259,9 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec handle_cast(any(), state()) -> kz_types:handle_cast_ret_state(state()).
+handle_cast({'replace_channel', Channel}, State) ->
+    _ = kz_amqp_channel:consumer_channel(Channel),
+    {'noreply', State};
 handle_cast('stop', State) ->
     {'stop', 'normal', State};
 handle_cast({'update_node', Node}, #state{node=OldNode}=State) ->

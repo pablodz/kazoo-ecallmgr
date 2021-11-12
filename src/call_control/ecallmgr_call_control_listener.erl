@@ -11,9 +11,7 @@
 
 -behaviour(gen_listener).
 
--export([start_link/0]).
-
--export([control_q/1]).
+-export([start_link/2]).
 
 -export([init/1
         ,handle_call/3
@@ -31,9 +29,8 @@
                   ,{'self', []}
                   ]).
 
--define(QUEUE_NAME, <<>>).
--define(QUEUE_OPTIONS, []).
--define(CONSUME_OPTIONS, []).
+-define(QUEUE_OPTIONS, [{'exclusive', 'false'}]).
+-define(CONSUME_OPTIONS, [{'exclusive', 'false'}]).
 
 -type state() :: map().
 
@@ -45,16 +42,16 @@
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec start_link() -> kz_types:startlink_ret().
-start_link() ->
+-spec start_link(pid(), kz_term:ne_binary()) -> kz_types:startlink_ret().
+start_link(Manager, Queue) ->
     gen_listener:start_link(?MODULE
                            ,[{'responders', ?RESPONDERS}
                             ,{'bindings', ?BINDINGS}
-                            ,{'queue_name', ?QUEUE_NAME}
+                            ,{'queue_name', Queue}
                             ,{'queue_options', ?QUEUE_OPTIONS}
                             ,{'consume_options', ?CONSUME_OPTIONS}
                             ]
-                           ,[]).
+                           ,[Manager]).
 
 
 %%%=============================================================================
@@ -66,17 +63,13 @@ start_link() ->
 %%
 %% @end
 %%------------------------------------------------------------------------------
--spec init([]) -> {'ok', state()}.
-init([]) ->
+-spec init([pid()]) -> {'ok', state()}.
+init([Pid]) ->
     process_flag('trap_exit', 'true'),
-    lager:info("starting new fs amqp event listener"),
-    {'ok', #{}}.
+    lager:info("starting new call control listener"),
+    {'ok', #{manager => Pid}}.
 
 -spec handle_call(any(), kz_term:pid_ref(), state()) -> kz_types:handle_call_ret_state(state()).
-handle_call('control_q', _From, #{queue := Q}=State) ->
-    {'reply', {'ok', Q, kz_amqp_channel:consumer_channel()}, State};
-handle_call('control_q', _From, State) ->
-    {'reply', {'error', 'no_queue'}, State};
 handle_call(_Request, _From, State) ->
     {'reply', {'error', 'not_implemented'}, State}.
 
@@ -86,7 +79,9 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec handle_cast(any(), state()) -> {'noreply', state()}.
-handle_cast({'gen_listener',{'is_consuming', Active}}, State) ->
+handle_cast({'gen_listener',{'is_consuming', Active}}, #{manager := Pid} = State) ->
+    lager:info("call control listener is ~s, notifying manager", [is_consuming_description(Active)]),
+    gen_server:cast(Pid, {'call_control_listener_is_ready', self(), kz_amqp_channel:consumer_channel(), Active}),
     {'noreply', State#{active => Active}};
 handle_cast({'gen_listener',{'created_queue', Q}}, State) ->
     {'noreply', State#{queue => Q}};
@@ -125,6 +120,5 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {'ok', State}.
 
--spec control_q(pid()) -> {'ok', kz_term:ne_binary(), pid()} | {'error', 'no_queue'}.
-control_q(Pid) ->
-    gen_listener:call(Pid, 'control_q').
+is_consuming_description(true) -> <<"consuming">>;
+is_consuming_description(false) -> <<"not consuming">>.

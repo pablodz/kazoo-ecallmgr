@@ -643,7 +643,6 @@ handle_nodedown(#node{connect_strategy='heartbeat', node=NodeName}=Node, #state{
     _ = maybe_disconnect_from_node(Node),
     gen_server:cast(Srv, {'remove_capabilities', NodeName}),
     gen_server:cast(Srv, {'update_node', Node#node{connected='false'}}),
-    _ = maybe_start_node_pinger(Node),
     'ok';
 handle_nodedown(#node{node=NodeName}=Node, #state{self=Srv}) ->
     lager:critical("received node down notice for ~s", [NodeName]),
@@ -733,6 +732,7 @@ maybe_disconnect_from_node(#node{connected='false'}) ->
     'ok'.
 
 -spec maybe_start_node_pinger(fs_node()) -> 'ok'.
+maybe_start_node_pinger(#node{connect_strategy='heartbeat'}) -> ok;
 maybe_start_node_pinger(#node{node=NodeName, options=Props}=Node) ->
     case ecallmgr_fs_pinger_sup:add_node(NodeName, Props) of
         {'ok', _} -> 'ok';

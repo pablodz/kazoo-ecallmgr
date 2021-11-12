@@ -16,7 +16,7 @@
 
 %% API
 -export([start_link/0]).
--export([start_proc/1]).
+-export([start_call_control/1]).
 -export([init/1]).
 
 -include("ecallmgr.hrl").
@@ -37,15 +37,9 @@
 start_link() ->
     supervisor:start_link({'local', ?SERVER}, ?MODULE, []).
 
--spec start_proc(map()) -> kz_types:sup_startchild_ret().
-start_proc(Map) ->
-    supervisor:start_child(?SERVER, [control_q(Map)]).
-
-control_q(#{control_q := _Queue}= Map) -> Map;
-control_q(#{control_q_callback := Fun}= Map) ->
-    Fun(Map);
-control_q(Map) ->
-    ecallmgr_call_control_listener_sup:control_q(Map).
+-spec start_call_control(map()) -> kz_types:sup_startchild_ret().
+start_call_control(Map) ->
+    supervisor:start_child(?SERVER, [Map]).
 
 %%%=============================================================================
 %%% Supervisor callbacks

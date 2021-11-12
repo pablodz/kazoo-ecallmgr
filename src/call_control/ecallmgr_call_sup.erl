@@ -14,8 +14,6 @@
 
 -export([start_link/0]).
 
--export([start_control_process/1]).
-
 -export([init/1]).
 
 -include("ecallmgr.hrl").
@@ -24,6 +22,7 @@
 
 -define(CHILDREN, [?SUPER('ecallmgr_call_control_sup')
                   ,?SUPER('ecallmgr_call_control_listener_sup')
+                  ,?WORKER('ecallmgr_call_control_manager')
                   ]).
 
 %%==============================================================================
@@ -58,8 +57,3 @@ init([]) ->
     SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
     {'ok', {SupFlags, ?CHILDREN}}.
-
--spec start_control_process(map()) -> kz_types:sup_startchild_ret().
-start_control_process(#{call_id := CallId} = Context) ->
-    lager:debug("starting call control for ~s", [CallId]),
-    ecallmgr_call_control_sup:start_proc(Context).

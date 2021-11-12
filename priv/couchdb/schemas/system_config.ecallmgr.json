@@ -39,6 +39,14 @@
             "description": "ecallmgr freeswitch context",
             "type": "string"
         },
+        "fs_nodes": {
+            "default": [],
+            "description": "ecallmgr fs nodes",
+            "items": {
+                "type": "string"
+            },
+            "type": "array"
+        },
         "insert_fetched_registration_locally": {
             "default": false,
             "description": "ecallmgr insert fetched registration locally",

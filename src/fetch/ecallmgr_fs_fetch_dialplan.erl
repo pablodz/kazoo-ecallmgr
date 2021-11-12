@@ -46,7 +46,7 @@ dialplan(#{node := Node, fetch_id := FetchId, payload := FetchJObj}=Map) ->
                ,fun(M) -> M#{channel => kz_amqp_channel:consumer_channel()} end
                ,fun(M) -> M#{callback => fun process/1} end
                ,fun(M) -> M#{options => []} end
-               ,fun(M) -> M#{start_result => ecallmgr_call_control_sup:start_proc(M)} end
+               ,fun(M) -> M#{start_result => ecallmgr_call_control_manager:start_call_control(M)} end
                ],
     {'ok', kz_maps:exec(Routines, Map)}.
 

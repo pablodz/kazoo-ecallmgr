@@ -14,7 +14,7 @@
 -include("ecallmgr.hrl").
 
 -export([start_link/0]).
--export([control_q/1]).
+-export([start_listener/2]).
 -export([init/1]).
 
 %% ===================================================================
@@ -27,15 +27,7 @@
 %%------------------------------------------------------------------------------
 -spec start_link() -> kz_types:startlink_ret().
 start_link() ->
-    {'ok', Pid} = supervisor:start_link({'local', ?MODULE}, ?MODULE, []),
-    Workers = kz_app_config:get_integer(?APP, [<<"call_control">>, <<"listeners">>], 5),
-    _ = kz_process:spawn(fun() -> [begin
-                                       _ = supervisor:start_child(Pid, []),
-                                       timer:sleep(250)
-                                   end || _N <- lists:seq(1, Workers)
-                                  ]
-                         end),
-    {'ok', Pid}.
+    supervisor:start_link({'local', ?MODULE}, ?MODULE, []).
 
 %% ===================================================================
 %% Supervisor callbacks
@@ -56,14 +48,6 @@ init([]) ->
     SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
     {'ok', {SupFlags, [?WORKER_ARGS_TYPE('ecallmgr_call_control_listener', [], 'temporary')]}}.
 
--spec control_q(map()) -> map().
-control_q(Map) ->
-    Listeners = supervisor:which_children(?MODULE),
-    Size = length(Listeners),
-    Selected = rand:uniform(Size),
-    {_, ControlP, _, _} = lists:nth(Selected, Listeners),
-    {'ok', Q, Channel} = ecallmgr_call_control_listener:control_q(ControlP),
-    lager:debug("fs call control sup control_q returning  ~p, ~p , ~p", [ControlP, Q, Channel]),
-    Map#{control_q => Q
-        ,channel => Channel
-        }.
+-spec start_listener(pid(), kz_term:ne_binary()) -> kz_types:startlink_ret().
+start_listener(Pid, Queue) ->
+    supervisor:start_child(?MODULE, [Pid, Queue]).

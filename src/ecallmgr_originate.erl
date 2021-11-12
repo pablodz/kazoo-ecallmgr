@@ -567,7 +567,7 @@ start_control_process(#state{originate_req=JObj
            ,controller_q => ControllerQ
            ,initial_ccvs => kz_json:new()
            },
-    case ecallmgr_call_sup:start_control_process(Ctx) of
+    case ecallmgr_call_control_manager:start_call_control(Ctx) of
         {'ok', CtrlPid} when is_pid(CtrlPid) ->
             lager:debug("started control pid ~p for uuid ~s", [CtrlPid, UUID]),
             {'ok', State#state{control_pid=CtrlPid}};

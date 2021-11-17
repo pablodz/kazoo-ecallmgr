@@ -516,60 +516,11 @@
 -define(SEPARATOR_SIMULTANEOUS, <<",">>).
 -define(SEPARATOR_SINGLE, <<"|">>).
 
--define(CONFERENCE_VARS, [<<"variable_conference_moderator">>
-                         ,<<"Floor">>
-                         ,<<"Video">>
-                         ,<<"See">>
-                         ,<<"Speak">>
-                         ,<<"Hear">>
-                         ,<<"Talking">>
-                         ,<<"Mute-Detect">>
-                         ,<<"Energy-Level">>
-                         ,<<"Member-ID">>
-                         ,<<"Member-Type">>
-                         ,<<"Member-Ghost">>
-                         ]).
-
--define(CONFERENCE_VAR_MAP, [{<<"variable_conference_moderator">>, {<<"Is-Moderator">>, fun kz_term:to_boolean/1}}
-                            ,{<<"Floor">>, fun kz_term:to_boolean/1}
-                            ,{<<"Video">>, fun kz_term:to_boolean/1}
-                            ,{<<"See">>, fun kz_term:to_boolean/1}
-                            ,{<<"Speak">>, fun kz_term:to_boolean/1}
-                            ,{<<"Hear">>, fun kz_term:to_boolean/1}
-                            ,{<<"Talking">>, fun kz_term:to_boolean/1}
-                            ,{<<"Mute-Detect">>, fun kz_term:to_boolean/1}
-                            ,{<<"Energy-Level">>, fun kz_term:to_integer/1}
-                            ,{<<"Current-Energy">>, fun kz_term:to_integer/1}
-                            ,{<<"Member-ID">>, fun kz_term:to_integer/1}
-                            ,{<<"Member-Ghost">>, fun kz_term:to_boolean/1}
-                            ]).
 
 -define(NODE_MODULES_KEY(R), [<<"configuration">>
                              ,R
                              ,<<"modules">>
                              ]).
-
--define(NODE_MODULES,
-        [<<"node">>
-        ,<<"monitor">>
-        ,<<"event_stream_sup">>
-        ,<<"fetch_sup">>
-        ,<<"notify">>
-        ,<<"resource">>
-        ]).
-
--define(EVENTSTREAM_MODS, ['ecallmgr_fs_channel_stream'
-                          ,'ecallmgr_fs_conference_stream'
-                          ,'ecallmgr_fs_event_stream_registered'
-                          ,'ecallmgr_call_event_publisher'
-                          ,'ecallmgr_conference_event_publisher'
-                          ,'ecallmgr_presence_event_publisher'
-                          ,'ecallmgr_fs_recordings'
-                          ,'ecallmgr_cdr_event_publisher'
-                          ]).
-
--define(HTTP_GET_PREFIX, "http_cache://").
-
 
 -type dialplan_callback() :: fun((dialplan_context()) -> 'ok' | {'ok', dialplan_context()}).
 -type dialplan_exit_fun() :: fun((dialplan_context()) -> 'ok').

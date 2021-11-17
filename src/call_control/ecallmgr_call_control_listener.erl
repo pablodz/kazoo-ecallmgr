@@ -36,7 +36,10 @@
 
 -define(QOS, 50).
 
--type state() :: map().
+-type state() :: #{manager := pid()
+                  ,active => boolean()
+                  ,queue => kz_term:api_ne_binary()
+                  }.
 
 %%%=============================================================================
 %%% API
@@ -54,8 +57,8 @@ start_link(Manager, Queue) ->
                             ,{'basic_qos', ?QOS}
                             | queue_settings(Queue)
                             ]
-                           ,[Manager]).
-
+                           ,[Manager]
+                           ).
 
 %%%=============================================================================
 %%% gen_server callbacks
@@ -82,12 +85,16 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec handle_cast(any(), state()) -> {'noreply', state()}.
-handle_cast({'gen_listener',{'is_consuming', Active}}, #{manager := Pid, queue := Queue} = State) ->
+handle_cast({'gen_listener',{'is_consuming', Active}}
+           ,#{manager := Pid
+             ,queue := Queue
+             }=State
+           ) ->
     lager:info("call control listener is ~s, notifying manager", [is_consuming_description(Active)]),
     gen_server:cast(Pid, {'call_control_listener_is_ready', self(), kz_amqp_channel:consumer_channel(), Queue, Active}),
     {'noreply', State#{active => Active}};
-handle_cast({'gen_listener',{'created_queue', Q}}, State) ->
-    {'noreply', State#{queue => Q}};
+handle_cast({'gen_listener',{'created_queue', QueueName}}, State) ->
+    {'noreply', State#{queue => QueueName}};
 handle_cast(_Cast, State) ->
     lager:debug("unhandled cast: ~p", [_Cast]),
     {'noreply', State, 'hibernate'}.
@@ -123,10 +130,10 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {'ok', State}.
 
-is_consuming_description(true) -> <<"consuming">>;
-is_consuming_description(false) -> <<"not consuming">>.
+is_consuming_description('true') -> <<"consuming">>;
+is_consuming_description('false') -> <<"not consuming">>.
 
-queue_settings(undefined) ->
+queue_settings('undefined') ->
     [{'queue_name', list_to_binary([<<"callctl-">>, kz_binary:rand_uuid()])}
     ,{'queue_options', ?QUEUE_OPTIONS}
     ,{'consume_options', ?CONSUME_OPTIONS}

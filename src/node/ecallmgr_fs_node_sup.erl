@@ -11,8 +11,6 @@
 
 -behaviour(supervisor).
 
--include("ecallmgr.hrl").
-
 -export([start_link/2]).
 
 -export([node_srv/1
@@ -33,6 +31,15 @@
 -export([init/1]).
 
 -include("ecallmgr.hrl").
+
+-define(NODE_MODULES,
+        [<<"node">>
+        ,<<"monitor">>
+        ,<<"event_stream_sup">>
+        ,<<"fetch_sup">>
+        ,<<"notify">>
+        ,<<"resource">>
+        ]).
 
 %%==============================================================================
 %% API functions

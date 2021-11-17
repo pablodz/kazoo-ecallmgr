@@ -29,8 +29,12 @@
                   ,{'self', []}
                   ]).
 
--define(QUEUE_OPTIONS, [{'exclusive', 'false'}]).
--define(CONSUME_OPTIONS, [{'exclusive', 'false'}]).
+-define(QUEUE_OPTIONS, []).
+-define(CONSUME_OPTIONS, []).
+-define(SHARED_QUEUE_OPTIONS, [{'exclusive', 'false'}]).
+-define(SHARED_CONSUME_OPTIONS, [{'exclusive', 'false'}]).
+
+-define(QOS, 50).
 
 -type state() :: map().
 
@@ -42,14 +46,13 @@
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec start_link(pid(), kz_term:ne_binary()) -> kz_types:startlink_ret().
+-spec start_link(pid(), kz_term:api_ne_binary()) -> kz_types:startlink_ret().
 start_link(Manager, Queue) ->
     gen_listener:start_link(?MODULE
                            ,[{'responders', ?RESPONDERS}
                             ,{'bindings', ?BINDINGS}
-                            ,{'queue_name', Queue}
-                            ,{'queue_options', ?QUEUE_OPTIONS}
-                            ,{'consume_options', ?CONSUME_OPTIONS}
+                            ,{'basic_qos', ?QOS}
+                            | queue_settings(Queue)
                             ]
                            ,[Manager]).
 
@@ -79,9 +82,9 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec handle_cast(any(), state()) -> {'noreply', state()}.
-handle_cast({'gen_listener',{'is_consuming', Active}}, #{manager := Pid} = State) ->
+handle_cast({'gen_listener',{'is_consuming', Active}}, #{manager := Pid, queue := Queue} = State) ->
     lager:info("call control listener is ~s, notifying manager", [is_consuming_description(Active)]),
-    gen_server:cast(Pid, {'call_control_listener_is_ready', self(), kz_amqp_channel:consumer_channel(), Active}),
+    gen_server:cast(Pid, {'call_control_listener_is_ready', self(), kz_amqp_channel:consumer_channel(), Queue, Active}),
     {'noreply', State#{active => Active}};
 handle_cast({'gen_listener',{'created_queue', Q}}, State) ->
     {'noreply', State#{queue => Q}};
@@ -122,3 +125,14 @@ code_change(_OldVsn, State, _Extra) ->
 
 is_consuming_description(true) -> <<"consuming">>;
 is_consuming_description(false) -> <<"not consuming">>.
+
+queue_settings(undefined) ->
+    [{'queue_name', list_to_binary([<<"callctl-">>, kz_binary:rand_uuid()])}
+    ,{'queue_options', ?QUEUE_OPTIONS}
+    ,{'consume_options', ?CONSUME_OPTIONS}
+    ];
+queue_settings(Queue) ->
+    [{'queue_name', Queue}
+    ,{'queue_options', ?SHARED_QUEUE_OPTIONS}
+    ,{'consume_options', ?SHARED_CONSUME_OPTIONS}
+    ].

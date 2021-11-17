@@ -54,9 +54,10 @@ start_link() ->
 -spec init(list()) -> {'ok', state()}.
 init(_) ->
     Workers = kz_app_config:get_integer(?APP, [<<"call_control">>, <<"listeners">>], 5),
+    QueueStrategy = kz_app_config:get_atom(?APP, [<<"call_control">>, <<"queue_strategy">>], private),
     kz_amqp_channel:requisition(),
     {'ok', #{workers => Workers
-            ,queue => set_queue()
+            ,queue => set_queue(QueueStrategy)
             ,listeners => #{}
             ,pids => #{}
             ,refs => #{}
@@ -80,8 +81,8 @@ handle_call(_Request, _From, State) ->
 handle_cast('init_queues', State) ->
     {'noreply', init_queues(State)};
 
-handle_cast({'call_control_listener_is_ready', Pid, Channel, Active}, State) ->
-    {'noreply', add_listener(Pid, Channel, Active, State)};
+handle_cast({'call_control_listener_is_ready', Pid, Channel, Queue, Active}, State) ->
+    {'noreply', add_listener(Pid, Channel, Queue, Active, State)};
 
 handle_cast(_Msg, State) ->
     lager:debug("unhandled cast: ~p", [_Msg]),
@@ -124,14 +125,17 @@ code_change(_OldVsn, State, _Extra) ->
     {'ok', State}.
 
 
-set_queue() ->
+-spec set_queue(atom()) -> kz_term:api_ne_binary().
+set_queue(private) ->
+    persistent_term:put(ecallmgr_call_control_amqp_queue, undefined),
+    undefined;
+set_queue(shared) ->
     Queue = list_to_binary([<<"callctl-">>, kz_binary:rand_uuid()]),
     persistent_term:put(ecallmgr_call_control_amqp_queue, Queue),
-    Queue.
-
--spec queue() -> kz_term:ne_binary().
-queue() ->
-    persistent_term:get(ecallmgr_call_control_amqp_queue).
+    Queue;
+set_queue(_) ->
+    persistent_term:put(ecallmgr_call_control_amqp_queue, undefined),
+    undefined.
 
 -spec set_control_q_strategy(atom()) -> ok.
 set_control_q_strategy(Strategy) ->
@@ -166,8 +170,9 @@ control_q(Map) ->
     control_q(Map, control_q_strategy()).
 
 control_q(Map, direct) ->
-    Map#{control_q => queue()
-        ,channel => direct_channel(direct_control_q_strategy())
+    {Channel, Queue} = direct_control_ref(direct_control_q_strategy()),
+    Map#{control_q => Queue
+        ,channel => Channel
         }.
 
 -spec remove_listener(pid(), state()) -> state().
@@ -185,13 +190,13 @@ remove_listener(Pid, State) ->
             State#{refs => NewRefs, listeners => NewListeners, channels => NewChannels}
     end.
 
--spec add_listener(pid(), pid(), boolean(), state()) -> state().
-add_listener(Pid, Channel, Active, State0) ->
+-spec add_listener(pid(), pid(), kz_term:ne_binary(), boolean(), state()) -> state().
+add_listener(Pid, Channel, Queue, Active, State0) ->
     State = remove_listener(Pid, State0),
     #{listeners := Listeners, channels := Channels, refs := Refs} = State,
 
-    NewListeners = maps:put(Pid, #{channel => Channel, count => 0, call_control => #{}}, maps:without([Pid], Listeners)),
-    NewChannels = maps:put(Channel, #{listener => Pid, count => 0}, maps:without([Channel], Channels)),
+    NewListeners = maps:put(Pid, #{channel => Channel, queue => Queue, count => 0, call_control => #{}}, maps:without([Pid], Listeners)),
+    NewChannels = maps:put(Channel, #{listener => Pid, queue => Queue, count => 0}, maps:without([Channel], Channels)),
 
     ListenerRef = erlang:monitor(process, Pid),
     ChannelRef = erlang:monitor(process, Channel),
@@ -199,8 +204,8 @@ add_listener(Pid, Channel, Active, State0) ->
     NewRefs = maps:put(ChannelRef, #{channel => Channel}, NewRefs0),
 
     case Active of
-        true -> set_channels(maps:keys(NewChannels));
-        false -> set_channels(maps:keys(maps:without([Channel], NewChannels)))
+        true -> set_control_refs(NewChannels);
+        false -> set_control_refs(maps:without([Channel], NewChannels))
     end,
 
     State#{listeners => NewListeners, channels => NewChannels, refs => NewRefs}.
@@ -237,27 +242,34 @@ next() ->
     counters:add(counter(), 1, 1),
     counters:get(counter(), 1).
 
-set_channels(Channels) ->
-    persistent_term:put(call_control_listener_channels, Channels).
+-spec set_control_refs(map() | undefined) -> ok.
+set_control_refs(undefined) ->
+    persistent_term:put(call_control_listener_refs, []);
+set_control_refs(Channels) ->
+    persistent_term:put(call_control_listener_refs, maps:fold(fun build_control_ref/3, [], Channels)).
 
-channels() ->
-    persistent_term:get(call_control_listener_channels).
+build_control_ref(Channel, #{queue := Queue}, Acc)->
+    [{Channel, Queue} | Acc].
+
+
+control_refs() ->
+    persistent_term:get(call_control_listener_refs).
 
 %% without going thru gen_server:call
-direct_channel(random) ->
-    Channels = channels(),
-    Index = rand:uniform(length(Channels)),
-    lists:nth(Index, Channels);
-direct_channel(sequential) ->
-    Channels = channels(),
-    Index = next() rem length(Channels),
-    lists:nth(Index + 1, Channels).
+direct_control_ref(random) ->
+    ControlRefs = control_refs(),
+    Index = rand:uniform(length(ControlRefs)),
+    lists:nth(Index, ControlRefs);
+direct_control_ref(sequential) ->
+    ControlRefs = control_refs(),
+    Index = next() rem length(ControlRefs),
+    lists:nth(Index + 1, ControlRefs).
 
 handle_canary(false, Channel, State) ->
     gen_server:cast(self(), 'init_queues'),
     handle_canary(Channel, State);
 handle_canary(true, Channel, #{channels := Channels} = State) ->
-    set_channels(maps:keys(Channels)),
+    set_control_refs(Channels),
     handle_canary(Channel, State).
 
 handle_canary(Channel, #{refs := Refs} = State) ->
@@ -276,7 +288,7 @@ handle_down(Pid, Ref, Reason, #{refs := Refs} = State) ->
 
 handle_down(Pid, Ref, Reason, #{canary := Pid}, #{refs := Refs, canary := Pid} = State) ->
     lager:debug("received down (~p/~p/~p) for canary channel, we're closing until we get it back", [Pid, Ref, Reason]),
-    set_channels([]),
+    set_control_refs(undefined),
     NewRefs = maps:without([Ref], Refs),
     State#{refs => NewRefs};
 handle_down(Pid, Ref, Reason, #{listener := Pid}, #{refs := Refs, listeners := Listeners, channels := Channels} = State) ->
@@ -285,11 +297,12 @@ handle_down(Pid, Ref, Reason, #{listener := Pid}, #{refs := Refs, listeners := L
     NewRefs = maps:without([Ref], Refs),
     NewListeners = maps:without([Pid], Listeners),
     NewChannels = maps:without([Channel], Channels),
-    set_channels(NewChannels),
+    set_control_refs(NewChannels),
     State#{refs => NewRefs, listeners => NewListeners, channels => NewChannels};
 handle_down(Pid, Ref, Reason, #{channel := Pid}, #{refs := Refs, channels := Channels} = State) ->
     lager:warning("received down (~p/~p/~p) for channel, this is bad.", [Pid, Ref, Reason]),
     NewRefs = maps:without([Ref], Refs),
     NewChannels = maps:without([Pid], Channels),
-    set_channels(NewChannels),
+    set_control_refs(NewChannels),
     State#{refs => NewRefs, channels => NewChannels}.
+

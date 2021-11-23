@@ -365,6 +365,8 @@
                               ,{<<"Call-Flag-NO-Flip">>, <<"no_flip">>}
                               ,{<<"Endpoint-Is-Ephemeral">>, <<"endpoint_is_ephemeral">>}
                               ,{<<"KAZOO-AOR">>, <<"sip_h_X-KAZOO-AOR">>}
+                              ,{<<"Application-UUID">>, <<"app_uuid">>}
+                              ,{<<"Application-UUID-Name">>, <<"app_uuid_name">>}
                               ]).
 
 -define(CALLER_PROFILE_VARS, [{<<"Caller-ID-Name">>, <<"caller_id_name">>}

@@ -201,7 +201,7 @@ wait_for_authz(#{authz_worker := {Pid, Ref}
 -spec send_reply(dialplan_context()) -> {'ok', dialplan_context()}.
 send_reply(#{node := Node, fetch_id := FetchId, reply := #{payload := Reply}}=Context) ->
     {'ok', XML} = ecallmgr_fs_xml:route_resp_xml('dialplan', Reply, Context),
-    lager:debug("sending xml dialplan reply for request ~s tp ~s", [FetchId, Node]),
+    lager:debug("sending xml dialplan reply for request ~s to ~s", [FetchId, Node]),
     _ = freeswitch:fetch_reply(Context#{reply => iolist_to_binary(XML)}),
     case kz_api:defer_response(Reply)
         orelse kz_json:get_ne_binary_value(<<"Method">>, Reply) =/= <<"park">>

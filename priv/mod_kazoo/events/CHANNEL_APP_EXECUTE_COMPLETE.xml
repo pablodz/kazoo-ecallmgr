@@ -1,0 +1,34 @@
+<event name="CHANNEL_APP_EXECUTE_COMPLETE">
+	<fields>
+		<field name="call_event_headers" type="reference" />
+		<field name="Event-Name" type="static" value="CHANNEL_EXECUTE_COMPLETE" />
+		<field name="application-uuid" type="reference" />
+		<field name="Application-Error-Code"/>
+		<field name="Application-Error-Msg"/>
+
+		<field name="Application-Response" type="first-of"
+			value="Application-Response|variable_originate_disposition|variable_endpoint_disposition|#NONE" />
+
+        <!--  bridge specific -->
+		<!--
+        <field name="Application-Response" type="first-of"
+            value="variable_originate_failed_cause|variable_last_bridge_hangup_cause|variable_bridge_hangup_cause|variable_hangup_cause|Hangup-Cause|variable_originate_disposition|variable_endpoint_disposition|#NONE">
+	        <filters>
+	            <filter name="Application-UUID-Name" type="include" compare="value" value="xbridge" />
+	        </filters>
+
+        </field>
+		-->
+
+
+		<field name="Bridge-Hangup-Cause" type="first-of" value="variable_bridge_hangup_cause|variable_last_bridge_hangup_cause" />
+		<field name="variable_endpoint_disposition" as="Endpoint-Disposition" /> <!-- code in kapps_call_command should use this variable instead of disposition -->
+		<field name="variable_transfer_disposition" as="Transfer-Disposition" />
+		<field name="hangup-cause" type="reference" />
+        <field name="hangup-code" type="reference" />
+		<field name="Disposition" type="first-of" value="variable_endpoint_disposition|variable_originate_disposition" />
+
+		<field name="debug-call" type="reference" />
+	</fields>
+
+</event>

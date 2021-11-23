@@ -350,6 +350,8 @@ handle_info('nodedown_restart_exceeded', #state{is_node_up='false'}=State) ->
     {'noreply', handle_channel_destroyed(State)};
 handle_info({switch_reply, _}, State) ->
     {'noreply', State};
+handle_info({switch_reply, _, _}, State) ->
+    {'noreply', State};
 handle_info({route_resp, _, _}, State) ->
     {'noreply', State};
 handle_info(_Msg, State) ->
@@ -768,10 +770,10 @@ insert_command(#state{node=Node
             _ = execute_control_request(JObj, State),
             CommandQ
     end;
-insert_command(#state{node=Node, call_id=CallId}, 'flush', JObj) ->
+insert_command(#state{node=Node, call_id=CallId, command_q=CmdQ, current_cmd_uuid=CurrCmdId}, 'flush', JObj) ->
     lager:debug("received control queue flush command, clearing all waiting commands"),
     _ = freeswitch:api(Node, 'uuid_break', <<CallId/binary, " all">>),
-    self() ! {'force_queue_advance', CallId},
+    _ = maybe_force_queue_advance(CallId, CurrCmdId, queue:is_empty(CmdQ)),
     insert_command_into_queue(queue:new(), 'tail', JObj);
 insert_command(#state{command_q=CommandQ}, 'head', JObj) ->
     insert_command_into_queue(CommandQ, 'head', JObj);
@@ -780,6 +782,10 @@ insert_command(#state{command_q=CommandQ}, 'tail', JObj) ->
 insert_command(Q, Pos, _) ->
     lager:debug("received command for an unknown queue position: ~p", [Pos]),
     Q.
+
+maybe_force_queue_advance(_CallId, undefined, true) -> ok;
+maybe_force_queue_advance(CallId, _, _) ->
+    self() ! {'force_queue_advance', CallId}.
 
 execute_queue_commands([], _, _) -> 'ok';
 execute_queue_commands([Command|Commands], DefJObj, State) ->
@@ -1151,6 +1157,8 @@ maybe_query_state(_Node, _CallId, 'NODE_DOWN') ->
 maybe_query_state(_Node, _CallId, 'DOWN') ->
     {<<"DOWN">>, <<"DOWN">>};
 maybe_query_state(_Node, _CallId, 'nosession') ->
+    {<<"DOWN">>, <<"DOWN">>};
+maybe_query_state(_Node, _CallId, 'timeout') ->
     {<<"DOWN">>, <<"DOWN">>};
 maybe_query_state(Node, CallId, _Error) ->
     query_state(Node, CallId).

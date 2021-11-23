@@ -650,12 +650,8 @@ prepare_app(Target, _Node, Target, _JObj) ->
 prepare_app(Target, Node, UUID, JObj) ->
     case ecallmgr_fs_channel:fetch(Target, 'record') of
         {'ok', #channel{node=Node
-                       ,answered=IsAnswered
-                       ,interaction_id=CDR
                        }} ->
             lager:debug("target ~s is on same node(~s) as us", [Target, Node]),
-            _ = ecallmgr_fs_command:set(Node, UUID, [{<<?CALL_INTERACTION_ID>>, CDR}]),
-            maybe_answer(Node, UUID, IsAnswered),
             {'execute', Node, UUID, JObj, Target};
         {'ok', #channel{node=OtherNode}} ->
             lager:debug("target ~s is on other node (~s), not ~s", [Target, OtherNode, Node]),
@@ -720,11 +716,6 @@ prepare_app_via_amqp(Node, UUID, TargetCallId, Resp) ->
     TargetNode = kz_json:get_value(<<"Switch-Nodename">>, Resp),
     lager:debug("call ~s is on ~s", [TargetCallId, TargetNode]),
     prepare_app_maybe_move_remote(Node, UUID, TargetCallId, kz_term:to_atom(TargetNode, 'true'), Resp).
-
--spec maybe_answer(atom(), kz_term:ne_binary(), boolean()) -> 'ok'.
-maybe_answer(_Node, _UUID, 'true') -> 'ok';
-maybe_answer(Node, UUID, 'false') ->
-    ecallmgr_util:send_cmd(Node, UUID, <<"answer">>, <<>>).
 
 -spec prepare_app_maybe_move(atom(), kz_term:ne_binary(), kz_term:ne_binary(), atom()) ->
           {kz_term:ne_binary(), kz_term:ne_binary()} |

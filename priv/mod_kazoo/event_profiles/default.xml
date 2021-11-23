@@ -18,6 +18,7 @@
 	<event name="kazoo::noop" />
 	<event name="kazoo::masquerade" />
 	<event name="CHANNEL_EXECUTE_COMPLETE" />
+	<event name="CHANNEL_APP_EXECUTE_COMPLETE" />
 	<event name="spandsp::txfaxnegociateresult" />
 	<event name="spandsp::txfaxpageresult" />
 	<event name="spandsp::txfaxresult" />

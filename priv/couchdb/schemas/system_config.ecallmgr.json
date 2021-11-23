@@ -96,6 +96,11 @@
             "default": false,
             "description": "ecallmgr should detect inband dtmf",
             "type": "boolean"
+        },
+        "use_bypass_media_after_bridge": {
+            "default": false,
+            "description": "ecallmgr use bypass media after bridge",
+            "type": "boolean"
         }
     },
     "type": "object"

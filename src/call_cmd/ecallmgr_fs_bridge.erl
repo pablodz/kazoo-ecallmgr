@@ -297,43 +297,44 @@ handle_loopback(DP, _Node, _UUID, _Channel, JObj) ->
     Keys = [<<"Simplify-Loopback">>, <<"Loopback-Bowout">>],
     handle_loopback_keys(Keys, JObj, DP).
 
--spec continue_on_fail(kz_json:object()) -> kz_term:ne_binary().
-continue_on_fail(JObj) ->
+-spec continue_on_fail(kz_json:object(), kz_term:ne_binary()) -> kz_term:ne_binary().
+continue_on_fail(JObj, Default) ->
     case kz_json:get_value(<<"Continue-On-Fail">>, JObj) of
-        'undefined' -> <<"true">>;
+        'undefined' -> Default;
         Val when is_binary(Val) -> Val;
         Val when is_boolean(Val) -> kz_term:to_binary(Val);
         Val when is_list(Val) -> kz_binary:join(Val, <<",">>);
-        _ -> <<"true">>
+        _ -> Default
     end.
+
+-spec continue_on_fail_channel(channel(), kz_json:object()) -> kz_term:ne_binary().
+continue_on_fail_channel(#channel{is_loopback=true}, JObj) ->
+    continue_on_fail(JObj, <<"false">>);
+continue_on_fail_channel(_, JObj) ->
+    continue_on_fail(JObj, <<"true">>).
 
 -spec hangup_after_bridge(kz_json:object()) -> kz_term:ne_binary().
 hangup_after_bridge(JObj) ->
     case kz_json:get_boolean_value(<<"Continue-After">>, JObj) of
         'true' -> <<"false">>;
         'false' -> <<"true">>;
-        'undefined' -> <<"true">>
+        'undefined' -> <<"false">>
     end.
 
 -spec pre_exec(kz_term:proplist(), atom(), kz_term:ne_binary(), channel(), kz_json:object()) -> kz_term:proplist().
-pre_exec(DP, _Node, _UUID, _Channel, JObj) ->
+pre_exec(DP, _Node, _UUID, Channel, JObj) ->
     [{"application", "export sip_redirect_context=context_2"}
-    ,{"application", list_to_binary(["set continue_on_fail=", continue_on_fail(JObj)])}
+    ,{"application", list_to_binary(["set continue_on_fail=", continue_on_fail_channel(Channel, JObj)])}
     ,{"application", list_to_binary(["set hangup_after_bridge=", hangup_after_bridge(JObj)])}
     | DP
     ].
 
 -spec post_exec(kz_term:proplist(), kz_term:ne_binary()) -> kz_term:proplist().
-post_exec(DP, AppUUID) ->
-    Props = [{<<"Application-UUID">>, AppUUID}],
-    Event = ecallmgr_util:create_masquerade_event(<<"bridge">>, <<"CHANNEL_EXECUTE_COMPLETE">>, Props),
-    [{"application", Event}
-    ,{"application", "park"}
-    | DP
-    ].
+post_exec(DP, _AppUUID) ->
+    [{"application", "park"} | DP].
 
 -spec create_command(kz_term:proplist(), atom(), kz_term:ne_binary(), channel(), kz_json:object(), kz_term:ne_binary()) -> kz_term:proplist().
-create_command(DP, Node, UUID, #channel{profile=ChannelProfile}, JObj, _AppUUID) ->
+create_command(DP, Node, UUID, #channel{profile=ChannelProfile}, JObj, AppUUID) ->
     BypassAfterBridge = ?BYPASS_MEDIA_AFTER_BRIDGE,
     BridgeProfile = kz_term:to_binary(kz_json:get_value(<<"SIP-Interface">>, JObj, ?DEFAULT_FS_PROFILE)),
     EPs = kz_json:get_list_value(<<"Endpoints">>, JObj, []),
@@ -344,7 +345,9 @@ create_command(DP, Node, UUID, #channel{profile=ChannelProfile}, JObj, _AppUUID)
     lager:debug("lifting from leg to channel: ~s", [kz_json:encode(CommonProperties)]),
     UpdatedJObj = kz_json:set_value(<<"Endpoints">>, UniqueEndpoints, kz_json:merge(JObj, CommonProperties)),
 
-    LiftedCmd = list_to_binary(["bridge "
+    BridgeApp = kz_app_config:get_ne_binary(?APP, [<<"dialplan">>, <<"apps">>, <<"bridge">>], <<"bridge">>),
+    Scope = list_to_binary(["/^[app_uuid=",AppUUID,"^app_uuid_name=bridge]"]),
+    LiftedCmd = list_to_binary([BridgeApp, " ", Scope
                                ,build_channels_vars(Node, UUID, UniqueEndpoints, UpdatedJObj)
                                ,try_create_bridge_string(UniqueEndpoints, UpdatedJObj)
                                ]),

@@ -89,7 +89,7 @@ directory_not_found(#{node := Node, fetch_id := FetchId} = Context) ->
 validate_token(#{payload := JObj}=Context) ->
     case kz_json:get_ne_binary_value(<<"JWT-Token">>, kzd_fetch:cauth(JObj)) of
         'undefined' -> directory_not_found(Context);
-        Token -> validate_token(Context, kz_auth:validate_token(Token))
+        Token -> validate_token(Context#{auth_token => Token}, kz_auth:validate_token(Token))
     end.
 
 -type validate_token_result() :: {'ok', kz_json:object()} | {'error', any()}.
@@ -100,42 +100,18 @@ validate_token(#{fetch_id := FetchId}=Context, {error, Error}) ->
                  ,[FetchId, Error]
                  ),
     directory_not_found(Context);
-validate_token(#{payload := JObj} = Context, {'ok', Claims}) ->
+validate_token(#{payload := JObj, auth_token := Token} = Context, {'ok', Claims}) ->
+    Sub = kz_json:get_ne_binary_value(<<"sub">>, Claims),
+    [EndpointId, AccountId] = binary:split(Sub, <<"@">>, ['global']),
     KVs = [{<<"Requested-Domain-Name">>, kzd_fetch:fetch_key_value(JObj)}
           ,{<<"Requested-User-ID">>, kzd_fetch:fetch_user(JObj)}
           ],
-    Ctx = Context#{claims => Claims
-                  ,payload => kz_json:set_values(KVs, JObj)
-                  },
-    validate_token_claims(Ctx).
-
--spec validate_token_claims(map()) -> fs_handlecall_ret().
-validate_token_claims(#{claims := Claims} = Context) ->
-    Sub = kz_json:get_ne_binary_value(<<"sub">>, Claims),
-    [EndpointId, AccountId] = binary:split(Sub, <<"@">>, ['global']),
-    Ctx = Context#{endpoint_id => EndpointId
+    Ctx = Context#{payload => kz_json:set_values(KVs, JObj)
+                  ,endpoint_id => EndpointId
                   ,account_id => AccountId
                   },
-    Endpoint = to_endpoint(EndpointId, AccountId, Claims),
-    Options = [{'claims', Claims}
-              ,{'endpoint', Endpoint}
-              ],
+    Options = [{'token', Token}],
     fetch_directory(EndpointId, AccountId, Ctx, Options).
-
-to_endpoint(EndpointId, AccountId, Claims) ->
-    SIPInfo = kz_json:normalize(kz_json:get_json_value(<<"SIP-Info">>, Claims)),
-    kz_json:from_list(
-      props:filter_undefined(
-        [{<<"_id">>, EndpointId}
-        ,{<<"_rev">>, kz_auth_claims:identity_sig(Claims)}
-        ,{<<"pvt_account_id">>, AccountId}
-        ,{<<"pvt_account_db">>, AccountId}
-        ,{<<"pvt_type">>, <<"device">>}
-        ,{<<"device_type">>, <<"smartphone">>}
-        ,{<<"owner_id">>, kz_auth_claims:owner_id(Claims)}
-        ,{<<"sip">>, kz_json:from_list(kz_json:to_proplist(<<"user_agent">>, SIPInfo))}
-        | kz_json:to_proplist(kz_json:normalize(kz_json:delete_keys([<<"user_agent">>], SIPInfo)))
-        ])).
 
 -spec validate_rpc_token(map()) -> fs_handlecall_ret().
 validate_rpc_token(#{payload := JObj}=Context) ->

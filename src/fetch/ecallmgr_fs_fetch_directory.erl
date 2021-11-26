@@ -50,7 +50,7 @@ fetch_directory(#{node := Node, fetch_id := FetchId, payload := JObj}=Context) -
         <<"sip_auth">> -> lookup_directory(Context);
         <<"sip_auth_token">> -> validate_token(Context);
         <<"jsonrpc-authenticate">> -> validate_rpc_token(Context);
-        <<"user_call">> -> maybe_lookup_registrar(Context);
+        <<"user_call">> -> lookup_registrar(Context);
         <<"group_call">> -> lookup_directory(kzd_fetch:fetch_group(JObj), Context);
         _Other ->
             lager:debug("unhandled action '~s' in request ~s"
@@ -177,17 +177,6 @@ send_reply(#{node := Node, fetch_id := FetchId} = Context) ->
                ,[Node, FetchId]
                ),
     freeswitch:fetch_reply(Context).
-
--spec maybe_lookup_registrar(map()) -> fs_handlecall_ret().
-maybe_lookup_registrar(#{payload := JObj} = Context) ->
-    case kz_json:is_true(<<"endpoint_is_ephemeral">>, JObj, false)
-        andalso not kz_app_config:get_boolean(?APP, <<"use_proxy_contact_api">>, false)
-    of
-        true ->
-            lookup_registrar(Context);
-        false ->
-            lookup_directory(Context)
-    end.
 
 -spec lookup_registrar(map()) -> fs_handlecall_ret().
 lookup_registrar(#{payload := JObj}=Context) ->

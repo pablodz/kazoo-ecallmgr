@@ -195,11 +195,12 @@ add_listener(Pid, Channel, Queue, Active, State0) ->
     State = remove_listener(Pid, State0),
     #{listeners := Listeners, channels := Channels, refs := Refs} = State,
 
-    NewListeners = maps:put(Pid, #{channel => Channel, queue => Queue, count => 0, call_control => #{}}, maps:without([Pid], Listeners)),
-    NewChannels = maps:put(Channel, #{listener => Pid, queue => Queue, count => 0}, maps:without([Channel], Channels)),
-
     ListenerRef = erlang:monitor(process, Pid),
     ChannelRef = erlang:monitor(process, Channel),
+
+    NewListeners = maps:put(Pid, #{channel => Channel, queue => Queue, monitor => ListenerRef}, maps:without([Pid], Listeners)),
+    NewChannels = maps:put(Channel, #{listener => Pid, queue => Queue, monitor => ChannelRef}, maps:without([Channel], Channels)),
+
     NewRefs0 = maps:put(ListenerRef, #{listener => Pid}, Refs),
     NewRefs = maps:put(ChannelRef, #{channel => Channel}, NewRefs0),
 

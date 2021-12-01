@@ -330,8 +330,13 @@ handle_info({'force_queue_advance', CallId}, #state{call_id=CallId
     {'noreply', force_queue_advance(State#state{event_uuids=[EventUUID | EventUUIDs]})};
 handle_info({'force_queue_advance', _}, State) ->
     {'noreply', State};
-handle_info({'forward_queue', CallId}, #state{call_id=CallId}=State) ->
+handle_info({'forward_queue', CallId}, #state{call_id=CallId, current_cmd_uuid='undefined'}=State) ->
     {'noreply', forward_queue(State)};
+handle_info({'forward_queue', CallId}, #state{call_id=CallId
+                                             ,current_cmd_uuid=EventUUID
+                                             ,event_uuids=EventUUIDs
+                                             }=State) ->
+    {'noreply', forward_queue(State#state{event_uuids=[EventUUID | EventUUIDs]})};
 handle_info('keep_alive_expired', State) ->
     lager:debug("no new commands received after channel destruction, our job here is done"),
     {'stop', 'normal', State};
@@ -760,14 +765,20 @@ insert_command(#state{node=Node
             'true' = kapi_dialplan:queue_v(JObj),
             Commands = kz_json:get_list_value(<<"Commands">>, JObj, []),
             DefJObj = kz_json:from_list(kz_api:extract_defaults(JObj)),
+            freeswitch:call_cmd_sync(true),
             _ = execute_queue_commands(Commands, DefJObj, State),
+            freeswitch:call_cmd_sync(false),
             CommandQ;
         <<"noop">> ->
+            freeswitch:call_cmd_sync(true),
             _ = execute_control_request(JObj, State),
+            freeswitch:call_cmd_sync(false),
             maybe_filter_queue(kz_json:get_value(<<"Filter-Applications">>, JObj), CommandQ);
         _ ->
             lager:debug("recv and executing ~s now!", [AName]),
+            freeswitch:call_cmd_sync(true),
             _ = execute_control_request(JObj, State),
+            freeswitch:call_cmd_sync(false),
             CommandQ
     end;
 insert_command(#state{node=Node, call_id=CallId, command_q=CmdQ, current_cmd_uuid=CurrCmdId}, 'flush', JObj) ->

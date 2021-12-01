@@ -65,7 +65,7 @@ language_resp_xml(JObj) ->
 
 language_el(Props, PhrasesEl) ->
     #xmlElement{name='language'
-               ,attributes=[xml_attrib(K, V)
+               ,attributes=[xml_attrib(kz_term:to_atom(K, true), V)
                             || {K, V} <- props:unique(
                                            props:filter_undefined(Props)
                                           )

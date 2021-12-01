@@ -17,7 +17,6 @@
 		<filter name="Application" value="ring_ready" />
 		<filter name="Application" value="log" />
 		<filter name="Application" value="execute_extension" />
-		<filter name="Application" value="bridge" />
 	</filters>
 
 	<fields>

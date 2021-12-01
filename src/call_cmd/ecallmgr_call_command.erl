@@ -441,9 +441,9 @@ get_fs_app(_Node, UUID, JObj, <<"set">>) ->
             Command = get_set_command(JObj),
 
             props:filter_undefined(
-              [{Command, maybe_multi_set(UUID, ChannelVars)}
-              ,{Command, maybe_multi_set(UUID, [{?CAV(K), V} || {K, V} <- AppVars])}
-              ,{Command, maybe_multi_set(UUID, [{?JSON_CAV(K), V} || {K, V} <- JSONAppVars])}
+              [{Command, maybe_no_channel_data_scope(maybe_multi_set(UUID, ChannelVars))}
+              ,{Command, maybe_no_channel_data_scope(maybe_multi_set(UUID, [{?CAV(K), V} || {K, V} <- AppVars]))}
+              ,{Command, maybe_no_channel_data_scope(maybe_multi_set(UUID, [{?JSON_CAV(K), V} || {K, V} <- JSONAppVars]))}
                %% CallVars are always exported
               ,{<<"kz_export_encoded">>, maybe_multi_set(UUID, CallVars)}
               ])
@@ -1574,3 +1574,6 @@ detect_speech_vars(JObj) ->
 
 add_detect_speech_var(K, V, Vars) ->
     [list_to_binary([K, "=", kz_term:to_binary(V)]) | Vars].
+
+maybe_no_channel_data_scope(undefined) -> undefined;
+maybe_no_channel_data_scope(Value) -> <<"%^[No-Channel-Data=true]", Value/binary>>.

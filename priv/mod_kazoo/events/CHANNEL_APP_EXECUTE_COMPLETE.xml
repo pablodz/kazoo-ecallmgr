@@ -1,4 +1,11 @@
 <event name="CHANNEL_APP_EXECUTE_COMPLETE">
+<!--
+	<filters>
+		<filter type="exclude" name="Application-UUID-Name" value="set" />
+		<filter type="exclude" name="Application" value="set" />
+	</filters>
+-->
+
 	<fields>
 		<field name="call_event_headers" type="reference" />
 		<field name="Event-Name" type="static" value="CHANNEL_EXECUTE_COMPLETE" />

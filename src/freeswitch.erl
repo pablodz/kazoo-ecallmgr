@@ -47,7 +47,10 @@
         ]).
 -export([sendmsg/3]).
 -export([cmd/3, cmds/3]).
+-export([cmd/4, cmds/4]).
 -export([cast_cmd/3, cast_cmds/3]).
+-export([cast_cmd/4, cast_cmds/4]).
+-export([call_cmd_sync/0, call_cmd_sync/1]).
 
 -export([config/1, config/2
         ,bgapi4/5
@@ -178,14 +181,26 @@ sendmsg(Node, UUID, Headers) -> ?FS_MODULE:sendmsg(Node, UUID, Headers).
 -spec cmd(atom(), kz_term:ne_binary(), list()) -> fs_api_return().
 cmd(Node, UUID, Headers) -> ?FS_MODULE:cmd(Node, UUID, Headers).
 
+-spec cmd(atom(), kz_term:ne_binary(), boolean(), list()) -> fs_api_return().
+cmd(Node, UUID, Sync, Headers) -> ?FS_MODULE:cmd(Node, UUID, Sync, Headers).
+
 -spec cmds(atom(), kz_term:ne_binary(), list()) -> fs_api_return().
 cmds(Node, UUID, Headers) -> ?FS_MODULE:cmds(Node, UUID, Headers).
+
+-spec cmds(atom(), kz_term:ne_binary(), boolean(), list()) -> fs_api_return().
+cmds(Node, UUID, Sync, Headers) -> ?FS_MODULE:cmds(Node, UUID, Sync, Headers).
 
 -spec cast_cmd(atom(), kz_term:ne_binary(), list()) -> fs_api_return().
 cast_cmd(Node, UUID, Headers) -> ?FS_MODULE:cast_cmd(Node, UUID, Headers).
 
+-spec cast_cmd(atom(), kz_term:ne_binary(), boolean(), list()) -> fs_api_return().
+cast_cmd(Node, UUID, Sync, Headers) -> ?FS_MODULE:cast_cmd(Node, UUID, Sync, Headers).
+
 -spec cast_cmds(atom(), kz_term:ne_binary(), list()) -> fs_api_return().
 cast_cmds(Node, UUID, Headers) -> ?FS_MODULE:cast_cmds(Node, UUID, Headers).
+
+-spec cast_cmds(atom(), kz_term:ne_binary(), boolean(), list()) -> fs_api_return().
+cast_cmds(Node, UUID, Sync, Headers) -> ?FS_MODULE:cast_cmds(Node, UUID, Sync, Headers).
 
 -spec config(atom()) -> 'ok'.
 config(Node) -> ?FS_MODULE:config(Node).
@@ -253,3 +268,11 @@ async_api(Node, Cmd, Args) -> ?FS_MODULE:async_api(Node, Cmd, Args).
 
 -spec contact_api(atom()) -> binary().
 contact_api(Node) -> ?FS_MODULE:contact_api().
+
+-spec call_cmd_sync() -> boolean().
+call_cmd_sync() ->
+    kz_term:is_true(erlang:get(kz_fs_sync_app)).
+
+-spec call_cmd_sync(boolean()) -> boolean() | undefined.
+call_cmd_sync(Value) ->
+    erlang:put(kz_fs_sync_app, Value).

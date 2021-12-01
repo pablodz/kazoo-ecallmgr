@@ -44,7 +44,9 @@
         ]).
 -export([sendmsg/3]).
 -export([cmd/3, cmds/3]).
+-export([cmd/4, cmds/4]).
 -export([cast_cmd/3, cast_cmds/3]).
+-export([cast_cmd/4, cast_cmds/4]).
 
 -export([config/1, config/2
         ,bgapi4/5
@@ -471,19 +473,35 @@ internal_fs_error(Reason) ->
 
 -spec cmd(atom(), kz_term:ne_binary(), list()) -> freeswitch:fs_api_return().
 cmd(Node, UUID, Command) ->
-    gen_server:call({'mod_kazoo', Node}, {'command', UUID, Command}).
+    cmd(Node, UUID, call_cmd_sync(), Command).
+
+-spec cmd(atom(), kz_term:ne_binary(), boolean(), list()) -> freeswitch:fs_api_return().
+cmd(Node, UUID, Sync, Command) ->
+    gen_server:call({'mod_kazoo', Node}, {'command', UUID, Sync, Command}).
 
 -spec cmds(atom(), kz_term:ne_binary(), list()) -> freeswitch:fs_api_return().
 cmds(Node, UUID, Commands) ->
-    gen_server:call({'mod_kazoo', Node}, {'commands', UUID, Commands}).
+    cmds(Node, UUID, call_cmd_sync(), Commands).
+
+-spec cmds(atom(), kz_term:ne_binary(), boolean(), list()) -> freeswitch:fs_api_return().
+cmds(Node, UUID, Sync, Commands) ->
+    gen_server:call({'mod_kazoo', Node}, {'commands', UUID, Sync, Commands}).
 
 -spec cast_cmd(atom(), kz_term:ne_binary(), list()) -> freeswitch:fs_api_return().
 cast_cmd(Node, UUID, Command) ->
-    gen_server:cast({'mod_kazoo', Node}, {'command', UUID, Command}).
+    cast_cmd(Node, UUID, call_cmd_sync(), Command).
+
+-spec cast_cmd(atom(), kz_term:ne_binary(), boolean(), list()) -> freeswitch:fs_api_return().
+cast_cmd(Node, UUID, Sync, Command) ->
+    gen_server:cast({'mod_kazoo', Node}, {'command', UUID, Sync, Command}).
 
 -spec cast_cmds(atom(), kz_term:ne_binary(), list()) -> freeswitch:fs_api_return().
 cast_cmds(Node, UUID, Commands) ->
-    gen_server:cast({'mod_kazoo', Node}, {'commands', UUID, Commands}).
+    cast_cmds(Node, UUID, call_cmd_sync(), Commands).
+
+-spec cast_cmds(atom(), kz_term:ne_binary(), boolean(), list()) -> freeswitch:fs_api_return().
+cast_cmds(Node, UUID, Sync, Commands) ->
+    gen_server:cast({'mod_kazoo', Node}, {'commands', UUID, Sync, Commands}).
 
 -spec sync_channel(atom(), kz_term:ne_binary()) -> 'ok'.
 sync_channel(Node, UUID) ->
@@ -525,3 +543,5 @@ async_api(Node, Cmd, Args) ->
 
 -spec contact_api() -> binary().
 contact_api() -> <<"kz_contact">>.
+
+call_cmd_sync() -> freeswitch:call_cmd_sync().

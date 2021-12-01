@@ -13,9 +13,19 @@
             "description": "ecallmgr authz enabled",
             "type": "boolean"
         },
+        "default_fax_extension": {
+            "default": ".tiff",
+            "description": "ecallmgr default fax extension",
+            "type": "string"
+        },
         "default_realm": {
             "default": "nodomain.com",
             "description": "ecallmgr default realm",
+            "type": "string"
+        },
+        "default_recording_extension": {
+            "default": ".mp3",
+            "description": "ecallmgr default recording extension",
             "type": "string"
         },
         "expandable_macros": {
@@ -33,6 +43,16 @@
             "default": 180,
             "description": "ecallmgr expires deviation time",
             "type": "integer"
+        },
+        "failover_when_all_unreg": {
+            "default": false,
+            "description": "ecallmgr failover_when_all_unreg",
+            "type": "boolean"
+        },
+        "fax_file_path": {
+            "default": "/tmp/",
+            "description": "ecallmgr fax file path",
+            "type": "string"
         },
         "freeswitch_context": {
             "default": "context_2",
@@ -67,6 +87,16 @@
             "description": "ecallmgr maximum timeout for node restart",
             "type": "integer"
         },
+        "multivar_separator": {
+            "default": "~",
+            "description": "ecallmgr multivar_separator",
+            "type": "string"
+        },
+        "network_map": {
+            "default": {},
+            "description": "ecallmgr network map",
+            "type": "object"
+        },
         "publish_channel_reconnect": {
             "default": false,
             "description": "ecallmgr publish channel reconnect",
@@ -87,9 +117,19 @@
             "description": "ecallmgr record waste resources",
             "type": "boolean"
         },
+        "recording_file_path": {
+            "default": "/tmp/",
+            "description": "ecallmgr recording file path",
+            "type": "string"
+        },
         "recording_software_name": {
             "default": "2600Hz, Inc.'s Kazoo",
             "description": "ecallmgr recording software name",
+            "type": "string"
+        },
+        "sanitize_fs_value_regex": {
+            "default": "[^0-9\\w\\s-]",
+            "description": "ecallmgr sanitize_fs_value_regex",
             "type": "string"
         },
         "should_detect_inband_dtmf": {
@@ -100,6 +140,21 @@
         "use_bypass_media_after_bridge": {
             "default": false,
             "description": "ecallmgr use bypass media after bridge",
+            "type": "boolean"
+        },
+        "use_http_cache": {
+            "default": true,
+            "description": "ecallmgr use http cache",
+            "type": "boolean"
+        },
+        "use_shout": {
+            "default": false,
+            "description": "ecallmgr use shout",
+            "type": "boolean"
+        },
+        "use_vlc": {
+            "default": false,
+            "description": "ecallmgr use vlc",
             "type": "boolean"
         }
     },

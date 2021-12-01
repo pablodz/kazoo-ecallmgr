@@ -1313,7 +1313,7 @@ media_path(MediaName, Type, UUID, JObj) ->
             lager:warning("failed to get media path for ~s: ~p", [MediaName, _E]),
             kz_term:to_binary(MediaName);
         {'ok', Path} ->
-            lager:debug("found path ~s for ~s", [Path, MediaName]),
+            lager:debug("found path ~s for ~s", [kz_log:redactor(Path), MediaName]),
             kz_term:to_binary(get_fs_playback(Path))
     end.
 
@@ -1386,15 +1386,15 @@ maybe_playback_via_shout(URI) ->
 
 -spec maybe_playback_via_http_cache(kz_term:ne_binary()) -> kz_term:ne_binary().
 maybe_playback_via_http_cache(<<?HTTP_GET_PREFIX, _/binary>> = URI) ->
-    lager:debug("media is streamed via http_cache, using ~s", [URI]),
+    lager:debug("media is streamed via http_cache, using ~s", [kz_log:redactor(URI)]),
     URI;
 maybe_playback_via_http_cache(URI) ->
     case kapps_config:is_true(?APP_NAME, <<"use_http_cache">>, 'true') of
         'false' ->
-            lager:debug("using straight URI ~s", [URI]),
+            lager:debug("using straight URI ~s", [kz_log:redactor(URI)]),
             URI;
         'true' ->
-            lager:debug("media is streamed via http_cache, using ~s", [URI]),
+            lager:debug("media is streamed via http_cache, using ~s", [kz_log:redactor(URI)]),
             <<"http_cache://", URI/binary>>
     end.
 
@@ -1470,7 +1470,9 @@ maybe_cache_media_response(MediaName, MediaResp) ->
                                       ,MediaUrl
                                       ,CacheProps
                                       ),
-            lager:debug("media ~s stored to playback cache : ~s", [MediaName, MediaUrl]),
+            lager:debug("media ~s stored to playback cache : ~s"
+                       ,[MediaName, kz_log:redactor(MediaUrl)]
+                       ),
             {'ok', MediaUrl}
     end.
 

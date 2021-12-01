@@ -76,9 +76,9 @@ reply_success(JObj, Response) ->
     kapi_switch:publish_fs_reply(Queue, API).
 
 -spec send_http(atom(), binary(), binary(), atom(), kz_json:object()) -> 'ok'.
-send_http(_Node, undefined, _Url, _Method, JObj) ->
+send_http(_Node, 'undefined', _Url, _Method, JObj) ->
     reply_error(<<"missing file">>, JObj);
-send_http(_Node, _File, undefined, _Method, JObj) ->
+send_http(_Node, _File, 'undefined', _Method, JObj) ->
     reply_error(<<"missing url">>, JObj);
 send_http(Node, File, Url, Method, JObj) ->
     lager:debug("processing http_send command : ~s / ~s", [File, Url]),
@@ -89,9 +89,11 @@ send_http(Node, File, Url, Method, JObj) ->
         {'ok', JobId} -> lager:debug("send_http command started ~p", [JobId])
     end.
 
--spec send_http_cb(atom(),  kz_term:ne_binary(),  kz_term:proplist(), list()) -> 'ok'.
+-spec send_http_cb(atom(), kz_term:ne_binary(), kz_term:proplist(), list()) -> 'ok'.
 send_http_cb('ok', _Reply, FSProps, [_JobId, JObj, _File, _Node, Channel]) ->
-    lager:debug("processed http_send command (~s) ~s for file ~s with success : ~s", [_Node, _JobId, _File, _Reply]),
+    lager:debug("processed http_send command (~s) ~s for file ~s with success : ~s"
+               ,[_Node, _JobId, _File, kz_log:redactor(_Reply)]
+               ),
     _ = kz_amqp_channel:consumer_channel(Channel),
     reply_success(JObj, FSProps);
 send_http_cb('error', Reply, FSProps, [JobId, JObj, _File, _Node, Channel]) ->

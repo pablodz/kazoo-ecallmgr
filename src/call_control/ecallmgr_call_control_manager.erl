@@ -288,22 +288,19 @@ handle_down(Pid, Ref, Reason, #{refs := Refs} = State) ->
     end.
 
 handle_down(Pid, Ref, Reason, #{canary := Pid}, #{refs := Refs, canary := Pid} = State) ->
-    lager:debug("received down (~p/~p/~p) for canary channel, we're closing until we get it back", [Pid, Ref, Reason]),
+    lager:warning("received down (~p/~p/~p) for canary channel, we're closing until we get it back", [Pid, Ref, Reason]),
     set_control_refs(undefined),
     NewRefs = maps:without([Ref], Refs),
     State#{refs => NewRefs};
-handle_down(Pid, Ref, Reason, #{listener := Pid}, #{refs := Refs, listeners := Listeners, channels := Channels} = State) ->
+handle_down(Pid, Ref, Reason, #{listener := Pid}, State) ->
     lager:warning("received down (~p/~p/~p) for listener, this is bad.", [Pid, Ref, Reason]),
-    #{channel := Channel} = maps:get(Pid, Listeners),
-    NewRefs = maps:without([Ref], Refs),
-    NewListeners = maps:without([Pid], Listeners),
-    NewChannels = maps:without([Channel], Channels),
-    set_control_refs(NewChannels),
-    State#{refs => NewRefs, listeners => NewListeners, channels => NewChannels};
-handle_down(Pid, Ref, Reason, #{channel := Pid}, #{refs := Refs, channels := Channels} = State) ->
+    NewState = #{channels := Channels} = remove_listener(Pid, State),
+    set_control_refs(Channels),
+    NewState;
+handle_down(Pid, Ref, Reason, #{channel := Pid}, #{channels := Channels} = State) ->
     lager:warning("received down (~p/~p/~p) for channel, this is bad.", [Pid, Ref, Reason]),
-    NewRefs = maps:without([Ref], Refs),
-    NewChannels = maps:without([Pid], Channels),
+    #{listener := ListenerPid} = maps:get(Pid, Channels),
+    NewState = #{channels := NewChannels} = remove_listener(ListenerPid, State),
     set_control_refs(NewChannels),
-    State#{refs => NewRefs, channels => NewChannels}.
+    NewState.
 

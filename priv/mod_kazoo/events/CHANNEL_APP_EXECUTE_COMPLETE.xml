@@ -5,11 +5,16 @@
 	</flags>
 
 	<filters>
-		<filter type="exclude" name="Application-Response" value="NONE" />
-		<filter name="Channel-Flags" type="exclude" compare="contains" value="TRANSFER" />
-		<filter name="Channel-Flags" type="exclude" compare="contains" value="REDIRECT" />
-		<filter name="Channel-Flags" type="exclude" compare="contains" value="INTERCEPTED" />
+		<filter type="exclude" name="Application" value="bridge">
+			<filters>
+				<filter name="Application-Response" type="exclude" value="NONE" />
+				<filter name="Channel-Flags" type="exclude" compare="contains" value="TRANSFER" />
+				<filter name="Channel-Flags" type="exclude" compare="contains" value="REDIRECT" />
+				<filter name="Channel-Flags" type="exclude" compare="contains" value="INTERCEPTED" />
+			</filters>
+		</filter>
 	</filters>
+
 
 	<fields>
 		<field name="call_event_headers" type="reference" />

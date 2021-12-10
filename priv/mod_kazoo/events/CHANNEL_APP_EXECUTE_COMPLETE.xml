@@ -1,10 +1,15 @@
 <event name="CHANNEL_APP_EXECUTE_COMPLETE">
-<!--
+
+	<flags>
+		<flag name="uuid-add-flags" value="true"/>
+	</flags>
+
 	<filters>
-		<filter type="exclude" name="Application-UUID-Name" value="set" />
-		<filter type="exclude" name="Application" value="set" />
+		<filter type="exclude" name="Application-Response" value="NONE" />
+		<filter name="Channel-Flags" type="exclude" compare="contains" value="TRANSFER" />
+		<filter name="Channel-Flags" type="exclude" compare="contains" value="REDIRECT" />
+		<filter name="Channel-Flags" type="exclude" compare="contains" value="INTERCEPTED" />
 	</filters>
--->
 
 	<fields>
 		<field name="call_event_headers" type="reference" />

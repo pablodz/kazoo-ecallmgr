@@ -5,9 +5,9 @@
 			<!--<filter name="Caller-Endpoint-ID" type="include" compare="exists" />-->
 		</filters>
 		<fields>
-			<field name="Caller-ID-Number" type="first-of"	value="KZ-Caller-ID-Number|variable_origination_caller_id_number|variable_effective_caller_id_number|Caller-Caller-ID-Number" />
-			<field name="Caller-ID-Name" type="first-of" value="KZ-Caller-ID-Name|variable_origination_caller_id_name|variable_effective_caller_id_name|Caller-Caller-ID-Name" />
-			<field name="Callee-ID-Number" type="first-of" value="KZ-Callee-ID-Number|variable_effective_callee_id_number|Caller-Callee-ID-Number|Other-Leg-Caller-ID-Number" />
+			<field name="Caller-ID-Number" type="first-of"	value="KZ-Caller-ID-Original-Number|KZ-Caller-ID-Number|variable_origination_caller_id_number|variable_effective_caller_id_number|Caller-Caller-ID-Number" />
+			<field name="Caller-ID-Name" type="first-of" value="KZ-Caller-ID-Original-Name|KZ-Caller-ID-Name|variable_origination_caller_id_name|variable_effective_caller_id_name|Caller-Caller-ID-Name" />
+			<field name="Callee-ID-Number" type="first-of" value="KZ-Destination-Number|KZ-Callee-ID-Number|variable_effective_callee_id_number|Caller-Callee-ID-Number|Other-Leg-Caller-ID-Number" />
 		</fields>
 	</field>
 	<field name="caller-id" type="group">

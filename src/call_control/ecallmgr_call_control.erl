@@ -707,6 +707,7 @@ set_control_info(UUID, #state{node=Node
                          ,";ecallmgr_Ecallmgr-Node=", kz_term:to_binary(node())
                          ,";Call-Control-Node=", kz_term:to_binary(node())
                          ,";Fetch-UUID=", FetchId
+                         ,";hangup_after_bridge=true"
                          ]),
     _ = freeswitch:api(Node, Cmd, Arg),
     'ok'.

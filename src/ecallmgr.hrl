@@ -451,7 +451,7 @@
                    ,{'bridge', ['CHANNEL_BRIDGE', 'CHANNEL_UNBRIDGE']}
                    ,{'media', ['DETECTED_TONE', 'DTMF','CHANNEL_PROGRESS','CHANNEL_PROGRESS_MEDIA']}
                    ,{'record', ['RECORD_START', 'RECORD_STOP']}
-                   ,{'callflow', ['ROUTE_WINNER', 'CHANNEL_EXECUTE_COMPLETE', 'CHANNEL_METAFLOW']}
+                   ,{'callflow', ['ROUTE_WINNER', 'CHANNEL_EXECUTE_COMPLETE', 'CHANNEL_APP_EXECUTE_COMPLETE', 'CHANNEL_METAFLOW']}
                    ,{'presence', ['PRESENCE_IN']}
                    ,{'channel_full_update', ['CHANNEL_DATA','CHANNEL_SYNC','CALL_UPDATE']}
                    ,{'channel_update', ['CHANNEL_HOLD','CHANNEL_UNHOLD']}
@@ -461,7 +461,6 @@
                    ,{'transfer', ?FS_SOFIA_TRANSFER_EVENTS}
                    ,{'loopback', ['loopback::bowout', 'loopback::direct']}
                    ,{'cdr', ['KZ_CDR']}
-                   ,{'originate', ['KZ_ORIGINATE_START', 'KZ_ORIGINATE_EXECUTE', 'KZ_ORIGINATE_COMPLETE']}
                    ]).
 
 -define(FS_FETCH_SECTIONS, ['configuration'

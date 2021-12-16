@@ -12,8 +12,7 @@
 	<field name="Conference-Node" />
 	<field name="Conference-Profile" as="Profile" />
 	<field name="Unique-ID" as="Call-ID" />
-	<field name="Account-ID" type="first-of"
-		value="Conference-Account-ID|variable_ecallmgr_Account-ID" />
+	<field name="Account-ID" type="first-of" value="Conference-Account-ID|variable_ecallmgr_Account-ID" />
 	<field name="conference-caller-id" type="reference" />
 
 	<field name="Channel-Presence-ID" />

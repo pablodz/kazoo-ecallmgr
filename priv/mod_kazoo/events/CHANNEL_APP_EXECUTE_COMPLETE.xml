@@ -23,8 +23,7 @@
 		<field name="Application-Error-Code"/>
 		<field name="Application-Error-Msg"/>
 
-		<field name="Application-Response" type="first-of"
-			value="Application-Response|variable_originate_disposition|variable_endpoint_disposition|#NONE" />
+		<field name="Application-Response" type="first-of" value="Application-Response|variable_originate_disposition|variable_endpoint_disposition|#NONE" />
 
         <!--  bridge specific -->
 		<!--
@@ -44,6 +43,10 @@
 		<field name="hangup-cause" type="reference" />
         <field name="hangup-code" type="reference" />
 		<field name="Disposition" type="first-of" value="variable_endpoint_disposition|variable_originate_disposition" />
+
+		<field name="Custom-Channel-Vars" type="reference" />
+		<field name="Custom-Application-Vars" type="reference" />
+		<field name="Custom-SIP-Headers" type="reference" />
 
 		<field name="debug-call" type="reference" />
 	</fields>

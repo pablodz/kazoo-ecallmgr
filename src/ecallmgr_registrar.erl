@@ -141,6 +141,7 @@ start_link() ->
                             ,{'queue_name', ?REG_QUEUE_NAME}
                             ,{'queue_options', ?REG_QUEUE_OPTIONS}
                             ,{'consume_options', ?REG_CONSUME_OPTIONS}
+                            ,{'auto_gc', 'false'}
                             ]
                            ,[]
                            ).

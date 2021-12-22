@@ -1449,7 +1449,8 @@ set_page_timeout(Dialplan, JObj) ->
     ].
 
 -spec set_page_endpoints(kz_term:proplist(), node(), kz_term:ne_binary(), kz_json:object(), kz_json:objects()) -> kz_term:proplist().
-set_page_endpoints(Dialplan, _Node, UUID, JObj, Endpoints) ->
+set_page_endpoints(Dialplan, Node, UUID, JObj, Endpoints) ->
+    InteractionId = kz_json:get_value([<<"Custom-Channel-Vars">>, <<?CALL_INTERACTION_ID>>], JObj, <<"${Call-Interaction-ID}">>),
     DefaultCCV = kz_json:from_list([{<<"Auto-Answer-Suppress-Notify">>, 'true'}]),
     CCVs = kz_json:to_proplist(kz_json:get_value(<<"Custom-Channel-Vars">>, JObj, DefaultCCV)),
     BargeParams = ecallmgr_util:multi_set_args(UUID, CCVs, <<";">>, <<";">>),
@@ -1460,6 +1461,10 @@ set_page_endpoints(Dialplan, _Node, UUID, JObj, Endpoints) ->
                                 ]),
 
     Values = [{[<<"Custom-Channel-Vars">>, <<"Auto-Answer">>], 'true'}
+             ,{[<<"Custom-Channel-Vars">>, <<"Ecallmgr-Node">>], kz_term:to_binary(Node)}
+             ,{<<"Call-Flag-NO-Flip">>, true}
+             ,{<<?CALL_INTERACTION_ID>>, InteractionId}
+             ,{<<"Existing-Call-ID">>, UUID}
              ],
     EPs = [kz_json:set_values(Values, Endpoint) || Endpoint <- Endpoints],
     Channels = [<<AutoAnswer/binary, Channel/binary>> || Channel <- ecallmgr_util:build_bridge_channels(EPs)],
@@ -1475,21 +1480,13 @@ add_page_conference_app(Dialplan, ConferenceName) ->
     ].
 
 -spec add_page_exports(kz_term:proplist(), kz_term:ne_binary()) -> kz_term:proplist().
-add_page_exports(DP, UUID) ->
+add_page_exports(DP, _UUID) ->
     Exports = [<<"sip_redirect_context">>
-              ,<<"ecallmgr_Ecallmgr-Node">>
-              ,<<?CALL_INTERACTION_ID>>
-              ,{<<"kz_originate_aleg_uuid">>, UUID}
-              ,{<<"no_flip">>, <<"true">>}
               ],
-    ExportVars = kz_binary:join([add_page_export(Export) || Export <- Exports], <<",">>),
+    ExportVars = kz_binary:join(Exports, <<",">>),
     [{"set", <<"conference_auto_outcall_export_vars=", ExportVars/binary>>}
     |DP
     ].
-
-add_page_export({AsVar,FromVar}) ->
-    list_to_binary([AsVar, "=", FromVar]);
-add_page_export(Var) -> Var.
 
 -type ep_actions() :: kz_term:ne_binaries().
 

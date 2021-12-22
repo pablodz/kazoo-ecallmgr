@@ -146,8 +146,9 @@ exec_dial(ConferenceNode, ConferenceId, JObj) ->
 exec_dial(ConferenceNode, ConferenceId, JObj, Endpoints) ->
     lager:info("conference ~s is running on ~s, dialing out", [ConferenceId, ConferenceNode]),
     Pid = self(),
+    IteractionId = ?CALL_INTERACTION_DEFAULT,
     Pids = [kz_process:spawn(fun() ->
-                                     exec_endpoint(Pid, ConferenceNode, ConferenceId, JObj, Endpoint)
+                                     exec_endpoint(Pid, ConferenceNode, ConferenceId, IteractionId, JObj, Endpoint)
                              end) || Endpoint <- Endpoints],
     Num = length(Pids),
     handle_responses(JObj, Num, []).
@@ -162,9 +163,11 @@ handle_responses(JObj, N, Responses) ->
         {'result', Response} -> handle_responses(JObj, N - 1, [Response | Responses])
     end.
 
-update_endpoint(Endpoint) ->
+update_endpoint(Endpoint, InteractionId) ->
     Updates = [{fun kz_json:set_value/3, [<<"Custom-Channel-Vars">>, <<"Ecallmgr-Node">>], node()}
               ,{fun kz_json:set_value/3, [<<"Custom-Channel-Vars">>, <<"Ignore-Early-Media">>], 'true'}
+              ,{fun kz_json:set_value/3, [<<"Custom-Channel-Vars">>, <<"Call-Flag-NO-Flip">>], true}
+              ,{fun kz_json:set_value/3, [<<"Custom-Channel-Vars">>, <<?CALL_INTERACTION_ID>>], InteractionId}
               ],
     lists:foldl(fun({F, K, V}, JObj) -> F(K, V, JObj) end, Endpoint, Updates).
 
@@ -175,10 +178,10 @@ endpoint_id(JObj) ->
            ],
     kz_json:get_first_defined(Keys, JObj).
 
--spec exec_endpoint(pid(), atom(), kz_term:ne_binary(), kapi_conference:doc(), kz_json:object()) -> any().
-exec_endpoint(Parent, ConferenceNode, ConferenceId, JObj, EP) ->
+-spec exec_endpoint(pid(), atom(), kz_term:ne_binary(), kz_term:ne_binary(), kapi_conference:doc(), kz_json:object()) -> any().
+exec_endpoint(Parent, ConferenceNode, ConferenceId, InteractionId, JObj, EP) ->
     EndpointCallId = kz_json:find(<<"Outbound-Call-ID">>, [EP, JObj], kz_binary:rand_hex(16)),
-    Endpoint = update_endpoint(EP),
+    Endpoint = update_endpoint(EP, InteractionId),
     EndpointId = endpoint_id(Endpoint),
     lager:debug("endpoint ~s(~s)", [EndpointId, EndpointCallId]),
     _ = (catch gproc:reg({'p', 'l', ?FS_CONFERENCE_EVENT_REG_MSG(ConferenceNode, ConferenceId, <<"add-member">>)})),

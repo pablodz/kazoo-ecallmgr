@@ -3,6 +3,21 @@
     "_id": "system_config.ecallmgr",
     "description": "Schema for ecallmgr system_config",
     "properties": {
+        "acl_request_timeout_fudge_ms": {
+            "default": 100,
+            "description": "ecallmgr acl_request_timeout_fudge_ms",
+            "type": "integer"
+        },
+        "acl_request_timeout_ms": {
+            "default": 2000,
+            "description": "ecallmgr acl_request_timeout_ms",
+            "type": "integer"
+        },
+        "acls": {
+            "default": {},
+            "description": "ecallmgr acls",
+            "type": "object"
+        },
         "allow_endless_recording": {
             "default": false,
             "description": "ecallmgr allow_endless_recording",

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2021, 2600Hz
+%%% @copyright (C) 2012-2022, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -36,6 +36,7 @@
        ).
 -define(IP_REGEX, <<"^(\\d{1,3}\\\.\\d{1,3}\\\.\\d{1,3}\\\.\\d{1,3}).*">>).
 -define(ACL_RESULT(IP, ACL), {'acl', IP, ACL}).
+-define(ACL_RESULT_MERGE(ACL), {'acl_merge', ACL}).
 
 -type acls() :: kz_json:object().
 -type acl_builder_fun() :: fun((pid(), kzd_resources:doc(), kz_term:ne_binaries()) -> 'ok').
@@ -56,14 +57,16 @@ get() ->
 
 -spec get(atom() | kz_term:ne_binary()) -> acls().
 get(Node) ->
-    Routines = [fun offnet_resources/1
+    Routines = [fun collect_system_config_acls/2
+               ,fun offnet_resources/1
                ,fun local_resources/1
                ,fun sip_auth_ips/1
                ,fun collect_media_acls/1
                ],
-    PidRefs = [kz_process:spawn_monitor(fun erlang:apply/2, [F, [self()]]) || F <- Routines],
+    Args = [self(), Node],
+    PidRefs = collector_spawn(Routines, Args),
     lager:debug("collecting ACLs in ~p", [PidRefs]),
-    collect(system_config_acls(Node), PidRefs).
+    collect(kz_json:new(), PidRefs).
 
 -spec media_acls() -> acls().
 media_acls() ->
@@ -97,13 +100,15 @@ edge() ->
 
 -spec edge(atom() | kz_term:ne_binary()) -> acls().
 edge(Node) ->
-    Routines = [fun offnet_resources/1
+    Routines = [fun collect_trusted_acls/2
+               ,fun offnet_resources/1
                ,fun local_resources/1
                ,fun sip_auth_ips/1
                ],
-    PidRefs = [kz_process:spawn_monitor(fun erlang:apply/2, [F, [self()]]) || F <- Routines],
+    Args = [self(), Node],
+    PidRefs = collector_spawn(Routines, Args),
     lager:debug("collecting ACLs in ~p", [PidRefs]),
-    token(cidrs(collect(trusted_acls(Node), PidRefs))).
+    token(cidrs(collect(kz_json:new(), PidRefs))).
 
 %%------------------------------------------------------------------------------
 %% @doc Fetches just the system_config ACLs
@@ -117,24 +122,39 @@ system() ->
 system(Node) ->
     kapps_config:fetch_current(?APP_NAME, <<"acls">>, kz_json:new(), Node).
 
+-spec collector_spawn(list(), list()) -> kz_term:pid_refs().
+collector_spawn(Routines, Args) ->
+    [collector_routine_spawn(Routine, Args) || Routine <- Routines].
+
+collector_routine_spawn(Routine, [Collector | _])
+  when is_function(Routine, 1) ->
+    kz_process:spawn_monitor(Routine, [Collector]);
+collector_routine_spawn(Routine, [Collector , Arg2 | _])
+  when is_function(Routine, 2) ->
+    kz_process:spawn_monitor(Routine, [Collector, Arg2]);
+collector_routine_spawn(Routine, [Collector , Arg2, Arg3 | _])
+  when is_function(Routine, 3) ->
+    kz_process:spawn_monitor(Routine, [Collector, Arg2, Arg3]).
+
 -spec collect(kz_json:object(), kz_term:pid_refs()) ->
           kz_json:object().
 collect(ACLs, PidRefs) ->
-    collect(ACLs, PidRefs, request_timeout()).
+    collect(ACLs, PidRefs, request_timeout(), 0).
 
 -spec request_timeout() -> pos_integer().
 request_timeout() ->
     ?REQUEST_TIMEOUT + ?REQUEST_TIMEOUT_FUDGE.
 
--spec collect(kz_json:object(), kz_term:pid_refs(), timeout()) ->
+-spec collect(kz_json:object(), kz_term:pid_refs(), timeout(), integer()) ->
           kz_json:object().
-collect(ACLs, [], _Timeout) ->
+collect(ACLs, [], _Timeout, 0) ->
     lager:debug("acls built with ~p ms to spare", [_Timeout]),
     ACLs;
-collect(ACLs, _PidRefs, Timeout) when Timeout < 0 ->
-    lager:info("timed out waiting for ACLs, returning what we got"),
-    ACLs;
-collect(ACLs, PidRefs, Timeout) ->
+collect(_ACLs, [], _Timeout, Errors) ->
+    throw(io_lib:format("got ~b error(s) collecting ACLs", [Errors]));
+collect(_ACLs, _PidRefs, Timeout, _Errors) when Timeout < 0 ->
+    throw("timed out waiting for ACLs");
+collect(ACLs, PidRefs, Timeout, Errors) ->
     Start = kz_time:start_time(),
 
     receive
@@ -145,26 +165,44 @@ collect(ACLs, PidRefs, Timeout) ->
             collect(kz_json:set_value(ACLName, ACL, ACLs)
                    ,PidRefs
                    ,kz_time:decr_timeout(Timeout, Start)
+                   ,Errors
                    );
-        {'DOWN', Ref, 'process', Pid, _Reason} ->
-            case lists:keytake(Pid, 1, PidRefs) of
-                'false' ->
-                    collect(ACLs, PidRefs, kz_time:decr_timeout(Timeout, Start));
-                {'value', {Pid, Ref}, NewPidRefs} ->
-                    lager:info("down ~p ~p", [Pid, _Reason]),
-                    collect(ACLs, NewPidRefs, kz_time:decr_timeout(Timeout, Start))
-            end
+        ?ACL_RESULT_MERGE(ACL) ->
+            lager:info("merging acl"),
+            collect(kz_json:merge(ACL, ACLs)
+                   ,PidRefs
+                   ,kz_time:decr_timeout(Timeout, Start)
+                   ,Errors
+                   );
+        {'DOWN', Ref, 'process', Pid, Reason} ->
+            collect_continue(ACLs, PidRefs, Ref, Pid, Reason, kz_time:decr_timeout(Timeout, Start), Errors)
     after Timeout ->
-            lager:debug("timed out collecting acls, working with what we have"),
-            ACLs
+            throw("timed out collecting acls")
     end.
+
+collect_continue(ACLs, PidRefs, Ref, Pid, Reason, Timeout, Errors) ->
+    case lists:keytake(Pid, 1, PidRefs) of
+        'false' ->
+            collect(ACLs, PidRefs, Timeout, Errors);
+        {'value', {Pid, Ref}, NewPidRefs} ->
+            lager:info("collect process ~p ended => ~p", [Pid, Reason]),
+            collect(ACLs, NewPidRefs, Timeout, collect_errors(Reason, Errors))
+    end.
+
+collect_errors(normal, Errors) -> Errors;
+collect_errors(_, Errors) -> Errors + 1.
+
+-spec collect_system_config_acls(pid(), atom() | kz_term:ne_binary()) -> ok.
+collect_system_config_acls(Collector, Node) ->
+    ACLs = system_config_acls(Node),
+    Collector ! ?ACL_RESULT_MERGE(ACLs),
+    ok.
 
 -spec system_config_acls(atom() | kz_term:ne_binary()) -> acls().
 system_config_acls(Node) ->
     case kapps_config:fetch_current(?APP_NAME, <<"acls">>, kz_json:new(), Node) of
         {'error', Error} ->
-            lager:warning("error getting system acls : ~p", [Error]),
-            kz_json:new();
+            throw(io_lib:format("error getting system acls : ~s", [Error]));
         JObj -> resolve(JObj)
     end.
 
@@ -223,11 +261,15 @@ trusted_acls() ->
 -spec trusted_acls(atom() | kz_term:ne_binary()) -> acls().
 trusted_acls(Node) ->
     case kapps_config:fetch_current(?APP_NAME, <<"acls">>, kz_json:new(), Node) of
-        {'error', Error} ->
-            lager:warning("error getting system acls : ~p", [Error]),
-            kz_json:new();
+        {'error', Error} -> throw(io_lib:format("error fetch trusted acls : ~s", Error));
         JObj -> resolve(kz_json:filtermap(fun trusted_acl/2, JObj))
     end.
+
+-spec collect_trusted_acls(pid(), atom() | kz_term:ne_binary()) -> ok.
+collect_trusted_acls(Collector, Node) ->
+    ACLs = trusted_acls(Node),
+    Collector ! ?ACL_RESULT_MERGE(ACLs),
+    ok.
 
 -spec trusted_acl(kz_term:ne_binary(), kz_json:object()) -> boolean() | {'true', kz_json:object()}.
 trusted_acl(K, V) ->
@@ -260,7 +302,7 @@ sip_auth_ips(Collector) ->
     ViewOptions = [],
     case kz_datamgr:get_results(?KZ_SIP_DB, <<"credentials/lookup_by_ip">>, ViewOptions) of
         {'error', _R} ->
-            lager:info("unable to get view results for auth-by-ip devices: ~p", [_R]);
+            throw(io_lib:format("unable to get view results for auth-by-ip devices: ~s", [_R]));
         {'ok', JObjs} ->
             {RawIPs, RawHosts} = lists:foldl(fun needs_resolving/2, {[], []}, JObjs),
 
@@ -369,7 +411,7 @@ local_resources(Collector) ->
     ViewOptions = ['include_docs'],
     case kz_datamgr:get_results(?KZ_SIP_DB, <<"resources/listing_active_by_weight">>, ViewOptions) of
         {'error', _R} ->
-            lager:debug("unable to get view results for local active resources: ~p", [_R]);
+            throw(io_lib:format("unable to get view results for local active resources: ~s", [_R]));
         {'ok', JObjs} ->
             handle_resource_results(Collector, JObjs)
     end.
@@ -379,7 +421,7 @@ offnet_resources(Collector) ->
     ViewOptions = ['include_docs'],
     case kz_datamgr:get_results(?KZ_OFFNET_DB, <<"resources/listing_active_by_weight">>, ViewOptions) of
         {'error', _R} ->
-            lager:debug("unable to get view results for offnet active resources: ~p", [_R]);
+            throw(io_lib:format("unable to get view results for offnet active resources : ~s", [_R]));
         {'ok', ViewResources} ->
             handle_resource_results(Collector, ViewResources)
     end.

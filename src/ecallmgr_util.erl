@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc Various utilities specific to ecallmgr. More general utilities go
 %%% in kazoo_util.erl
 %%%
@@ -24,6 +24,7 @@
 -export([multi_set_args/2, multi_unset_args/2]).
 -export([multi_set_args/3, multi_unset_args/3]).
 -export([multi_set_args/4, multi_unset_args/4]).
+-export([set_prefix/0]).
 
 -export([get_expires/1]).
 -export([get_interface_list/1, get_interface_properties/1, get_interface_properties/2]).
@@ -1594,3 +1595,6 @@ maybe_use_kz_moh(Media, JObj) ->
         'true' -> list_to_binary(["kz_moh::", Media]);
         'false' -> Media
     end.
+
+-spec set_prefix() -> kz_term:ne_binary().
+set_prefix() -> list_to_binary([?FS_MULTI_VAR_SEP_PREFIX, ?FS_MULTI_VAR_SEP]).

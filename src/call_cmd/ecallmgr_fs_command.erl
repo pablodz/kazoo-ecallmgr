@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2021, 2600Hz
+%%% @copyright (C) 2013-2022, 2600Hz
 %%% @doc
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -133,7 +133,7 @@ api(Node, Cmd, Args) ->
 api(_, _, _, []) -> 'ok';
 api(Node, UUID, Cmd, Args)
   when is_list(Args)->
-    api(Node, Cmd, list_to_binary([UUID, " ", ecallmgr_util:fs_args_to_binary(Args)])).
+    api(Node, Cmd, list_to_binary([UUID, " ", ecallmgr_util:set_prefix(), ecallmgr_util:fs_args_to_binary(Args)])).
 
 -spec bgapi(atom(), atom(), binary()) -> ecallmgr_util:send_cmd_ret().
 bgapi(Node, Cmd, Args) ->
@@ -143,4 +143,4 @@ bgapi(Node, Cmd, Args) ->
 bgapi(_, _, _, []) -> 'ok';
 bgapi(Node, UUID, Cmd, Args)
   when is_list(Args)->
-    bgapi(Node, Cmd, list_to_binary([UUID, " ", ecallmgr_util:fs_args_to_binary(Args)])).
+    bgapi(Node, Cmd, list_to_binary([UUID, " ", ecallmgr_util:set_prefix(), ecallmgr_util:fs_args_to_binary(Args)])).

@@ -80,7 +80,7 @@
                  ,realm :: kz_term:api_ne_binary() | '_' | '$2'
                  ,username :: kz_term:api_ne_binary() | '_' | '$1'
                  ,import_moh = 'false' :: boolean() | '_'
-                 ,answered = 'true' :: boolean() | '_'
+                 ,answered = 'false' :: boolean() | '_'
                  ,other_leg :: kz_term:api_binary() | '$2' | '_'
                  ,node :: atom() | '$1' | '$2' | '$3' | '_'
                  ,former_node :: atom() | '$2' | '_'
@@ -244,6 +244,7 @@
                               ,{<<"Default-Language">>, <<"default_language">>}
                               ,{<<"Channel-Language">>, <<"channel_language">>}
                               ,{<<"Diversions">>, <<"sip_h_Diversion">>}
+                              ,{<<"Eavesdrop-Enable-DTMF">>, <<"eavesdrop_enable_dtmf">>}
                               ,{<<"Eavesdrop-Group">>, <<"eavesdrop_group">>}
                               ,{<<"Eavesdrop-Group-ID">>, <<"eavesdrop_group">>}
                               ,{<<"Enable-T38-Fax">>, <<"fax_enable_t38">>}

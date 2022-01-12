@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc Execute call commands
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -458,14 +458,10 @@ get_fs_app(_Node, _UUID, JObj, <<"respond">>) ->
             {<<"respond">>, Response}
     end;
 
-get_fs_app(Node, UUID, JObj, <<"redirect">>) ->
+get_fs_app(_Node, UUID, JObj, <<"redirect">>) ->
     case kapi_dialplan:redirect_v(JObj) of
         'false' -> {'error', <<"redirect failed to execute as JObj did not validate">>};
-        'true' ->
-            RedirectServer = lookup_redirect_server(JObj) ,
-            maybe_add_redirect_header(Node, UUID, RedirectServer),
-
-            {<<"redirect">>, kz_json:get_value(<<"Redirect-Contact">>, JObj, <<>>)}
+        'true' -> redirect_app(UUID, JObj)
     end;
 
 get_fs_app(Node, UUID, JObj, <<"conference">>) ->
@@ -562,31 +558,6 @@ maybe_multi_set(_UUID, []) -> 'undefined';
 maybe_multi_set(UUID, Vars) -> ecallmgr_util:multi_set_args(UUID, Vars).
 
 %%------------------------------------------------------------------------------
-%% @doc Redirect command helpers
-%% @end
-%%------------------------------------------------------------------------------
-
--spec lookup_redirect_server(kz_json:object()) -> kz_term:api_binary().
-lookup_redirect_server(JObj) ->
-    case kz_json:get_value(<<"Redirect-Server">>, JObj) of
-        'undefined' -> fixup_redirect_node(kz_json:get_value(<<"Redirect-Node">>, JObj));
-        Server -> Server
-    end.
-
--spec fixup_redirect_node(kz_term:api_binary()) -> kz_term:api_binary().
-fixup_redirect_node('undefined') ->
-    'undefined';
-fixup_redirect_node(Node) ->
-    SipUrl = ecallmgr_fs_node:sip_url(Node),
-    binary:replace(SipUrl, <<"mod_sofia@">>, <<>>).
-
--spec maybe_add_redirect_header(atom(), kz_term:ne_binary(), kz_term:api_binary()) -> 'ok'.
-maybe_add_redirect_header(_Node, _UUID, 'undefined') -> 'ok';
-maybe_add_redirect_header(Node, UUID, RedirectServer) ->
-    lager:debug("set X-Redirect-Server to ~s", [RedirectServer]),
-    ecallmgr_fs_command:set(Node, UUID, [{<<"sip_rh_X-Redirect-Server">>, RedirectServer}]).
-
-%%------------------------------------------------------------------------------
 %% @doc Eavesdrop command helpers
 %% @end
 %%------------------------------------------------------------------------------
@@ -649,8 +620,7 @@ prepare_app(Target, _Node, Target, _JObj) ->
     {'error', <<"intercept target is the same as the caller">>};
 prepare_app(Target, Node, UUID, JObj) ->
     case ecallmgr_fs_channel:fetch(Target, 'record') of
-        {'ok', #channel{node=Node
-                       }} ->
+        {'ok', #channel{node=Node}} ->
             lager:debug("target ~s is on same node(~s) as us", [Target, Node]),
             {'execute', Node, UUID, JObj, Target};
         {'ok', #channel{node=OtherNode}} ->
@@ -814,32 +784,14 @@ exports_from_api(JObj, Ks) ->
 
 -spec get_eavesdrop_app(atom(), kz_term:ne_binary(), kz_json:object(), kz_term:ne_binary()) ->
           {kz_term:ne_binary(), kz_term:ne_binary()}.
-get_eavesdrop_app(Node, UUID, JObj, Target) ->
-    ExportsApi = exports_from_api(JObj, [<<"Park-After-Pickup">>
-                                        ,<<"Continue-On-Fail">>
-                                        ,<<"Continue-On-Cancel">>
-                                        ]),
+get_eavesdrop_app(_Node, UUID, JObj, Target) ->
+    Args = get_eavesdrop_app_args(UUID, JObj),
+    {<<"eavesdrop">>, list_to_binary([Args , Target])}.
 
-    SetApi = [{<<"Enable-DTMF">>, 'undefined', <<"eavesdrop_enable_dtmf">>}
-             ],
-
-    Exports = [{<<"failure_causes">>, <<"NORMAL_CLEARING,ORIGINATOR_CANCEL,CRASH">>}
-              | build_set_args(ExportsApi, JObj)
-              ],
-
-    ControlUsurp = [{<<"Call-ID">>, Target}
-                   ,{<<"Reason">>, <<"redirect">>}
-                   ,{<<"Fetch-ID">>, kz_binary:rand_hex(4)}
-                   | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
-                   ],
-    _ = kz_amqp_worker:cast(ControlUsurp
-                           ,fun(C) -> kapi_call:publish_usurp_control(Target, C) end
-                           ),
-    lager:debug("published ~p for ~s~n", [ControlUsurp, Target]),
-
-    _ = ecallmgr_fs_command:set(Node, UUID, build_set_args(SetApi, JObj)),
-    _ = ecallmgr_fs_command:export(Node, UUID, Exports),
-    {<<"eavesdrop">>, Target}.
+-spec get_eavesdrop_app_args(kz_term:ne_binary(), kz_json:object()) -> binary().
+get_eavesdrop_app_args(UUID, JObj) ->
+    Args = [{<<"Eavesdrop-Enable-DTMF">>, kz_json:get_boolean_value(<<"Enable-DTMF">>, JObj)}],
+    scope_variables(UUID, props:filter_undefined(Args)).
 
 -type set_headers() :: kz_term:proplist() | [{kz_term:ne_binary(), kz_term:api_binary(), kz_term:ne_binary()},...].
 
@@ -1240,10 +1192,7 @@ record_call_vars(UUID, JObj) ->
                        ]
                       ,Routines
                       ),
-    case ecallmgr_util:process_fs_kv(UUID, Vars, 'set') of
-        [] -> <<>>;
-        Args -> list_to_binary(["%^[", kz_binary:join(Args, <<"^">>), "]"])
-    end.
+    scope_variables(UUID, Vars).
 
 -spec record_call_args(kz_json:object()) -> binary().
 record_call_args(JObj) ->
@@ -1566,7 +1515,7 @@ detect_speech_vars(JObj) ->
     Speech = kz_json:get_json_value(<<"ASR-Engine-Settings">>, JObj, kz_json:new()),
     case kz_json:foldl(fun add_detect_speech_var/3, [], Speech) of
         [] -> <<>>;
-        Exports -> list_to_binary(["%^[", kz_binary:join(Exports, <<"^">>), "]"])
+        Exports -> scope_variables(Exports)
     end.
 
 add_detect_speech_var(K, V, Vars) ->
@@ -1574,3 +1523,75 @@ add_detect_speech_var(K, V, Vars) ->
 
 maybe_no_channel_data_scope(undefined) -> undefined;
 maybe_no_channel_data_scope(Value) -> <<"%^[No-Channel-Data=true]", Value/binary>>.
+
+-spec scope_variables(kz_term:ne_binary(), kz_term:proplist()) -> binary().
+scope_variables(UUID, Vars) ->
+    case ecallmgr_util:process_fs_kv(UUID, Vars, 'set') of
+        [] -> <<>>;
+        Args -> scope_variables(Args)
+    end.
+
+-spec scope_variables(kz_term:binaries()) -> binary().
+scope_variables(Vars) ->
+    list_to_binary(["%^[", kz_binary:join(Vars, <<"^">>), "]"]).
+
+-spec redirect_app(kz_term:ne_binary(), kz_json:object()) -> fs_apps().
+redirect_app(UUID, JObj) ->
+    case ecallmgr_fs_channel:fetch(UUID, record) of
+        {ok, #channel{answered = IsAnswered}} -> redirect_app(UUID, IsAnswered, JObj);
+        {error, not_found} = Error -> Error
+    end.
+
+-spec redirect_app(kz_term:ne_binary(), boolean(), kz_json:object()) -> fs_apps().
+redirect_app(_UUID, false, JObj) ->
+    case redirect_app_server(JObj) of
+        undefined ->
+            {<<"redirect">>, redirect_contact(JObj)};
+        RedirectServer ->
+            [{<<"set">>, redirect_app_server_header(false, RedirectServer)}
+            ,{<<"redirect">>, redirect_contact(JObj)}
+            ]
+    end;
+redirect_app(_UUID, true, JObj) ->
+    case redirect_app_server(JObj) of
+        undefined ->
+            {<<"deflect">>, redirect_contact(JObj)};
+        RedirectServer ->
+            [{<<"set">>, redirect_app_server_header(true, RedirectServer)}
+            ,{<<"deflect">>, redirect_contact(JObj)}
+            ]
+    end.
+
+-spec redirect_contact(kz_json:object()) -> binary().
+redirect_contact(JObj) ->
+    kz_json:get_ne_binary_value(<<"Redirect-Contact">>, JObj, <<>>).
+
+-spec redirect_app_server_header(boolean(), kz_term:ne_binary()) -> kz_term:ne_binary().
+redirect_app_server_header(false, RedirectServer) ->
+    lager:debug("set X-Redirect-Server to ~s", [RedirectServer]),
+    list_to_binary(["sip_rh_X-Redirect-Server=", RedirectServer]);
+redirect_app_server_header(true, RedirectServer) ->
+    lager:debug("set X-Redirect-Server to ~s", [RedirectServer]),
+    list_to_binary(["sip_h_X-Redirect-Server=", RedirectServer]).
+
+-spec redirect_app_server(kz_json:object()) -> kz_term:api_binary().
+redirect_app_server(JObj) ->
+    case kz_json:get_ne_binary_value(<<"Redirect-Server">>, JObj) of
+        undefined -> redirect_app_node(JObj);
+        Server -> redirect_app_fixup_url(Server)
+    end.
+
+-spec redirect_app_node(kz_json:object()) -> kz_term:api_binary().
+redirect_app_node(JObj) ->
+    case kz_json:get_ne_binary_value(<<"Redirect-Node">>, JObj) of
+        undefined -> undefined;
+        Node -> redirect_app_fixup_node(Node)
+    end.
+
+-spec redirect_app_fixup_node(kz_term:ne_binary()) -> kz_term:ne_binary().
+redirect_app_fixup_node(Node) ->
+    SipUrl = ecallmgr_fs_node:sip_url(Node),
+    redirect_app_fixup_url(SipUrl).
+
+redirect_app_fixup_url(SipUrl) ->
+    binary:replace(SipUrl, <<"mod_sofia@">>, <<>>).

@@ -43,6 +43,7 @@
 		<field name="hangup-cause" type="reference" />
         <field name="hangup-code" type="reference" />
 		<field name="Disposition" type="first-of" value="variable_endpoint_disposition|variable_originate_disposition" />
+		<field name="channel-state" type="reference" />
 
 		<field name="Custom-Channel-Vars" type="reference" />
 		<field name="Custom-Application-Vars" type="reference" />

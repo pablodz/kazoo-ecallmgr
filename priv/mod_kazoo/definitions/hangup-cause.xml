@@ -59,6 +59,8 @@
 	<field name="variable_last_bridge_hangup_cause" as="Hangup-Cause">
 		<filters>
 			<filter name="Call-Direction" type="include" compare="value" value="outbound" />
+			<filter name="Caller-Logical-Direction" type="exclude" compare="value" value="inbound" />
+			<filter name="last_app" type="exclude" compare="contains" value="intercept" />
 		</filters>
 	</field>
 

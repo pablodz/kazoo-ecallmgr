@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2021, 2600Hz
+%%% @copyright (C) 2013-2022, 2600Hz
 %%% @doc Track the FreeSWITCH channel information, and provide accessors
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -354,8 +354,9 @@ handle_query_channels(JObj, _Props) ->
         kz_json:is_true(<<"Active-Only">>, JObj, 'false')
     of
         'true' ->
-            lager:debug("not sending query_channels resp due to active-only=true");
+            lager:debug("no channels found, not sending query_channels resp due to active-only=true");
         'false' ->
+            lager:debug("found ~B channels, sending reply", [length(kz_json:get_keys(Channels))]),
             Resp = [{<<"Channels">>, Channels}
                    ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
                    | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
@@ -651,6 +652,7 @@ find_by_authorizing_id([AuthId|AuthIds], Acc) ->
 
 -spec find_by_user_realm(kz_term:api_binary() | kz_term:ne_binaries(), kz_term:ne_binary()) -> [] | kz_term:proplist().
 find_by_user_realm('undefined', Realm) ->
+    lager:debug("search channels in realm ~s", [Realm]),
     Pattern = #channel{realm=kz_term:to_lower_binary(Realm)
                       ,_='_'},
     case ets:match_object(?CHANNELS_TBL, Pattern) of
@@ -661,7 +663,8 @@ find_by_user_realm('undefined', Realm) ->
             ]
     end;
 find_by_user_realm(<<?CALL_PARK_FEATURE, _/binary>>=Username, Realm) ->
-    Pattern = #channel{destination=kz_term:to_lower_binary(Username)
+    lager:debug("search channels for call park feature in realm ~s", [Realm]),
+    Pattern = #channel{destination=Username
                       ,realm=kz_term:to_lower_binary(Realm)
                       ,other_leg='undefined'
                       ,_='_'},
@@ -673,6 +676,7 @@ find_by_user_realm(<<?CALL_PARK_FEATURE, _/binary>>=Username, Realm) ->
             ]
     end;
 find_by_user_realm(Usernames, Realm) when is_list(Usernames) ->
+    lager:debug("search channels for users ~s in realm ~s", [kz_binary:join(Usernames), Realm]),
     ETSUsernames = build_matchspec_ors(Usernames),
     MatchSpec = [{#channel{username='$1'
                           ,realm=kz_term:to_lower_binary(Realm)
@@ -688,7 +692,8 @@ find_by_user_realm(Usernames, Realm) when is_list(Usernames) ->
             ]
     end;
 find_by_user_realm(Username, Realm) ->
-    Pattern = #channel{username=kz_term:to_lower_binary(Username)
+    lager:debug("search channels for user ~s in realm ~s", [Username, Realm]),
+    Pattern = #channel{username=Username
                       ,realm=kz_term:to_lower_binary(Realm)
                       ,_='_'},
     case ets:match_object(?CHANNELS_TBL, Pattern) of
@@ -703,6 +708,7 @@ find_by_user_realm(Username, Realm) ->
           {'ok', kz_json:objects()} |
           {'error', 'not_found'}.
 find_account_channels(<<"all">>) ->
+    lager:debug("search channels for all accounts"),
     case ets:match_object(?CHANNELS_TBL, #channel{_='_'}) of
         [] -> {'error', 'not_found'};
         Channels ->
@@ -711,6 +717,7 @@ find_account_channels(<<"all">>) ->
                    ]}
     end;
 find_account_channels(AccountId) ->
+    lager:debug("search channels for account ~s", [AccountId]),
     case ets:match_object(?CHANNELS_TBL, #channel{account_id=AccountId, _='_'}) of
         [] -> {'error', 'not_found'};
         Channels ->
@@ -728,15 +735,21 @@ build_matchspec_ors(Usernames) ->
 
 -spec build_matchspec_ors_fold(kz_term:ne_binary(), tuple() | 'false') -> tuple().
 build_matchspec_ors_fold(Username, Acc) ->
-    {'or', {'=:=', '$1', kz_term:to_lower_binary(Username)}, Acc}.
+    {'or', {'=:=', '$1', Username}, Acc}.
+
+log_fields(Fields)
+  when is_list(Fields) -> kz_binary:join(Fields);
+log_fields(Field) -> Field.
 
 -spec query_channels(kz_term:ne_binaries(), kz_term:api_binary()) -> kz_json:object().
 query_channels(Fields, 'undefined') ->
+    lager:debug("query all channels returning fields : ~s", [log_fields(Fields)]),
     query_channels(ets:match_object(?CHANNELS_TBL, #channel{_='_'}, 1)
                   ,Fields
                   ,kz_json:new()
                   );
 query_channels(Fields, CallId) ->
+    lager:debug("query channel ~s returning fields : ~s", [CallId, log_fields(Fields)]),
     query_channels(ets:match_object(?CHANNELS_TBL, #channel{uuid=CallId, _='_'}, 1)
                   ,Fields
                   ,kz_json:new()

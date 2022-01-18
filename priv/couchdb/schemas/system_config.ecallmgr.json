@@ -142,6 +142,11 @@
             "description": "ecallmgr recording software name",
             "type": "string"
         },
+        "redirect_via_proxy": {
+            "default": true,
+            "description": "ecallmgr redirect via proxy",
+            "type": "boolean"
+        },
         "sanitize_fs_value_regex": {
             "default": "[^0-9\\w\\s-]",
             "description": "ecallmgr sanitize_fs_value_regex",

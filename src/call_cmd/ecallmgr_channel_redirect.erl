@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2021, 2600Hz
+%%% @copyright (C) 2013-2022, 2600Hz
 %%% @doc
 %%% @author James Aimonetti
 %%%
@@ -62,9 +62,13 @@ send_redirect(RedirectUrl, Contact, #channel{node=Node
                                             ,uuid=UUID
                                             ,answered=IsAnswered
                                             }) ->
-    _ = ecallmgr_fs_command:set(Node, UUID, [{<<"sip_rh_X-Redirect-Server">>, RedirectUrl}]),
+    _ = ecallmgr_fs_command:set(Node, UUID, [{redirect_server_header(IsAnswered), RedirectUrl}]),
     ecallmgr_util:send_cmd(Node, UUID, redirect_app(IsAnswered), Contact).
 
 -spec redirect_app(boolean()) -> kz_term:ne_binary().
 redirect_app('true') -> <<"deflect">>;
 redirect_app('false') -> <<"redirect">>.
+
+-spec redirect_server_header(boolean()) -> kz_term:ne_binary().
+redirect_server_header('true') -> <<"sip_h_X-Redirect-Server">>;
+redirect_server_header('false') -> <<"sip_rh_X-Redirect-Server">>.

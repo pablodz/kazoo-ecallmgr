@@ -354,6 +354,7 @@
                               ,{<<"recording_follow_attxfer">>, <<"recording_follow_attxfer">>}
                               ,{<<"recording_follow_transfer">>, <<"recording_follow_transfer">>}
                               ,{<<"sip_rh_X-Redirect-Server">>, <<"sip_rh_X-Redirect-Server">>}
+                              ,{<<"sip_h_X-Redirect-Server">>, <<"sip_h_X-Redirect-Server">>}
                               ,{<<"tts_engine">>, <<"tts_engine">>}
                               ,{<<"tts_voice">>, <<"tts_voice">>}
                               ,{<<"CDR-URI-From">>, <<"cdr_uri_from">>}

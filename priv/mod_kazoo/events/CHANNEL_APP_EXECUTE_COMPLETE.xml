@@ -41,7 +41,8 @@
 		<field name="variable_endpoint_disposition" as="Endpoint-Disposition" /> <!-- code in kapps_call_command should use this variable instead of disposition -->
 		<field name="variable_transfer_disposition" as="Transfer-Disposition" />
 		<field name="hangup-cause" type="reference" />
-        <field name="hangup-code" type="reference" />
+		<field name="hangup-code" type="reference" />
+		<field name="hangup-phrase" type="reference" />
 		<field name="Disposition" type="first-of" value="variable_endpoint_disposition|variable_originate_disposition" />
 		<field name="channel-state" type="reference" />
 

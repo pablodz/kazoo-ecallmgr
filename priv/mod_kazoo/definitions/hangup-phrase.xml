@@ -1,0 +1,4 @@
+
+<definition name="hangup-phrase">
+	<field name="sip_hangup_phrase" as="Hangup-Phrase" />
+</definition>

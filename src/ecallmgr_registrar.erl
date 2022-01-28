@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2021, 2600Hz
+%%% @copyright (C) 2011-2022, 2600Hz
 %%% @doc Listener for reg_success, and reg_query AMQP requests
 %%% @author James Aimonetti
 %%%
@@ -232,7 +232,7 @@ lookup_proxy_path(<<Realm/binary>>, <<Username/binary>>) ->
         [] ->
             {'ok', 'undefined', []};
         [#registration{}=Reg] ->
-            {'ok', proxy_with_transport(Reg), contact_vars(to_props(Reg))}
+            {'ok', proxy_with_transport(Reg), proxy_vars(Reg)}
     end.
 
 -spec proxy_with_transport(registration()) -> binary().
@@ -241,6 +241,51 @@ proxy_with_transport(#registration{proxy = Proxy, proxy_proto = Proto}) ->
         nomatch -> list_to_binary([Proxy, ";transport=", Proto]);
         _Else -> Proxy
     end.
+
+-spec proxy_vars_options(registration()) -> map().
+proxy_vars_options(Reg) ->
+    Funs = [fun proxy_var_option_token/2
+           ],
+    lists:foldl(proxy_vars_options_fun(Reg), #{}, Funs).
+
+proxy_vars_options_fun(Reg) ->
+    fun(F, Acc) ->
+            F(Reg, Acc)
+    end.
+
+-spec proxy_var_option_token(registration(), map()) -> map().
+proxy_var_option_token(#registration{endpoint_token=undefined}, Options) -> Options;
+proxy_var_option_token(#registration{}, Options) -> Options#{token_registration => true}.
+
+-spec proxy_vars(registration()) -> kz_term:proplist().
+proxy_vars(Reg) ->
+    proxy_vars(to_props(Reg), proxy_vars_options(Reg)).
+
+-spec proxy_vars(kz_term:proplist(), map()) -> kz_term:proplist().
+proxy_vars(Props, Options) ->
+    lists:usort(lists:foldl(proxy_vars_fun(Options), [], Props)).
+
+proxy_vars_fun(Options) ->
+    fun(Prop, Acc) ->
+            proxy_vars_fold(Prop, Acc, Options)
+    end.
+
+-spec proxy_vars_fold({kz_term:ne_binary(), term()}, kz_term:proplist(), map()) -> kz_term:proplist().
+proxy_vars_fold({<<"Proxy-Protocol">>, Proto}, Props, _Options) ->
+    case kz_term:to_lower_binary(Proto) of
+        <<"ws", _/binary>> ->
+            [{<<"Media-Webrtc">>, 'true'}
+            ,{<<"RTCP-MUX">>, 'true'}
+            | Props
+            ];
+        _ -> Props
+    end;
+proxy_vars_fold({<<"AOR">>, AOR}, Props, #{token_registration := true}) ->
+    [{<<"SIP-Invite-To-URI">>, AOR}
+    ,{<<"KAZOO-AOR">>, AOR}
+    | Props
+    ];
+proxy_vars_fold(_Prop , Props, _Options) -> Props.
 
 -spec lookup_contact(kz_term:ne_binary(), kz_term:ne_binary()) ->
           {'ok', kz_term:ne_binary(), kz_term:proplist()} |
@@ -278,17 +323,6 @@ contact_vars_fold({<<"Proxy-Protocol">>, Proto}, Props) ->
             ];
         _ -> Props
     end;
-contact_vars_fold({<<"Original-Contact">>, Contact}, Props) ->
-    [#uri{}=UriContact] = kzsip_uri:uris(Contact),
-    case props:get_value(<<"transport">>, UriContact#uri.opts) of
-        'undefined' -> Props;
-        Transport -> contact_vars_fold({<<"Proxy-Protocol">>, Transport}, Props)
-    end;
-contact_vars_fold({<<"AOR">>, AOR}, Props) ->
-    [{<<"SIP-Invite-To-URI">>, AOR}
-    ,{<<"KAZOO-AOR">>, AOR}
-    | Props
-    ];
 contact_vars_fold(_ , Props) -> Props.
 
 -spec lookup_original_contact(kz_term:ne_binary(), kz_term:ne_binary()) ->

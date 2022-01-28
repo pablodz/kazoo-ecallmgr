@@ -2,4 +2,5 @@
 	<field name="hangup-code" type="reference" />
 	<field name="hangup-cause" type="reference" />
 	<field name="hangup-disposition" type="reference" />
+	<field name="hangup-phrase" type="reference"/>
 </definition>

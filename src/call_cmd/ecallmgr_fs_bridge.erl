@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc Helpers for bridging in FreeSWITCH
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -297,21 +297,25 @@ handle_loopback(DP, _Node, _UUID, _Channel, JObj) ->
     Keys = [<<"Simplify-Loopback">>, <<"Loopback-Bowout">>],
     handle_loopback_keys(Keys, JObj, DP).
 
--spec continue_on_fail(kz_json:object(), kz_term:ne_binary()) -> kz_term:ne_binary().
+-spec continue_on_fail(kz_json:object(), kz_term:ne_binary() | boolean()) -> kz_term:ne_binary().
 continue_on_fail(JObj, Default) ->
     case kz_json:get_value(<<"Continue-On-Fail">>, JObj) of
-        'undefined' -> Default;
+        'undefined' -> kz_term:to_binary(Default);
         Val when is_binary(Val) -> Val;
         Val when is_boolean(Val) -> kz_term:to_binary(Val);
         Val when is_list(Val) -> kz_binary:join(Val, <<",">>);
-        _ -> Default
+        _ -> kz_term:to_binary(Default)
     end.
 
 -spec continue_on_fail_channel(channel(), kz_json:object()) -> kz_term:ne_binary().
-continue_on_fail_channel(#channel{is_loopback=true}, JObj) ->
-    continue_on_fail(JObj, <<"false">>);
+continue_on_fail_channel(#channel{is_loopback='true'
+                                 ,ccvs=CCVs
+                                 }
+                        ,JObj
+                        ) ->
+    continue_on_fail(JObj, kz_json:is_defined(<<"Inception-Account-ID">>, CCVs));
 continue_on_fail_channel(_, JObj) ->
-    continue_on_fail(JObj, <<"true">>).
+    continue_on_fail(JObj, 'true').
 
 -spec hangup_after_bridge(kz_json:object()) -> kz_term:ne_binary().
 hangup_after_bridge(JObj) ->

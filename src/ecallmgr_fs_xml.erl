@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2021, 2600Hz
+%%% @copyright (C) 2011-2022, 2600Hz
 %%% @doc Generate the XML for various FS responses
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -785,6 +785,9 @@ kazoo_var_to_fs_var_fold(<<"Loopback-Request-Variables">> = Key, Vars, Acc) ->
     Val = kz_binary:join([ecallmgr_util:get_fs_key(Var) || Var <- Vars], <<",">>),
     [encode_fs_val(Prefix, Val) | Acc];
 
+kazoo_var_to_fs_var_fold(<<"Media-Control">>, Variables, Acc) ->
+    kz_json:foldl(fun media_control_fold/3, Acc, Variables);
+
 kazoo_var_to_fs_var_fold(<<"Channel-Actions">>, Actions, Acc) ->
     [Actions |Acc];
 
@@ -801,6 +804,9 @@ kazoo_var_to_fs_var_fold(K, V, Acc) ->
             Val = ecallmgr_util:maybe_sanitize_fs_value(K, V),
             [encode_fs_val(Prefix, Val) | Acc]
     end.
+
+media_control_fold(K, V, Acc) ->
+    [encode_fs_val(K, V) | Acc].
 
 -spec kazoo_cavs_to_fs_vars_fold(kz_json:key(), kz_json:json_term(), iolist()) -> iolist().
 kazoo_cavs_to_fs_vars_fold(K, V, Acc) ->

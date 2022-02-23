@@ -881,20 +881,27 @@ get_profile_vars_fold(K, V, Acc) ->
 
 -spec get_channel_params(kz_json:object() | kz_term:proplist()) -> kz_term:proplist().
 get_channel_params(Props) when is_list(Props) ->
-    [get_channel_params_fold(K, V) || {K, V} <- Props];
+    lists:foldl(fun get_channel_params/2, [], Props);
 get_channel_params(JObj) ->
     get_channel_params(
       kz_json:to_proplist(
         kz_json:get_value(<<"Custom-Channel-Vars">>, JObj, kz_json:new())
        )).
 
--spec get_channel_params_fold(kz_term:ne_binary(), kz_term:ne_binary()) ->
-          {kz_term:ne_binary(), kz_term:ne_binary()}.
-get_channel_params_fold(<<"Hold-Media">>=Key, Media) ->
+-type channel_param_kv() :: {kz_term:ne_binary(), kz_json:json_term()}.
+-type channel_param_kvs() :: [channel_param_kv()].
+
+-spec get_channel_params(channel_param_kv(), channel_param_kvs()) -> channel_param_kvs().
+get_channel_params({<<"Media-Control">>, JObj}, Acc) ->
+    Acc ++ kz_json:to_proplist(JObj);
+get_channel_params({K, V}, Acc) ->
+    [get_channel_param(K, V) | Acc].
+
+get_channel_param(<<"Hold-Media">>=Key, Media) ->
     {ecallmgr_util:get_fs_key(Key), ecallmgr_util:moh_media_path(Media, 'extant', kz_log:get_callid(), kz_json:new())};
-get_channel_params_fold(<<"Custom-Hold-Media">>=Key, Media) ->
+get_channel_param(<<"Custom-Hold-Media">>=Key, Media) ->
     {ecallmgr_util:get_fs_key(Key), ecallmgr_util:moh_media_path(Media, 'extant', kz_log:get_callid(), kz_json:new())};
-get_channel_params_fold(Key, Val) ->
+get_channel_param(Key, Val) ->
     {ecallmgr_util:get_fs_key(Key), ecallmgr_util:maybe_sanitize_fs_value(Key, Val)}.
 
 -spec get_custom_sip_headers(kz_json:object()) -> kz_json:json_proplist().
@@ -1863,7 +1870,7 @@ get_directory_variable({Key, Value}) ->
 
 -spec get_directory_variable(kz_json:key(), kz_json:json_term()) -> kz_types:xml_el().
 get_directory_variable(Key, Value) ->
-    get_directory_variable(get_channel_params_fold(Key, Value)).
+    get_directory_variable(get_channel_param(Key, Value)).
 
 -spec codecs_els(kz_json:object()) -> kz_types:xml_els().
 codecs_els(Endpoint) ->

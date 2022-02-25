@@ -1,0 +1,15 @@
+<definition name="hunt-request">
+	<field name="Is-Transfer" type="static" serialize-as="boolean" value="true">
+		<filters>
+			<filter name="Hunt-Transfer-Source" type="include" compare="exists"/>
+		</filters>
+	</field>
+
+	<field name="Request" type="expand"
+		value="${regex(${first-of(variable_sip_h_X-FS-Destination-Number|Hunt-Destination-Number|Caller-Destination-Number)}|([^@]*)|%1)}@${first-of(variable_sip_invite_domain|variable_sip_to_host|variable_sip_req_host|variable_ecallmgr_Realm)}" />
+	<field name="To" type="expand"
+		value="${regex(${first-of(variable_sip_to_user|Hunt-Destination-Number)}|([^@]*)|%1)}@${first-of(variable_sip_invite_domain|variable_sip_to_host|variable_sip_req_host|variable_ecallmgr_Realm)}" />
+    <field name="variable_sip_to_uri" as="To-URI"/>
+	<field name="From" type="expand"
+		value="${first-of(variable_origination_caller_id_number|Hunt-Caller-ID-Number|origination_callee_id_number|variable_sip_from_user)}@${first-of(variable_sip_invite_domain|variable_sip_from_host|variable_sip_req_host|variable_ecallmgr_Realm)}" />
+</definition>

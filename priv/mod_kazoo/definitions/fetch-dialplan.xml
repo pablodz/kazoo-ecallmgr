@@ -15,6 +15,8 @@
 	<field name="destination-number" type="reference" />
 	<field name="Resource-Type" type="static" value="audio" />
 	<field name="hunt-context" type="reference" />
+	<field name="hunt-request" type="reference" />
+	<field name="hunt-privacy" type="reference" />
 	<field name="Call-Setup" type="static" value="true" serialize-as="boolean" />
 	<field name="Hunt-Prepend-CID-Name" as="Prepend-CID-Name"/>
 

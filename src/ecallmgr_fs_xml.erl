@@ -41,7 +41,7 @@
 -export([action_el/1, action_el/2, action_el/3]).
 -export([anti_action_el/1, anti_action_el/2, anti_action_el/3]).
 -export([condition_el/1, condition_el/3]).
--export([extension_el/1, extension_el/3]).
+-export([extension_el/1, extension_el/2, extension_el/3]).
 -export([context_el/2]).
 -export([variables_el/1, variable_el/2]).
 -export([hunt_context/1, context/1, context/2]).
@@ -1235,6 +1235,10 @@ extension_el(Children) ->
     #xmlElement{name='extension'
                ,content=Children
                }.
+
+-spec extension_el(kz_types:xml_attrib_value(), kz_types:xml_els()) -> kz_types:xml_el().
+extension_el(Name, Children) ->
+    extension_el(Name, 'undefined', Children).
 
 -spec extension_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value() | 'undefined', kz_types:xml_els()) -> kz_types:xml_el().
 extension_el(Name, 'undefined', Children) ->

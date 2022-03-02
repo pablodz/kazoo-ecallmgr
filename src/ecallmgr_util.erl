@@ -470,8 +470,6 @@ multi_unset_args(UUID, KVs, Separator, Prefix) ->
     fs_args_to_binary(lists:reverse(process_fs_kv(UUID, KVs, 'unset')), Separator, Prefix).
 
 -spec fs_args_to_binary(list()) -> binary().
-fs_args_to_binary([_]=Args) ->
-    list_to_binary(Args);
 fs_args_to_binary(Args) ->
     fs_args_to_binary(Args, ?FS_MULTI_VAR_SEP).
 

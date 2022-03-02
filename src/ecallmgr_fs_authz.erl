@@ -39,6 +39,7 @@ authorize(Data, CallId, Node) ->
     kz_log:put_callid(CallId),
     AuthorizeReply = is_emergency_number(Data)
         orelse is_mobile_device(Data)
+        orelse is_endpoint(Data)
         orelse maybe_authorized_channel(Data, Node),
     lager:info("channel is~s authorized", [authorized_log(AuthorizeReply)]),
     _ = ecallmgr_fs_channel:set_authorized(CallId, was_authorized(AuthorizeReply)),
@@ -76,6 +77,11 @@ kill_channel(<<"outbound">>, _, CallId, Node) ->
 -spec is_mobile_device(kzd_freeswitch:data()) -> authz_reply().
 is_mobile_device(Data) ->
     <<"mobile">> =:=  kzd_freeswitch:authorizing_type(Data).
+
+-spec is_endpoint(kzd_freeswitch:data()) -> authz_reply().
+is_endpoint(Data) ->
+    kzd_freeswitch:authorizing_id(Data) =/= undefined
+        andalso kzd_freeswitch:resource_id(Data) =:= undefined.
 
 -spec maybe_authorized_channel(kzd_freeswitch:data(), atom()) -> authz_reply().
 maybe_authorized_channel(Data, Node) ->

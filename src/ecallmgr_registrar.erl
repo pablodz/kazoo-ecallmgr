@@ -231,15 +231,8 @@ lookup_proxy_path(<<Realm/binary>>, <<Username/binary>>) ->
     case ets:match_object(?MODULE, MatchSpec) of
         [] ->
             {'ok', 'undefined', []};
-        [#registration{}=Reg] ->
-            {'ok', proxy_with_transport(Reg), proxy_vars(Reg)}
-    end.
-
--spec proxy_with_transport(registration()) -> binary().
-proxy_with_transport(#registration{proxy = Proxy, proxy_proto = Proto}) ->
-    case re:run(Proxy, <<"transport">>) of
-        nomatch -> list_to_binary([Proxy, ";transport=", Proto]);
-        _Else -> Proxy
+        [#registration{proxy = Proxy}=Reg] ->
+            {'ok', Proxy, proxy_vars(Reg)}
     end.
 
 -spec proxy_vars_options(registration()) -> map().

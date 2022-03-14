@@ -288,15 +288,8 @@ lookup_contact(_Realm, <<>>) -> {'error', 'not_found'};
 lookup_contact(<<Realm/binary>>, <<Username/binary>>) ->
     case get_registration(Realm, Username) of
         'undefined' -> fetch_contact(Username, Realm);
-        #registration{contact=Contact
-                     ,bridge_uri='undefined'
-                     }=Reg ->
+        #registration{contact=Contact}=Reg ->
             lager:info("found user ~s@~s contact ~s"
-                      ,[Username, Realm, Contact]
-                      ),
-            {'ok', Contact, contact_vars(to_props(Reg))};
-        #registration{bridge_uri=Contact}=Reg ->
-            lager:info("found user ~s@~s bridge uri  ~s"
                       ,[Username, Realm, Contact]
                       ),
             {'ok', Contact, contact_vars(to_props(Reg))}
@@ -316,6 +309,8 @@ contact_vars_fold({<<"Proxy-Protocol">>, Proto}, Props) ->
             ];
         _ -> Props
     end;
+contact_vars_fold({<<"Proxy-Path">>, ProxyPath}, Props) ->
+    [{<<"Proxy-Path">>, ProxyPath} | Props];
 contact_vars_fold(_ , Props) -> Props.
 
 -spec lookup_original_contact(kz_term:ne_binary(), kz_term:ne_binary()) ->
@@ -1020,7 +1015,7 @@ fix_contact(Contact) ->
 bridge_uri(_Contact, 'undefined', _, _) -> 'undefined';
 bridge_uri('undefined', _Proxy, _, _) -> 'undefined';
 bridge_uri(Contact, Proxy, Username, Realm) ->
-    [#uri{}=UriContact] = kzsip_uri:uris(Contact),
+    [#uri{opts = ContactOptions}=UriContact] = kzsip_uri:uris(Contact),
     [#uri{}=UriProxy] = kzsip_uri:uris(Proxy),
     Scheme = UriContact#uri.scheme,
     Options = #{uri_contact => UriContact
@@ -1030,31 +1025,22 @@ bridge_uri(Contact, Proxy, Username, Realm) ->
     BridgeUri = #uri{scheme=Scheme
                     ,user=Username
                     ,domain=Realm
-                    ,opts=BridgeUriOptions
+                    ,opts= ContactOptions ++ BridgeUriOptions
                     },
     kzsip_uri:ruri(BridgeUri).
 
 -spec bridge_uri_options(map()) -> kz_term:proplist().
 bridge_uri_options(Options) ->
-    Routines = [fun bridge_uri_transport/2
-               ,fun bridge_uri_path/2
+    Routines = [fun bridge_uri_path/2
                ],
     lists:foldl(fun(Fun, Acc) -> Fun(Options, Acc) end, [], Routines).
 
--spec bridge_uri_transport(map(), kz_term:proplist()) -> kz_term:proplist().
-bridge_uri_transport(#{uri_contact := UriContact}, Acc) ->
-    case application:get_env(?APP, 'use_transport_for_fs_path', 'false') of
-        'true' ->
-            case props:get_value(<<"transport">>, UriContact#uri.opts) of
-                'undefined' -> Acc;
-                Transport -> [{<<"transport">>, Transport} | Acc]
-            end;
-        'false' -> Acc
-    end.
-
 -spec bridge_uri_path(map(), kz_term:proplist()) -> kz_term:proplist().
 bridge_uri_path(#{uri_proxy := UriProxy}, Acc) ->
-    [{<<"fs_path">>, kzsip_uri:ruri(UriProxy)} | Acc].
+    #uri{opts = Options, ext_opts = ExtraOptions} = UriProxy,
+    UriOptions = Options ++ ExtraOptions,
+    Uri = UriProxy#uri{opts = UriOptions, ext_opts = []},
+    [{<<"fs_path">>, list_to_binary(["<", kzsip_uri:ruri(Uri), ">"])} | Acc].
 
 -spec existing_or_new_registration(kz_term:ne_binary(), kz_term:ne_binary()) -> registration().
 existing_or_new_registration(Username, Realm) ->

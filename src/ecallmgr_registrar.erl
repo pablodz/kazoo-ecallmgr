@@ -714,7 +714,7 @@ sort_fetched_registrations(A, B) ->
 fetch_contact(Username, Realm) ->
     case fetch_registration(Username, Realm) of
         {'ok', JObj} ->
-            Contact = kz_json:get_first_defined([<<"Bridge-RURI">>, <<"Contact">>], JObj),
+            Contact = kz_json:get_ne_binary_value(<<"Contact">>, JObj),
             lager:info("found user ~s@~s contact ~s via fetch"
                       ,[Username, Realm, Contact]
                       ),

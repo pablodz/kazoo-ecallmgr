@@ -396,9 +396,12 @@ route_resp_bridge_id() ->
     Action = action_el(<<"export">>, [?SET_CCV(<<"Bridge-ID">>, <<"${UUID}">>)], 'true'),
     condition_el(Action, <<"${", (?CCV(<<"Bridge-ID">>))/binary, "}">>, <<"^$">>).
 
--spec route_resp_set_originating_proxy(dialplan_context()) -> kz_types:xml_el().
+-spec route_resp_set_originating_proxy(dialplan_context()) -> kz_types:xml_el() | undefined.
 route_resp_set_originating_proxy(#{payload := Payload}) ->
-    action_el(<<"set">>, list_to_binary([<<"originating_proxy=">>, kz_json:get_ne_binary_value(<<"Originating-Proxy">>, Payload, <<>>)])).
+    case kz_json:get_ne_binary_value(<<"Originating-Proxy">>, Payload) of
+        undefined -> undefined;
+        Proxy -> action_el(<<"set">>, list_to_binary([<<"originating_proxy=">>, Proxy]))
+    end.
 
 -spec unset_custom_sip_headers() -> kz_types:xml_el().
 unset_custom_sip_headers() ->
@@ -424,7 +427,7 @@ route_resp_fire_route_win(JObj, #{'control_q' := ControlQ
              ],
     Args = [<<K/binary, "=", V/binary>> || {K, V} <- Params, kz_term:is_not_empty(V)],
     EventApp = kz_app_config:get_ne_binary(?APP, [<<"dialplan">>, <<"apps">>, <<"event">>], <<"kz_deliver_event">>),
-    action_el(EventApp, kz_binary:join(Args, <<",">>), 'true').
+    action_el(EventApp, kz_binary:join(Args, <<",">>)).
 
 -spec route_resp_ringback(kz_json:object()) -> kz_types:xml_el().
 route_resp_ringback(JObj) ->
@@ -1486,23 +1489,22 @@ event_filters_el(Filters) ->
 
 -spec route_resp_park_xml(kz_json:object(), dialplan_context()) -> kz_types:xml_els().
 route_resp_park_xml(JObj, DialplanContext) ->
-    Inline = [route_resp_set_winning_node()
-             ,route_resp_set_control_info(DialplanContext)
-             ,route_resp_fire_route_win(JObj, DialplanContext)
-             ,route_resp_bridge_id()
-             ],
-    Exten = [route_resp_ringback(JObj)
+    Exten = [route_resp_log_winning_node()
+            ,route_resp_set_winning_node()
+            ,route_resp_bridge_id()
+            ,route_resp_set_control_info(DialplanContext)
+            ,route_resp_ringback(JObj)
             ,route_resp_transfer_ringback(JObj)
             ,maybe_start_dtmf_action(DialplanContext)
             ,route_resp_pre_park_action(JObj)
-            ,route_resp_log_winning_node()
             ,route_resp_ccvs(JObj)
             ,route_resp_cavs(JObj)
             ,unset_custom_sip_headers()
             ,route_resp_set_originating_proxy(DialplanContext)
+            ,route_resp_fire_route_win(JObj, DialplanContext)
             ,route_resp_park()
             ],
-    [E || E <- Inline ++ Exten, E =/= 'undefined'].
+    [E || E <- Exten, E =/= 'undefined'].
 
 -spec route_resp_set_control_info(dialplan_context()) -> kz_types:xml_el().
 route_resp_set_control_info(#{control_q := ControlQ

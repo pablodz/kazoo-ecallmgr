@@ -1,8 +1,10 @@
 <event name="CHANNEL_APP_EXECUTE_COMPLETE">
 
+	<!--
 	<flags>
 		<flag name="uuid-add-flags" value="true"/>
 	</flags>
+	-->
 
 	<filters>
 		<filter type="exclude" name="Application" value="bridge">
@@ -22,6 +24,7 @@
 		<field name="application-uuid" type="reference" />
 		<field name="Application-Error-Code"/>
 		<field name="Application-Error-Msg"/>
+		<field name="Channel-Flags"/>
 
 		<field name="Application-Response" type="first-of" value="Application-Response|variable_originate_disposition|variable_endpoint_disposition|#NONE" />
 

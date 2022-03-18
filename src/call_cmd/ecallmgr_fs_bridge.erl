@@ -227,6 +227,7 @@ handle_bypass_media(DP, _Node, _UUID, #channel{profile=ChannelProfile}, JObj) ->
             lager:debug("bridge will process media through host switch"),
             [{"application", "set bypass_media=true"}|DP];
         _ ->
+            lager:debug("determining bypass media from endpoints"),
             Endpoints = kz_json:get_ne_value(<<"Endpoints">>, JObj, []),
             maybe_bypass_endpoint_media(Endpoints, BridgeProfile, ChannelProfile, DP)
     end.
@@ -243,7 +244,7 @@ maybe_bypass_endpoint_media(Endpoints, BridgeProfile, ChannelProfile, DP) ->
                             ),
     case ShouldBypass of
         'true' -> [{"application", "set bypass_media=true"}|DP];
-        'false' -> DP
+        'false' -> [{"application", "set bypass_media=false"}|DP]
     end.
 
 -spec bypass_endpoint_media_enabled(kz_json:object(), kz_term:ne_binary(), kz_term:ne_binary()) -> boolean().

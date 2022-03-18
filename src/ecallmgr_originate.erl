@@ -195,12 +195,12 @@ handle_cast(_Msg, State) ->
 %%------------------------------------------------------------------------------
 -spec handle_info(any(), state()) -> kz_types:handle_info_ret_state(state()).
 handle_info({'kapi', {{_Ex, _RK, {_Basic, _Deliver}}, {dialplan, originate_execute}, _Payload}}, State) ->
-    lager:error("received originate execute"),
+    lager:info("received originate execute"),
     gen_server:cast(self(), 'originate_execute'),
     {'noreply', State};
 
 handle_info({'kapi', {{_Ex, _RK, {_Basic, _Deliver}}, {dialplan, originate_cancel}, _Payload}}, State) ->
-    lager:error("received originate cancel"),
+    lager:info("received originate cancel"),
     gen_server:cast(self(), 'originate_cancel'),
     {'noreply', State};
 

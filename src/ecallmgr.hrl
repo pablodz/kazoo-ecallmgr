@@ -213,6 +213,7 @@
                               ,{<<"Bridge-Execute-On-Answer">>, <<"execute_on_answer">>}
                               ,{<<"Bridge-Generate-Comfort-Noise">>,<<"bridge_generate_comfort_noise">>}
                               ,{<<"Bypass-Media">>, <<"bypass_media_after_bridge">>}
+                              ,{<<"Bypass-Proxy">>, <<"bypass_proxy">>}
 
                               ,{<<"Callee-ID-Name">>, <<"callee_id_name">>}
                               ,{<<"Callee-ID-Number">>, <<"callee_id_number">>}

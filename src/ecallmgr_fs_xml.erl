@@ -412,6 +412,8 @@ unset_cshs() ->
 
 unset_csh_list() ->
     [<<"X-AUTH">>
+    ,<<"X-FS-">>
+    ,<<"X-CONF-">>
     ,<<"Referred-by">>
     ].
 

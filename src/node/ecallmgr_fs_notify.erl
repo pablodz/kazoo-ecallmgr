@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2021, 2600Hz
+%%% @copyright (C) 2012-2022, 2600Hz
 %%% @doc Notify-type requests, like MWI updates, received and processed here
 %%% @author Karl Anderson
 %%%
@@ -154,7 +154,7 @@ maybe_send_notify(Username, Realm, JObj) ->
 -spec send_notify(atom(), kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object(), kz_term:ne_binary()) -> 'ok'.
 send_notify(Node, Username, Realm, JObj, Contact) ->
     AOR = To = From = kzsip_uri:ruri(#uri{user=Username, domain=Realm}),
-    SIPHeaders = <<"X-KAZOO-AOR : ", AOR/binary, "\r\n">>,
+    SIPHeaders = notify_x_headers(AOR),
     Event = kz_json:get_ne_binary_value(<<"Event">>, JObj),
     Body = kz_json:get_ne_binary_value(<<"Body">>, JObj),
     ContentType = kz_json:get_ne_binary_value(<<"Content-Type">>, JObj),
@@ -208,7 +208,7 @@ send_mwi_update(JObj, Username, Realm, Node, Registration) ->
         'undefined' ->
             lager:error("invalid contact : ~p : ~p", [RegistrationContact, Registration]);
         Contact ->
-            SIPHeaders = <<"X-KAZOO-AOR : ", ToAccount/binary, "\r\n">>,
+            SIPHeaders = notify_x_headers(ToAccount),
             Headers = [{<<"profile">>, <<?DEFAULT_FS_PROFILE>>}
                       ,{<<"contact-uri">>, Contact}
                       ,{<<"extra-headers">>, SIPHeaders}
@@ -354,3 +354,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%=============================================================================
 %%% Internal functions
 %%%=============================================================================
+
+notify_x_headers(AOR) ->
+    SIPHeaders = [<<"X-KAZOO-AOR: ", AOR/binary>>
+                 ,<<"X-KAZOO-INVITE-FORMAT: username">>
+                 ,<<>>
+                 ],
+    kz_binary:join(SIPHeaders, <<"\r\n">>).

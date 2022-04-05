@@ -38,7 +38,7 @@ exec_cmd(Node, UUID, JObj, UUID) ->
     AnonymizedJObj = enforce_privacy(Node, UUID, JObj),
     case get_fs_app(Node, UUID, AnonymizedJObj, App) of
         {'error', Msg} -> throw({'msg', Msg});
-        {'return', error} -> lager:info("app ~s cmd errored", [App]);
+        {'return', 'error'} -> lager:info("app ~s cmd errored", [App]);
         {'return', _Result} -> lager:info("app ~s cmd return ~p", [App, _Result]);
         {_AppName, 'noop'} -> 'ok';
         {AppName, AppData} ->
@@ -1004,9 +1004,20 @@ play_app(UUID, JObj) ->
     F = ecallmgr_util:media_path(MediaName, 'new', UUID, JObj),
     %% if Leg is set, use uuid_broadcast; otherwise use playback
     case ecallmgr_fs_channel:is_bridged(UUID) of
-        'false' -> {<<"playback">>, F};
-        'true' -> play_bridged(JObj, F)
+        'true' -> play_bridged(JObj, F);
+        'false' ->
+            play_app(F
+                    ,kz_json:is_true(<<"Endless-Playback">>, JObj, 'false')
+                    ,kz_json:get_integer_value(<<"Loop-Count">>, JObj)
+                    )
     end.
+
+play_app(MediaPath, 'true', _Loop) ->
+    {<<"endless_playback">>, MediaPath};
+play_app(MediaPath, 'false', LoopCount) when is_integer(LoopCount), LoopCount > 0 ->
+    {<<"loop_playback +", (kz_term:to_binary(LoopCount))/binary>>, MediaPath};
+play_app(MediaPath, _Endless, _Loop) ->
+    {<<"playback">>, MediaPath}.
 
 -spec play_bridged(kz_json:object(), kz_term:ne_binary()) -> fs_app().
 play_bridged(JObj, F) ->
@@ -1411,7 +1422,7 @@ set_page_endpoints(Dialplan, Node, UUID, JObj, Endpoints) ->
 
     Values = [{[<<"Custom-Channel-Vars">>, <<"Auto-Answer">>], 'true'}
              ,{[<<"Custom-Channel-Vars">>, <<"Ecallmgr-Node">>], kz_term:to_binary(Node)}
-             ,{<<"Call-Flag-NO-Flip">>, true}
+             ,{<<"Call-Flag-NO-Flip">>, 'true'}
              ,{<<?CALL_INTERACTION_ID>>, InteractionId}
              ,{<<"Existing-Call-ID">>, UUID}
              ],
@@ -1521,7 +1532,7 @@ detect_speech_vars(JObj) ->
 add_detect_speech_var(K, V, Vars) ->
     [list_to_binary([K, "=", kz_term:to_binary(V)]) | Vars].
 
-maybe_no_channel_data_scope(undefined) -> undefined;
+maybe_no_channel_data_scope('undefined') -> 'undefined';
 maybe_no_channel_data_scope(Value) -> <<"%^[No-Channel-Data=true]", Value/binary>>.
 
 -spec scope_variables(kz_term:ne_binary(), kz_term:proplist()) -> binary().
@@ -1537,27 +1548,27 @@ scope_variables(Vars) ->
 
 -spec redirect_app(kz_term:ne_binary(), kz_json:object()) -> fs_apps().
 redirect_app(UUID, JObj) ->
-    case ecallmgr_fs_channel:fetch(UUID, record) of
-        {ok, #channel{answered = IsAnswered}} -> redirect_app(UUID, IsAnswered, JObj);
-        {error, not_found} = Error -> Error
+    case ecallmgr_fs_channel:fetch(UUID, 'record') of
+        {'ok', #channel{answered = IsAnswered}} -> redirect_app(UUID, IsAnswered, JObj);
+        {'error', 'not_found'} = Error -> Error
     end.
 
 -spec redirect_app(kz_term:ne_binary(), boolean(), kz_json:object()) -> fs_apps().
-redirect_app(_UUID, false, JObj) ->
+redirect_app(_UUID, 'false', JObj) ->
     case redirect_app_server(JObj) of
-        undefined ->
+        'undefined' ->
             {<<"redirect">>, redirect_contact(JObj)};
         RedirectServer ->
-            [{<<"set">>, redirect_app_server_header(false, RedirectServer)}
+            [{<<"set">>, redirect_app_server_header('false', RedirectServer)}
             ,{<<"redirect">>, redirect_contact(JObj)}
             ]
     end;
-redirect_app(_UUID, true, JObj) ->
+redirect_app(_UUID, 'true', JObj) ->
     case redirect_app_server(JObj) of
-        undefined ->
+        'undefined' ->
             {<<"deflect">>, redirect_contact(JObj)};
         RedirectServer ->
-            [{<<"set">>, redirect_app_server_header(true, RedirectServer)}
+            [{<<"set">>, redirect_app_server_header('true', RedirectServer)}
             ,{<<"deflect">>, redirect_contact(JObj)}
             ]
     end.
@@ -1567,24 +1578,24 @@ redirect_contact(JObj) ->
     kz_json:get_ne_binary_value(<<"Redirect-Contact">>, JObj, <<>>).
 
 -spec redirect_app_server_header(boolean(), kz_term:ne_binary()) -> kz_term:ne_binary().
-redirect_app_server_header(false, RedirectServer) ->
+redirect_app_server_header('false', RedirectServer) ->
     lager:debug("set X-Redirect-Server to ~s", [RedirectServer]),
     list_to_binary(["sip_rh_X-Redirect-Server=", RedirectServer]);
-redirect_app_server_header(true, RedirectServer) ->
+redirect_app_server_header('true', RedirectServer) ->
     lager:debug("set X-Redirect-Server to ~s", [RedirectServer]),
     list_to_binary(["sip_h_X-Redirect-Server=", RedirectServer]).
 
 -spec redirect_app_server(kz_json:object()) -> kz_term:api_binary().
 redirect_app_server(JObj) ->
     case kz_json:get_ne_binary_value(<<"Redirect-Server">>, JObj) of
-        undefined -> redirect_app_node(JObj);
+        'undefined' -> redirect_app_node(JObj);
         Server -> redirect_app_fixup_url(Server)
     end.
 
 -spec redirect_app_node(kz_json:object()) -> kz_term:api_binary().
 redirect_app_node(JObj) ->
     case kz_json:get_ne_binary_value(<<"Redirect-Node">>, JObj) of
-        undefined -> undefined;
+        'undefined' -> 'undefined';
         Node -> redirect_app_fixup_node(Node)
     end.
 

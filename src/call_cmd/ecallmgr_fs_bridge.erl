@@ -350,7 +350,7 @@ create_command(DP, Node, UUID, #channel{profile=ChannelProfile}, JObj, AppUUID) 
     lager:debug("lifting from leg to channel: ~s", [kz_json:encode(CommonProperties)]),
     UpdatedJObj = kz_json:set_value(<<"Endpoints">>, UniqueEndpoints, kz_json:merge(JObj, CommonProperties)),
 
-    BridgeApp = kz_app_config:get_ne_binary(?APP, [<<"dialplan">>, <<"apps">>, <<"bridge">>], <<"bridge">>),
+    BridgeApp = kz_app_config:get_ne_binary(?APP, [<<"dialplan">>, <<"apps">>, <<"bridge">>], <<"kz_bridge">>),
     Scope = list_to_binary(["/^[app_uuid=",AppUUID,"^app_uuid_name=bridge]"]),
     LiftedCmd = list_to_binary([BridgeApp, " ", Scope
                                ,build_channels_vars(Node, UUID, UniqueEndpoints, UpdatedJObj)

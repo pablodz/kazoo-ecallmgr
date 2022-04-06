@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc Created when a call hits a fetch_handler in ecallmgr_route.
 %%% A Control Queue is created by the lookup_route function in the
 %%% fetch_handler. On initialization, besides adding itself as the
@@ -1066,27 +1066,6 @@ handle_replaced(JObj, #state{fetch_id=FetchId
             {'noreply', State}
     end.
 
--spec handle_direct(kz_call_event:payload(), state()) ->
-          {'noreply', state()}.
-handle_direct(JObj, #state{fetch_id=FetchId
-                          ,node=_Node
-                          ,call_id=_CallId
-                          }=State) ->
-    case kz_call_event:custom_channel_var(JObj, <<"Fetch-ID">>) of
-        FetchId ->
-            ReplacedBy = kz_call_event:connecting_b_leg_id(JObj),
-            case ecallmgr_fs_channel:fetch(ReplacedBy) of
-                {'ok', _Channel} ->
-                    {'noreply', handle_sofia_replaced(ReplacedBy, State)};
-                _Else ->
-                    lager:debug("channel replaced was not handled : ~p", [_Else]),
-                    {'noreply', State}
-            end;
-        _Else ->
-            lager:info("sofia replaced on our channel but different fetch id~n"),
-            {'noreply', State}
-    end.
-
 -spec handle_sync(kz_json:object(), state()) ->
           {'noreply', state()}.
 handle_sync(JObj, #state{fetch_id=FetchId
@@ -1145,12 +1124,14 @@ handle_event_info(CallId, JObj, #state{call_id=CallId}=State) ->
         <<"CHANNEL_REPLACED">> ->
             handle_replaced(JObj, State);
         <<"CHANNEL_DIRECT">> ->
-            handle_direct(JObj, State);
+            lager:info("this call control is the target of a direct bowout, terminate immediately", [CallId]),
+            {'stop', 'normal', State};
         <<"CHANNEL_EXECUTE">> when Application =:= <<"redirect">> ->
             {'stop', 'normal', State};
         <<"CHANNEL_SYNC">> ->
             handle_sync(JObj, State);
         _Else ->
+            lager:info("EVENT NOT HANDLED ~s =>  ~s : ~s", [_Else, Application, kz_call_event:application_uuid(JObj)]),
             {'noreply', State}
     end.
 

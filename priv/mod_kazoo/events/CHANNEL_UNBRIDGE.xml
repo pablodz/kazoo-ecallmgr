@@ -1,4 +1,9 @@
 <event name="CHANNEL_UNBRIDGE">
+
+	<filters>
+		<filter type="exclude" name="variable_bridge_bowout"/>
+	</filters>
+
 	<fields>
 		<field name="call_event" type="reference" />
 		<field name="Bridge-A-Unique-ID" />

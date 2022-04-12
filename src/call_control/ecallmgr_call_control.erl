@@ -1131,7 +1131,7 @@ handle_event_info(CallId, JObj, #state{call_id=CallId}=State) ->
         <<"CHANNEL_SYNC">> ->
             handle_sync(JObj, State);
         _Else ->
-            lager:info("EVENT NOT HANDLED ~s =>  ~s : ~s", [_Else, Application, kz_call_event:application_uuid(JObj)]),
+            %% lager:info("EVENT NOT HANDLED ~s =>  ~s : ~s", [_Else, Application, kz_call_event:application_uuid(JObj)]),
             {'noreply', State}
     end.
 

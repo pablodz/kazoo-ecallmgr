@@ -683,7 +683,6 @@ handle_sofia_replaced(<<_/binary>> = ReplacedBy, #state{node=Node
                                                        }=State)->
     lager:debug("channel replaced by ~s for ~s in ~s", [ReplacedBy, CallId, Node]),
     unbind(Node, CallId),
-    kz_log:put_callid(ReplacedBy),
     bind(Node, ReplacedBy),
     lager:info("...call id updated, continuing post-transfer"),
     set_control_info(ReplacedBy, State),
@@ -709,8 +708,17 @@ set_control_info(UUID, #state{node=Node
                          ,";Fetch-UUID=", FetchId
                          ,";hangup_after_bridge=true"
                          ]),
-    _ = freeswitch:api(Node, Cmd, Arg),
+    defer_set_control_info(Node, Cmd, Arg).
+
+-spec defer_set_control_info(node(), atom(), binary()) -> ok.
+defer_set_control_info(Node, Cmd, Arg) ->
+    _ = kz_process:spawn(fun set_control_info/3, [Node, Cmd, Arg]),
     'ok'.
+
+-spec set_control_info(node(), atom(), binary()) -> freeswitch:fs_api_return().
+set_control_info(Node, Cmd, Arg) ->
+    timer:sleep(1500),
+    freeswitch:api(Node, Cmd, Arg).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1030,13 +1038,14 @@ get_keep_alive_ref(#state{keep_alive_ref=TRef
 %%------------------------------------------------------------------------------
 -spec bind(atom(), kz_term:ne_binary()) -> 'true'.
 bind(Node, CallId) ->
-    lager:debug("binding to call ~s events on node ~s", [CallId, Node]),
+    kz_log:put_callid(CallId),
+    lager:debug("binding to call events on node ~s", [Node]),
     'true' = gproc:reg({'p', 'l', {'call_control', CallId}}),
     'true' = gproc:reg({'p', 'l', {'call_event', Node, CallId}}).
 
 -spec unbind(atom(), kz_term:ne_binary()) -> 'true'.
 unbind(Node, CallId) ->
-    lager:debug("unbinding from call ~s events on node ~s", [CallId, Node]),
+    lager:debug("unbinding from call events on node ~s", [Node]),
     _ = (catch gproc:unreg({'p', 'l', {'call_control', CallId}})),
     _ = (catch gproc:unreg({'p', 'l', {'call_event', Node, CallId}})),
     'true'.

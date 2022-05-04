@@ -298,16 +298,21 @@ should_bypass_media(RouteJObj) ->
 -spec route_resp_xml(kz_term:ne_binary(), kz_json:objects(), kz_json:object(), dialplan_context()) -> {'ok', iolist()}.
 route_resp_xml(<<"bridge">>, Routes, JObj, DialplanContext) ->
     lager:debug("creating a bridge XML response"),
-    LogEl = route_resp_log_winning_node(),
-    RingbackEl = route_resp_ringback(JObj),
-    TransferEl = route_resp_transfer_ringback(JObj),
+    Bridge = [route_resp_progress(JObj)
+             ,route_resp_log_winning_node()
+             ,route_resp_ringback(JObj)
+             ,route_resp_transfer_ringback(JObj)
+             ],
+    Actions = [E || E <- Bridge, E =/= 'undefined'],
+
     %% format the Route based on protocol
     {_Idx, Extensions} = lists:foldr(fun route_resp_fold/2, {1, []}, Routes),
     FailRespondEl = action_el(<<"respond">>, <<"${bridge_hangup_cause}">>),
     FailConditionEl = condition_el(FailRespondEl),
     FailExtEl = extension_el(<<"failed_bridge">>, <<"false">>, [FailConditionEl]),
+
     Context = context(JObj, DialplanContext),
-    ContextEl = context_el(Context, [LogEl, RingbackEl, TransferEl] ++ [unset_custom_sip_headers()] ++ Extensions ++ [FailExtEl]),
+    ContextEl = context_el(Context, Actions ++ [unset_custom_sip_headers()] ++ Extensions ++ [FailExtEl]),
     SectionEl = section_el(<<"dialplan">>, <<"Route Bridge Response">>, ContextEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')};
 
@@ -499,9 +504,20 @@ route_resp_transfer_ringback(JObj) ->
 -spec route_resp_pre_park_action(kz_json:object()) -> 'undefined' | kz_types:xml_el().
 route_resp_pre_park_action(JObj) ->
     case kz_json:get_value(<<"Pre-Park">>, JObj) of
-        <<"ring_ready">> -> action_el(<<"ring_ready">>);
+        <<"ring_ready">> ->
+            case kz_json:is_true(<<"Ignore-Progress">>, JObj, false) of
+                true -> action_el(<<"ring_ready">>);
+                false -> undefined
+            end;
         <<"answer">> -> action_el(<<"answer">>);
-        _Else -> 'undefined'
+        _Else -> undefined
+    end.
+
+-spec route_resp_progress(kz_json:object()) -> 'undefined' | kz_types:xml_el().
+route_resp_progress(JObj) ->
+    case kz_json:is_true(<<"Ignore-Progress">>, JObj, false) of
+        true -> undefined;
+        false -> action_el(<<"ring_ready">>, undefined, true)
     end.
 
 -spec maybe_start_dtmf_action(dialplan_context()) -> 'undefined' | kz_types:xml_el().
@@ -1300,7 +1316,13 @@ action_el(App, Data) ->
                            ]
                }.
 
--spec action_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value(), boolean()) -> kz_types:xml_el().
+-spec action_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value() | undefined, boolean()) -> kz_types:xml_el().
+action_el(App, undefined, Inline) ->
+    #xmlElement{name='action'
+               ,attributes=[xml_attrib('application', App)
+                           ,xml_attrib('inline', kz_term:to_binary(Inline))
+                           ]
+               };
 action_el(App, Data, Inline) ->
     #xmlElement{name='action'
                ,attributes=[xml_attrib('application', App)
@@ -1499,7 +1521,8 @@ event_filters_el(Filters) ->
 
 -spec route_resp_park_xml(kz_json:object(), dialplan_context()) -> kz_types:xml_els().
 route_resp_park_xml(JObj, DialplanContext) ->
-    Exten = [route_resp_log_winning_node()
+    Exten = [route_resp_progress(JObj)
+            ,route_resp_log_winning_node()
             ,route_resp_set_winning_node()
             ,route_resp_bridge_id()
             ,route_resp_set_control_info(DialplanContext)

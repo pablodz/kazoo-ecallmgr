@@ -4,4 +4,5 @@
 	<field name="Action"/>
 	<field name="user"/>
 	<field name="group"/>
+	<field name="Call-ID" type="first-of" value="Call-ID|Fetch-Call-UUID|Unique-ID" />
 </definition>

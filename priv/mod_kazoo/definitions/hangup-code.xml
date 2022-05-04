@@ -1,4 +1,15 @@
 <definition name="hangup-code">
-	<field name="Hangup-Code" type="first-of"
-		value="variable_proto_specific_hangup_cause|variable_last_bridge_proto_specific_hangup_cause" />
+	<field name="Hangup-Code" type="first-of" value="variable_proto_specific_hangup_cause|variable_last_bridge_proto_specific_hangup_cause" />
+
+	<!-- code for loopback channels -->
+	<field name="Hangup-Code" type="static" value="sip:200">
+		<filters>
+			<filter name="Other-Leg-Source" type="include" compare="value" value="mod_loopback" />
+			<filter name="Application" type="include" compare="value" value="bridge"/>
+			<filter name="app_variable_app_uuid_name" type="include" compare="value" value="bridge" />
+			<filter name="variable_last_bridge_hangup_cause" type="include" compare="value" value="NORMAL_CLEARING"/>
+			<filter name="variable_bridge_hangup_cause" type="include" compare="value" value="NORMAL_CLEARING"/>
+		</filters>
+	</field>
+
 </definition>

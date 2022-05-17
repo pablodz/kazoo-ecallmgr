@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -73,10 +73,11 @@ version(Node, Timeout) ->
         'timeout' -> {'error', 'timeout'};
         Result -> Result
     catch
-        exit:{{nodedown, _Node}, _}:_ -> {error, nodedown};
+        'exit':{{'nodedown', _Node}, _}:_ -> {'error', 'nodedown'};
         _E:_R:_ ->
             lager:info("failed to get mod_kazoo version from ~s: ~p ~p"
-                      ,[Node, _E, _R]),
+                      ,[Node, _E, _R]
+                      ),
             {'error', 'exception'}
     end.
 
@@ -87,7 +88,8 @@ noevents(Node) ->
     catch
         _E:_R:_ ->
             lager:info("failed to send noevents to ~s: ~p ~p"
-                      ,[Node, _E, _R]),
+                      ,[Node, _E, _R]
+                      ),
             {'error', 'exception'}
     end.
 
@@ -107,7 +109,8 @@ getpid(Node, Timeout) ->
     catch
         _E:_R:_ ->
             lager:info("failed to get mod_kazoo pid from ~s: ~p ~p"
-                      ,[Node, _E, _R]),
+                      ,[Node, _E, _R]
+                      ),
             {'error', 'exception'}
     end.
 
@@ -134,10 +137,10 @@ fetch_reply(#{node := Node, section := Section, fetch_id := FetchID, reply := Re
 api_result(Result, 'undefined') -> Result;
 api_result(Result, Bin) ->
     case kz_binary:strip_left(kz_binary:strip_right(Bin, <<"\n">>), $\s) of
-        <<>> when Result =:= 'error' -> {error, 'failed'};
-        <<"true">> -> {Result, true};
-        <<"false">> -> {Result, false};
-        <<>> -> ok;
+        <<>> when Result =:= 'error' -> {'error', 'failed'};
+        <<"true">> -> {Result, 'true'};
+        <<"false">> -> {Result, 'false'};
+        <<>> -> 'ok';
         Msg -> {Result, maybe_number(Msg, byte_size(Msg))}
     end.
 
@@ -436,7 +439,7 @@ bgapi4(Node, Cmd, Args, Fun, CallBackParams, Self) ->
         {'ok', <<"-ERR ", Reason/binary>>} ->
             Self ! {'api', internal_fs_error(Reason)};
         {'ok', <<"+OK ", JobId/binary>>} ->
-            Self ! {'api', {ok, JobId}},
+            Self ! {'api', {'ok', JobId}},
             bgapi4_result(JobId, Fun, CallBackParams);
         {'ok', JobId}=JobOk ->
             Self ! {'api', JobOk},
@@ -517,10 +520,11 @@ no_legacy(Node) ->
         'timeout' -> {'error', 'timeout'};
         Result -> Result
     catch
-        exit:{{nodedown, _Node}, _}:_ -> {error, nodedown};
+        'exit':{{'nodedown', _Node}, _}:_ -> {'error', 'nodedown'};
         _E:_R:_ ->
             lager:info("failed to set mod_kazoo no_legacy on ~s: ~p ~p"
-                      ,[Node, _E, _R]),
+                      ,[Node, _E, _R]
+                      ),
             {'error', 'exception'}
     end.
 

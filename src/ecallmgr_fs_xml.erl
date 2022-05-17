@@ -401,10 +401,10 @@ route_resp_bridge_id() ->
     Action = action_el(<<"export">>, [?SET_CCV(<<"Bridge-ID">>, <<"${UUID}">>)], 'true'),
     condition_el(Action, <<"${", (?CCV(<<"Bridge-ID">>))/binary, "}">>, <<"^$">>).
 
--spec route_resp_set_originating_proxy(dialplan_context()) -> kz_types:xml_el() | undefined.
+-spec route_resp_set_originating_proxy(dialplan_context()) -> kz_types:xml_el() | 'undefined'.
 route_resp_set_originating_proxy(#{payload := Payload}) ->
     case kz_json:get_ne_binary_value(<<"Originating-Proxy">>, Payload) of
-        undefined -> undefined;
+        'undefined' -> 'undefined';
         Proxy -> action_el(<<"set">>, list_to_binary([<<"originating_proxy=">>, Proxy]))
     end.
 
@@ -427,7 +427,7 @@ route_resp_log_winning_node() ->
     action_el(<<"log">>, [<<"NOTICE log|${uuid}|", (kz_term:to_binary(node()))/binary, " won call control">>]).
 
 route_resp_set_winning_node() ->
-    action_el(<<"export">>, [?SET_CCV(<<"Ecallmgr-Node">>, (kz_term:to_binary(node())))], true).
+    action_el(<<"export">>, [?SET_CCV(<<"Ecallmgr-Node">>, (kz_term:to_binary(node())))], 'true').
 
 route_resp_fire_route_win(JObj, #{'control_q' := ControlQ
                                  ,'fetch_id' := FetchId
@@ -505,19 +505,19 @@ route_resp_transfer_ringback(JObj) ->
 route_resp_pre_park_action(JObj) ->
     case kz_json:get_value(<<"Pre-Park">>, JObj) of
         <<"ring_ready">> ->
-            case kz_json:is_true(<<"Ignore-Progress">>, JObj, false) of
-                true -> action_el(<<"ring_ready">>);
-                false -> undefined
+            case kz_json:is_true(<<"Ignore-Progress">>, JObj, 'false') of
+                'true' -> action_el(<<"ring_ready">>);
+                'false' -> 'undefined'
             end;
         <<"answer">> -> action_el(<<"answer">>);
-        _Else -> undefined
+        _Else -> 'undefined'
     end.
 
 -spec route_resp_progress(kz_json:object()) -> 'undefined' | kz_types:xml_el().
 route_resp_progress(JObj) ->
-    case kz_json:is_true(<<"Ignore-Progress">>, JObj, false) of
-        true -> undefined;
-        false -> action_el(<<"ring_ready">>, undefined, true)
+    case kz_json:is_true(<<"Ignore-Progress">>, JObj, 'false') of
+        'true' -> 'undefined';
+        'false' -> action_el(<<"ring_ready">>, 'undefined', 'true')
     end.
 
 -spec maybe_start_dtmf_action(dialplan_context()) -> 'undefined' | kz_types:xml_el().
@@ -1316,8 +1316,8 @@ action_el(App, Data) ->
                            ]
                }.
 
--spec action_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value() | undefined, boolean()) -> kz_types:xml_el().
-action_el(App, undefined, Inline) ->
+-spec action_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value() | 'undefined', boolean()) -> kz_types:xml_el().
+action_el(App, 'undefined', Inline) ->
     #xmlElement{name='action'
                ,attributes=[xml_attrib('application', App)
                            ,xml_attrib('inline', kz_term:to_binary(Inline))
@@ -1717,7 +1717,7 @@ directory_resp_user_xml(_Node, Endpoint, JObj) ->
 
 -spec directory_resp_group_ep_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
 directory_resp_group_ep_xml(_Node, Endpoint, JObj) ->
-    lager:warning_unsafe("GROUP => ~s", [kz_json:encode(Endpoint, [pretty])]),
+    lager:warning_unsafe("GROUP => ~s", [kz_json:encode(Endpoint, ['pretty'])]),
     DomainName = directory_resp_domain(Endpoint, JObj),
     GroupId = directory_resp_user_id(Endpoint, JObj),
     GroupProps = user_el_default_props(GroupId),
@@ -1727,8 +1727,7 @@ directory_resp_group_ep_xml(_Node, Endpoint, JObj) ->
                                Id = kz_json:get_ne_binary_value(<<"id">>, EP, <<"error">>),
                                Delay = kz_json:get_integer_value(<<"delay">>, EP, 0),
                                Timeout = kz_json:get_integer_value(<<"timeout">>, EP, 120),
-                               D = list_to_binary([
-                                                   "["
+                               D = list_to_binary(["["
                                                   ,"leg_delay_start=", kz_term:to_binary(Delay)
                                                   ,",leg_timeout=", kz_term:to_binary(Timeout)
                                                   ,"]",

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2021, 2600Hz
+%%% @copyright (C) 2012-2022, 2600Hz
 %%% @doc Send config commands to FS
 %%%
 %%% @author Edouard Swiac
@@ -42,7 +42,7 @@ init() ->
 -spec language_req(map()) -> fs_sendmsg_ret().
 language_req(#{fetch_id := Id, payload := JObj} = Context) ->
     kz_log:put_callid(Id),
-    {ok, Xml} = language_resp_xml(JObj),
+    {'ok', Xml} = language_resp_xml(JObj),
     freeswitch:fetch_reply(Context#{reply => iolist_to_binary(Xml)}).
 
 -spec language_resp_xml(kz_json:object()) -> {'ok', iolist()}.
@@ -65,7 +65,7 @@ language_resp_xml(JObj) ->
 
 language_el(Props, PhrasesEl) ->
     #xmlElement{name='language'
-               ,attributes=[xml_attrib(kz_term:to_atom(K, true), V)
+               ,attributes=[xml_attrib(kz_term:to_atom(K, 'true'), V)
                             || {K, V} <- props:unique(
                                            props:filter_undefined(Props)
                                           )

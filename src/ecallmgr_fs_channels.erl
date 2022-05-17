@@ -61,6 +61,8 @@
 
 -include("ecallmgr.hrl").
 
+-elvis([{elvis_style, no_debug_call, disable}]).
+
 -define(SERVER, ?MODULE).
 
 -define(RESPONDERS, [{{?MODULE, 'handle_query_auth_id'}
@@ -625,7 +627,7 @@ has_channels_for_owner(OwnerId) ->
                           ,_ = '_'
                           }
                  ,[]
-                 ,[{'=:=', '$1', {const, OwnerId}}]
+                 ,[{'=:=', '$1', {'const', OwnerId}}]
                  }
                 ],
     Count = ets:select_count(?CHANNELS_TBL, MatchSpec),
@@ -759,14 +761,18 @@ query_channels(Fields, CallId) ->
           kz_json:object().
 query_channels('$end_of_table', _, Channels) -> Channels;
 query_channels({[#channel{uuid=CallId}=Channel], Continuation}
-              ,<<"all">>, Channels) ->
+              ,<<"all">>
+              ,Channels
+              ) ->
     JObj = ecallmgr_fs_channel:to_api_json(Channel),
     query_channels(ets:match_object(Continuation)
                   ,<<"all">>
                   ,kz_json:set_value(CallId, JObj, Channels)
                   );
 query_channels({[#channel{uuid=CallId}=Channel], Continuation}
-              ,Fields, Channels) ->
+              ,Fields
+              ,Channels
+              ) ->
     ChannelProps = ecallmgr_fs_channel:to_api_props(Channel),
     JObj = kz_json:from_list(
              [{Field, props:get_value(Field, ChannelProps)}
@@ -798,8 +804,10 @@ print_summary({[#channel{uuid=UUID
                         ,destination=Destination
                         ,account_id=AccountId
                         }]
-              ,Continuation}
-             ,Count) ->
+              ,Continuation
+              }
+             ,Count
+             ) ->
     io:format(?SUMMARY_HEADER
              ,[UUID, Node, Direction, Destination, AccountId]
              ),
@@ -813,8 +821,10 @@ print_details(Match) ->
 print_details('$end_of_table', Count) ->
     io:format("~nFound ~p channels~n", [Count]);
 print_details({[#channel{}=Channel]
-              ,Continuation}
-             ,Count) ->
+              ,Continuation
+              }
+             ,Count
+             ) ->
     io:format("~n"),
     _ = [io:format("~-19s: ~s~n", [K, kz_term:to_binary(V)])
          || {K, V} <- ecallmgr_fs_channel:to_props(Channel),
@@ -826,7 +836,8 @@ print_details({[#channel{}=Channel]
 handle_channel_reconnected(#channel{handling_locally='true'
                                    ,uuid=_UUID
                                    }=Channel
-                          ,'true') ->
+                          ,'true'
+                          ) ->
     lager:debug("channel ~s connected, publishing update", [_UUID]),
     publish_channel_connection_event(Channel, [{<<"Event-Name">>, <<"CHANNEL_CONNECTED">>}]);
 handle_channel_reconnected(_Channel, _ShouldPublish) ->
@@ -850,7 +861,8 @@ publish_channel_connection_event(#channel{uuid=UUID
                                          ,from=From
                                          ,to=To
                                          }=Channel
-                                ,ChannelSpecific) ->
+                                ,ChannelSpecific
+                                ) ->
     Event = [{<<"Timestamp">>, kz_time:now_s()}
             ,{<<"Call-ID">>, UUID}
             ,{<<"Call-Direction">>, Direction}

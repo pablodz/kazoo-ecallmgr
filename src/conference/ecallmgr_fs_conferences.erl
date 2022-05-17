@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2021, 2600Hz
+%%% @copyright (C) 2013-2022, 2600Hz
 %%% @doc Track FreeSWITCH conference information and provide accessors
 %%% @author James Aimonetti
 %%%
@@ -51,6 +51,8 @@
         ]).
 
 -include("ecallmgr.hrl").
+
+-elvis([{elvis_style, no_debug_call, disable}]).
 
 -define(SERVER, ?MODULE).
 

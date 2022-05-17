@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc Manage a FreeSWITCH node and its resources
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -283,7 +283,7 @@ init(Node, Info, Options) ->
     gproc:reg({'p', 'l', 'fs_node'}),
     sync_channels(self()),
     sync_conferences(self()),
-    gen_listener:cast(self(), run_cmds),
+    gen_listener:cast(self(), 'run_cmds'),
     {'ok', #state{node=Node
                  ,options=Options
                  ,info=Info
@@ -372,9 +372,9 @@ handle_info({'DOWN', Ref, 'process', Pid, _Reason}, #state{node=_Node, start_cmd
     lager:debug("fs sync complete"),
     {'noreply', State#state{start_cmds_pid_ref='undefined'}};
 handle_info({'EXIT', _, 'noconnection'}, State) ->
-    {stop, {'shutdown', 'noconnection'}, State};
+    {'stop', {'shutdown', 'noconnection'}, State};
 handle_info({'EXIT', _, Reason}, State) ->
-    {stop, Reason, State};
+    {'stop', Reason, State};
 handle_info(_Msg, State) ->
     lager:debug("unhandled message: ~p", [_Msg]),
     {'noreply', State}.
@@ -581,7 +581,7 @@ interface(Node, Profile) ->
 -spec instance_uuid(atom() | binary() | pid()) -> kz_term:api_ne_binary().
 instance_uuid(Node) ->
     case find_srv(Node) of
-        undefined -> undefined;
+        'undefined' -> 'undefined';
         Pid -> gen_server:call(Pid, 'instance_uuid')
     end.
 
@@ -608,7 +608,7 @@ info(Srv) ->
 -spec node_restart(fs_node()) -> 'ok' | {'error', 'invalid_node'}.
 node_restart(Srv) ->
     case find_srv(Srv) of
-        undefined -> {'error', 'invalid_node'};
+        'undefined' -> {'error', 'invalid_node'};
         Pid when is_pid(Pid) ->
             gen_server:cast(Pid, 'sync_info'),
             gen_server:cast(Pid, 'run_cmds')

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2021, 2600Hz
+%%% @copyright (C) 2012-2022, 2600Hz
 %%% @doc Send config commands to FS
 %%%
 %%% @author Edouard Swiac
@@ -83,7 +83,7 @@ kazoo_req_not_handled(#{node := Node, fetch_id := Id} = Ctx) ->
 
 -spec kazoo_config() -> {'ok', binary()}.
 kazoo_config() ->
-    {ok, persistent_term:get(mod_kazoo_xml_config, <<>>)}.
+    {'ok', persistent_term:get('mod_kazoo_xml_config', <<>>)}.
 
 -spec build_kazoo_config() -> {'ok', binary()}.
 build_kazoo_config() ->
@@ -107,8 +107,8 @@ build_kazoo_config() ->
     SectionEl = section_el(<<"configuration">>, ConfigurationEl),
     Xml = xmerl:export([SectionEl], 'fs_xml'),
     Config = iolist_to_binary(Xml),
-    persistent_term:put(mod_kazoo_xml_config, Config),
-    {ok, Config}.
+    persistent_term:put('mod_kazoo_xml_config', Config),
+    {'ok', Config}.
 
 fs_handler(EventFile, {DefFiles, EventXmls}) ->
     EventXml = fs_xml(EventFile),
@@ -123,7 +123,7 @@ fs_defs(XmlEl, Acc) ->
 -spec fs_xml(file:filename_all()) -> kz_types:xml_el().
 fs_xml(File) ->
     case xmerl_scan:file(re:replace(File, "::", "-", ['global'])) of
-        {error, _Err} -> throw({invalid_configuration, lists:flatten(io_lib:format("error reading file : ~s : ~p", [File, _Err]))});
+        {'error', _Err} -> throw({'invalid_configuration', lists:flatten(io_lib:format("error reading file : ~s : ~p", [File, _Err]))});
         {Xml, _} -> Xml
     end.
 

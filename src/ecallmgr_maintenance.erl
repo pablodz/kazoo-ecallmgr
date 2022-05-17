@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2021, 2600Hz
+%%% @copyright (C) 2012-2022, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -113,6 +113,8 @@
         ]).
 
 -include("ecallmgr.hrl").
+
+-elvis([{elvis_style, no_debug_call, disable}]).
 
 -type config_fun() :: fun((kapps_config:config_category(), kapps_config:config_key(), any()) ->
                                  {'ok', kz_json:object()} |
@@ -463,7 +465,8 @@ conference_details(UUID) ->
 -spec sync_conferences() -> 'ok'.
 sync_conferences() ->
     lists:foreach(fun ecallmgr_fs_conferences:sync_node/1
-                 ,ecallmgr_fs_nodes:connected()).
+                 ,ecallmgr_fs_nodes:connected()
+                 ).
 
 -spec sync_conferences(kz_term:text()) -> 'ok'.
 sync_conferences(Node) ->

@@ -48,6 +48,8 @@
 -include("ecallmgr.hrl").
 -include_lib("kazoo_sip/include/kzsip_uri.hrl").
 
+-elvis([{elvis_style, no_debug_call, disable}]).
+
 -define(SERVER, ?MODULE).
 
 -define(RESPONDERS, [{{?MODULE, 'handle_reg_query'}
@@ -247,8 +249,8 @@ proxy_vars_options_fun(Reg) ->
     end.
 
 -spec proxy_var_option_token(registration(), map()) -> map().
-proxy_var_option_token(#registration{endpoint_token=undefined}, Options) -> Options;
-proxy_var_option_token(#registration{}, Options) -> Options#{token_registration => true}.
+proxy_var_option_token(#registration{endpoint_token='undefined'}, Options) -> Options;
+proxy_var_option_token(#registration{}, Options) -> Options#{token_registration => 'true'}.
 
 -spec proxy_vars(registration()) -> kz_term:proplist().
 proxy_vars(Reg) ->
@@ -273,7 +275,7 @@ proxy_vars_fold({<<"Proxy-Protocol">>, Proto}, Props, _Options) ->
             ];
         _ -> Props
     end;
-proxy_vars_fold({<<"AOR">>, AOR}, Props, #{token_registration := true}) ->
+proxy_vars_fold({<<"AOR">>, AOR}, Props, #{token_registration := 'true'}) ->
     [{<<"SIP-Invite-To-URI">>, AOR}
     ,{<<"KAZOO-AOR">>, AOR}
     | Props
@@ -425,7 +427,7 @@ details(Username, Realm) ->
     Id =  registration_id(Username, Realm),
     MatchSpec =
         [{#registration{id = '$1', _ = '_'}
-         ,[{'=:=', '$1', {const, Id}}]
+         ,[{'=:=', '$1', {'const', Id}}]
          ,['$_']
          }
         ],

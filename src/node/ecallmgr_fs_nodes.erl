@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc When connecting to a FreeSWITCH node, we create three processes: one to
 %%% handle authentication (directory) requests; one to handle route (dialplan)
 %%% requests, and one to monitor the node and various stats about the node.
@@ -53,6 +53,8 @@
         ]).
 
 -include("ecallmgr.hrl").
+
+-elvis([{elvis_style, no_debug_call, disable}]).
 
 -define(SERVER, ?MODULE).
 
@@ -180,8 +182,8 @@ do_flush(Args) ->
 -spec filter_release(atom()) -> boolean().
 filter_release(Node) ->
     case freeswitch:release(Node) of
-        {_, _, <<"community">>} -> true;
-        _ -> false
+        {_, _, <<"community">>} -> 'true';
+        _ -> 'false'
     end.
 
 -spec is_node_up(atom()) -> boolean().
@@ -732,7 +734,7 @@ maybe_disconnect_from_node(#node{connected='false'}) ->
     'ok'.
 
 -spec maybe_start_node_pinger(fs_node()) -> 'ok'.
-maybe_start_node_pinger(#node{connect_strategy='heartbeat'}) -> ok;
+maybe_start_node_pinger(#node{connect_strategy='heartbeat'}) -> 'ok';
 maybe_start_node_pinger(#node{node=NodeName, options=Props}=Node) ->
     case ecallmgr_fs_pinger_sup:add_node(NodeName, Props) of
         {'ok', _} -> 'ok';
@@ -851,7 +853,7 @@ default_fs_nodename() -> "freeswitch".
 registered_names() ->
     Mod = net_kernel:epmd_module(),
     case Mod:names() of
-        {ok, Names} -> lists:map(fun({K,_V}) -> erlang:list_to_atom(K) end, Names);
+        {'ok', Names} -> lists:map(fun({K,_V}) -> erlang:list_to_atom(K) end, Names);
         _Else -> []
     end.
 
@@ -859,8 +861,8 @@ registered_names() ->
 try_connect_to_default_fs() ->
     FSNode = erlang:list_to_atom(default_fs_nodename()),
     case proplists:is_defined(FSNode, registered_names()) of
-        true -> try_connect_to_default_fs(default_fs_node());
-        false -> skip
+        'true' -> try_connect_to_default_fs(default_fs_node());
+        'false' -> 'skip'
     end.
 
 -spec try_connect_to_default_fs(atom()) -> 'skip' | 'ok' | {'error', 'no_connection'}.

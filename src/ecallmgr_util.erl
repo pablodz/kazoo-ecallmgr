@@ -214,7 +214,7 @@ send_cmd(Node, UUID, <<"bridge">> = App, <<"xferext">>, Dialplan, Args) ->
                ,[Node, UUID, App, Result, AppUUID]
                ),
     case Result of
-        ok -> {ok, AppUUID};
+        'ok' -> {'ok', AppUUID};
         _Else -> Result
     end;
 

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2021, 2600Hz
+%%% @copyright (C) 2012-2022, 2600Hz
 %%% @doc Send config commands to FS
 %%%
 %%%
@@ -106,9 +106,9 @@ handle_info({'kz_amqp_assignment', 'lost_channel'}, State) ->
     lager:debug("channel lost"),
     {'noreply', State};
 handle_info({'EXIT', _, 'noconnection'}, State) ->
-    {stop, {'shutdown', 'noconnection'}, State};
+    {'stop', {'shutdown', 'noconnection'}, State};
 handle_info({'EXIT', _, Reason}, State) ->
-    {stop, Reason, State};
+    {'stop', Reason, State};
 handle_info(_Info, State) ->
     lager:debug("unhandled message: ~p", [_Info]),
     {'noreply', State}.

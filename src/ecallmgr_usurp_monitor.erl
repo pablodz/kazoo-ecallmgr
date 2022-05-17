@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc monitors usurp_control
 %%%
 %%%
@@ -105,7 +105,7 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec handle_cast(any(), state()) -> kz_types:handle_cast_ret_state(state()).
-handle_cast({register, Type, CallId, RefId, Pid}, State) ->
+handle_cast({'register', Type, CallId, RefId, Pid}, State) ->
     kz_log:put_callid(CallId),
     {'noreply', handle_register(#cache{key={Type, CallId}, ref_id=RefId, pid=Pid}, State)};
 handle_cast(_, State) ->
@@ -169,14 +169,21 @@ register(Type, CallId, RefId) ->
 
 -spec register(usurp_type(), kz_term:ne_binary(), kz_term:ne_binary(), pid()) -> 'ok'.
 register(Type, CallId, RefId, Pid) ->
-    gen_listener:cast(?SERVER, {register, Type, CallId, RefId, Pid}).
+    gen_listener:cast(?SERVER, {'register', Type, CallId, RefId, Pid}).
 
 -spec handle_register(cache(), state()) -> state().
-handle_register(#cache{key={Type, CallId}, ref_id=RefId, pid=Pid}=Cache, #{calls := Calls, pids := Pids} = State) ->
+handle_register(#cache{key={Type, CallId}
+                      ,ref_id=RefId
+                      ,pid=Pid
+                      }=Cache
+               ,#{calls := Calls
+                 ,pids := Pids
+                 }=State
+               ) ->
     _ = handle_usurp(Type, CallId, RefId, kz_json:new(), Calls),
     _ = ets:insert(Calls, Cache),
     _ = ets:insert(Pids, Cache),
-    _ = erlang:monitor(process, Pid),
+    _ = erlang:monitor('process', Pid),
     State.
 
 -spec handle_unregister(pid(), state()) -> state().

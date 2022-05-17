@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2021, 2600Hz
+%%% @copyright (C) 2011-2022, 2600Hz
 %%% @doc Directory lookups from FS
 %%%
 %%% @author James Aimonetti
@@ -95,7 +95,7 @@ validate_token(#{payload := JObj}=Context) ->
 -type validate_token_result() :: {'ok', kz_json:object()} | {'error', any()}.
 
 -spec validate_token(map(), validate_token_result()) -> fs_handlecall_ret().
-validate_token(#{fetch_id := FetchId}=Context, {error, Error}) ->
+validate_token(#{fetch_id := FetchId}=Context, {'error', Error}) ->
     lager:warning("fetch request ~s has an invalid token : ~s"
                  ,[FetchId, Error]
                  ),
@@ -123,7 +123,7 @@ validate_rpc_token(#{payload := JObj}=Context) ->
 -type validate_rpc_token_result() :: {'ok', kz_json:object()} | {'error', any()}.
 
 -spec validate_rpc_token(map(), validate_rpc_token_result()) -> fs_handlecall_ret().
-validate_rpc_token(#{fetch_id := FetchId}=Context, {error, Error}) ->
+validate_rpc_token(#{fetch_id := FetchId}=Context, {'error', Error}) ->
     lager:warning("fetch request ~s has an invalid token : ~s"
                  ,[FetchId, Error]
                  ),

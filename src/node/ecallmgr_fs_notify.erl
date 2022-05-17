@@ -114,7 +114,7 @@ resp_to_probe(State, User, Realm) ->
                      ,{<<"To-User">>, User}
                      ,{<<"To-Realm">>, Realm}
                      ,{<<"State">>, State}
-                     ,{<<"Call-ID">>, kz_term:to_hex_binary(crypto:hash(md5, PresenceId))}
+                     ,{<<"Call-ID">>, kz_term:to_hex_binary(crypto:hash('md5', PresenceId))}
                      | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
                      ],
     lager:debug("sending probe reply '~s' for ~s", [State, PresenceId]),
@@ -316,9 +316,9 @@ handle_cast(_Msg, State) ->
 %%------------------------------------------------------------------------------
 -spec handle_info(any(), state()) -> kz_types:handle_info_ret_state(state()).
 handle_info({'EXIT', _, 'noconnection'}, State) ->
-    {stop, {'shutdown', 'noconnection'}, State};
+    {'stop', {'shutdown', 'noconnection'}, State};
 handle_info({'EXIT', _, Reason}, State) ->
-    {stop, Reason, State};
+    {'stop', Reason, State};
 handle_info(_Info, State) ->
     lager:debug("unhandled message: ~p", [_Info]),
     {'noreply', State}.
@@ -355,6 +355,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%=============================================================================
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% @end
+%%------------------------------------------------------------------------------
 notify_x_headers(AOR) ->
     SIPHeaders = [<<"X-KAZOO-AOR: ", AOR/binary>>
                  ,<<"X-KAZOO-INVITE-FORMAT: username">>

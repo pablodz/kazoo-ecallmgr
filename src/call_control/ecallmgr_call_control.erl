@@ -199,8 +199,8 @@ init_control(Pid, #{node := Node
                           ,controller_q=ControllerQ
                           ,control_q=ControlQ
                           ,initial_ccvs=CCVs
-                          ,is_node_up=true
-                          ,is_call_up=true
+                          ,is_node_up='true'
+                          ,is_call_up='true'
                           },
             call_control_ready(State),
             gen_server:enter_loop(?MODULE, [], State);
@@ -232,8 +232,8 @@ init_control(Pid, #{node := Node
                   ,controller_q=ControllerQ
                   ,control_q=ControlQ
                   ,initial_ccvs=CCVs
-                  ,is_node_up=true
-                  ,is_call_up=true
+                  ,is_node_up='true'
+                  ,is_call_up='true'
                   },
     call_control_ready(State),
     gen_server:enter_loop(?MODULE, [], State).
@@ -353,11 +353,11 @@ handle_info('sanity_check', #state{call_id=CallId}=State) ->
 handle_info('nodedown_restart_exceeded', #state{is_node_up='false'}=State) ->
     lager:debug("we have not received a node up in time, assuming down for good for this call", []),
     {'noreply', handle_channel_destroyed(State)};
-handle_info({switch_reply, _}, State) ->
+handle_info({'switch_reply', _}, State) ->
     {'noreply', State};
-handle_info({switch_reply, _, _}, State) ->
+handle_info({'switch_reply', _, _}, State) ->
     {'noreply', State};
-handle_info({route_resp, _, _}, State) ->
+handle_info({'route_resp', _, _}, State) ->
     {'noreply', State};
 handle_info(_Msg, State) ->
     lager:debug("unhandled message: ~p", [_Msg]),
@@ -657,16 +657,16 @@ execute_complete_error(JObj, #state{current_cmd=Cmd
 
 execute_complete_has_error(JObj) ->
     kz_call_event:application_response(JObj) =:= <<"ERROR">>
-        orelse kz_call_event:application_error_message(JObj) =/= undefined.
+        orelse kz_call_event:application_error_message(JObj) =/= 'undefined'.
 
 handle_execute_complete_error(JObj, State) ->
     handle_execute_complete_error(execute_complete_has_error(JObj), JObj, State).
 
-handle_execute_complete_error(true, JObj, State) ->
+handle_execute_complete_error('true', JObj, State) ->
     Reply = execute_complete_error(JObj, State),
     publish_error_resp(Reply),
     State;
-handle_execute_complete_error(false, _JObj, State) ->
+handle_execute_complete_error('false', _JObj, State) ->
     State.
 
 %%------------------------------------------------------------------------------
@@ -674,13 +674,15 @@ handle_execute_complete_error(false, _JObj, State) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec handle_sofia_replaced(kz_term:ne_binary(), state()) -> state().
-handle_sofia_replaced(<<_/binary>> = CallId, #state{call_id=CallId}=State) ->
+handle_sofia_replaced(<<CallId/binary>>, #state{call_id=CallId}=State) ->
     lager:debug("call id hasn't changed, no replacement necessary"),
     State;
-handle_sofia_replaced(<<_/binary>> = ReplacedBy, #state{node=Node
-                                                       ,call_id=CallId
-                                                       ,command_q=CommandQ
-                                                       }=State)->
+handle_sofia_replaced(<<ReplacedBy/binary>>
+                     ,#state{node=Node
+                            ,call_id=CallId
+                            ,command_q=CommandQ
+                            }=State
+                     )->
     lager:debug("channel replaced by ~s for ~s in ~s", [ReplacedBy, CallId, Node]),
     unbind(Node, CallId),
     bind(Node, ReplacedBy),
@@ -710,7 +712,7 @@ set_control_info(UUID, #state{node=Node
                          ]),
     defer_set_control_info(Node, Cmd, Arg).
 
--spec defer_set_control_info(node(), atom(), binary()) -> ok.
+-spec defer_set_control_info(node(), atom(), binary()) -> 'ok'.
 defer_set_control_info(Node, Cmd, Arg) ->
     _ = kz_process:spawn(fun set_control_info/3, [Node, Cmd, Arg]),
     'ok'.
@@ -774,23 +776,30 @@ insert_command(#state{node=Node
             'true' = kapi_dialplan:queue_v(JObj),
             Commands = kz_json:get_list_value(<<"Commands">>, JObj, []),
             DefJObj = kz_json:from_list(kz_api:extract_defaults(JObj)),
-            freeswitch:call_cmd_sync(true),
+            freeswitch:call_cmd_sync('true'),
             _ = execute_queue_commands(Commands, DefJObj, State),
-            freeswitch:call_cmd_sync(false),
+            freeswitch:call_cmd_sync('false'),
             CommandQ;
         <<"noop">> ->
-            freeswitch:call_cmd_sync(true),
+            freeswitch:call_cmd_sync('true'),
             _ = execute_control_request(JObj, State),
-            freeswitch:call_cmd_sync(false),
+            freeswitch:call_cmd_sync('false'),
             maybe_filter_queue(kz_json:get_value(<<"Filter-Applications">>, JObj), CommandQ);
         _ ->
             lager:debug("recv and executing ~s now!", [AName]),
-            freeswitch:call_cmd_sync(true),
+            freeswitch:call_cmd_sync('true'),
             _ = execute_control_request(JObj, State),
-            freeswitch:call_cmd_sync(false),
+            freeswitch:call_cmd_sync('false'),
             CommandQ
     end;
-insert_command(#state{node=Node, call_id=CallId, command_q=CmdQ, current_cmd_uuid=CurrCmdId}, 'flush', JObj) ->
+insert_command(#state{node=Node
+                     ,call_id=CallId
+                     ,command_q=CmdQ
+                     ,current_cmd_uuid=CurrCmdId
+                     }
+              ,'flush'
+              ,JObj
+              ) ->
     lager:debug("received control queue flush command, clearing all waiting commands"),
     _ = freeswitch:api(Node, 'uuid_break', <<CallId/binary, " all">>),
     _ = maybe_force_queue_advance(CallId, CurrCmdId, queue:is_empty(CmdQ)),
@@ -803,9 +812,10 @@ insert_command(Q, Pos, _) ->
     lager:debug("received command for an unknown queue position: ~p", [Pos]),
     Q.
 
-maybe_force_queue_advance(_CallId, undefined, true) -> ok;
+maybe_force_queue_advance(_CallId, 'undefined', 'true') -> 'ok';
 maybe_force_queue_advance(CallId, _, _) ->
-    self() ! {'force_queue_advance', CallId}.
+    self() ! {'force_queue_advance', CallId},
+    'ok'.
 
 execute_queue_commands([], _, _) -> 'ok';
 execute_queue_commands([Command|Commands], DefJObj, State) ->
@@ -884,36 +894,51 @@ maybe_filter_queue([AppName|T]=Apps, CommandQ) when is_binary(AppName) ->
                     maybe_filter_queue(Apps, CommandQ1)
             end
     end;
-maybe_filter_queue([AppJObj|T]=Apps, CommandQ) ->
-    case queue:out(CommandQ) of
-        {'empty', _} -> CommandQ;
-        {{'value', NextJObj}, CommandQ1} ->
-            case (NextAppName = kapi_dialplan:application_name(NextJObj))
-                =:= (AppName = kapi_dialplan:application_name(AppJObj))
-                orelse kz_json:get_ne_binary_value(<<"Group-ID">>, NextJObj)
-                =:= kz_json:get_ne_binary_value(<<"Group-ID">>, AppJObj, <<"nomatch">>)
+maybe_filter_queue(Apps, CommandQ) ->
+    maybe_filter_queue(Apps, CommandQ, queue:out(CommandQ)).
+
+maybe_filter_queue(_Apps, CommandQ, {'empty', _}) ->
+    CommandQ;
+maybe_filter_queue([AppJObj | T]=Apps
+                  ,CommandQ
+                  ,{{'value', NextJObj}, CommandQ1}
+                  ) ->
+    case app_name_matches(AppJObj, NextJObj)
+        orelse group_id_matches(AppJObj, NextJObj)
+    of
+        'false' -> maybe_filter_queue(T, CommandQ);
+        'true' ->
+            Fields = kz_json:get_json_value(<<"Fields">>, AppJObj, kz_json:new()),
+            lager:debug("fields: ~p", [Fields]),
+
+            case kz_json:all(fun({AppField, AppValue}) ->
+                                     kz_json:get_value(AppField, NextJObj) =:= AppValue
+                             end
+                            ,Fields
+                            )
             of
                 'false' -> maybe_filter_queue(T, CommandQ);
                 'true' ->
-                    lager:debug("app ~s matched next command ~s, checking fields"
-                               ,[AppName, NextAppName]
-                               ),
-                    Fields = kz_json:get_json_value(<<"Fields">>, AppJObj, kz_json:new()),
-                    lager:debug("fields: ~p", [Fields]),
-
-                    case kz_json:all(fun({AppField, AppValue}) ->
-                                             kz_json:get_value(AppField, NextJObj) =:= AppValue
-                                     end
-                                    ,Fields
-                                    )
-                    of
-                        'false' -> maybe_filter_queue(T, CommandQ);
-                        'true' ->
-                            lager:debug("all fields matched queued command, popping it off"),
-                            maybe_filter_queue(Apps, CommandQ1) % same app and all fields matched
-                    end
+                    lager:debug("all fields matched queued command, popping it off"),
+                    maybe_filter_queue(Apps, CommandQ1) % same app and all fields matched
             end
     end.
+
+app_name_matches(AppJObj, NextJObj) ->
+    case {kapi_dialplan:application_name(NextJObj)
+         ,kapi_dialplan:application_name(AppJObj)
+         }
+    of
+        {AppMatches, AppMatches} ->
+            lager:debug("app ~s matched next command, checking fields", [AppMatches]),
+            'true';
+        {_NextAppName, _CurrentAppName} ->
+            'false'
+    end.
+
+group_id_matches(AppJObj, NextJObj) ->
+    kz_json:get_ne_binary_value(<<"Group-ID">>, NextJObj)
+        =:= kz_json:get_ne_binary_value(<<"Group-ID">>, AppJObj, <<"nomatch">>).
 
 -spec get_module(kz_term:ne_binary(), kz_term:ne_binary()) -> atom().
 get_module(Category, Name) ->

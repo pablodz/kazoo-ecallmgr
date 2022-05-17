@@ -23,10 +23,114 @@
             "description": "ecallmgr allow_endless_recording",
             "type": "boolean"
         },
+        "authz_default_action": {
+            "default": "deny",
+            "description": "ecallmgr authz default action",
+            "type": "string"
+        },
+        "authz_dry_run": {
+            "default": false,
+            "description": "ecallmgr authz dry run",
+            "type": "boolean"
+        },
         "authz_enabled": {
             "default": false,
             "description": "ecallmgr authz enabled",
             "type": "boolean"
+        },
+        "authz_local_resources": {
+            "default": false,
+            "description": "ecallmgr authz local resources",
+            "type": "boolean"
+        },
+        "balance_crawler_cycle_ms": {
+            "default": 60000,
+            "description": "ecallmgr balance crawler cycle in milliseconds",
+            "type": "integer"
+        },
+        "balance_crawler_enabled": {
+            "default": false,
+            "description": "ecallmgr balance crawler enabled",
+            "type": "boolean"
+        },
+        "balance_crawler_fetch_timeout_ms": {
+            "default": 10000,
+            "description": "ecallmgr balance crawler fetch timeout in milliseconds",
+            "type": "integer"
+        },
+        "balance_crawler_interaccount_delay_ms": {
+            "default": 10,
+            "description": "ecallmgr balance crawler interaccount delay in milliseconds",
+            "type": "integer"
+        },
+        "capabilities": {
+            "default": [
+                {
+                    "capability": "conference",
+                    "is_loaded": false,
+                    "module": "mod_conference"
+                },
+                {
+                    "capability": "channel_move",
+                    "is_loaded": false,
+                    "module": "mod_channel_move"
+                },
+                {
+                    "capability": "http_cache",
+                    "is_loaded": false,
+                    "module": "mod_http_cache"
+                },
+                {
+                    "capability": "dialplan",
+                    "is_loaded": false,
+                    "module": "mod_dptools"
+                },
+                {
+                    "capability": "sip",
+                    "is_loaded": false,
+                    "module": "mod_sofia"
+                },
+                {
+                    "capability": "fax",
+                    "is_loaded": false,
+                    "module": "mod_spandsp"
+                },
+                {
+                    "capability": "tts",
+                    "is_loaded": false,
+                    "module": "mod_flite"
+                },
+                {
+                    "capability": "freetdm",
+                    "is_loaded": false,
+                    "module": "mod_freetdm"
+                },
+                {
+                    "capability": "skype",
+                    "is_loaded": false,
+                    "module": "mod_skypopen"
+                },
+                {
+                    "capability": "xmpp",
+                    "is_loaded": false,
+                    "module": "mod_dingaling"
+                },
+                {
+                    "capability": "skinny",
+                    "is_loaded": false,
+                    "module": "mod_skinny"
+                },
+                {
+                    "capability": "sms",
+                    "is_loaded": false,
+                    "module": "mod_sms"
+                }
+            ],
+            "description": "ecallmgr capabilities",
+            "items": {
+                "type": "object"
+            },
+            "type": "array"
         },
         "default_fax_extension": {
             "default": ".tiff",
@@ -42,6 +146,16 @@
             "default": ".mp3",
             "description": "ecallmgr default recording extension",
             "type": "string"
+        },
+        "default_ringback": {
+            "default": "%(2000,4000,440,480)",
+            "description": "ecallmgr default ringback",
+            "type": "string"
+        },
+        "event_stream_idle_alert": {
+            "default": 0,
+            "description": "ecallmgr event stream idle alert",
+            "type": "integer"
         },
         "expandable_macros": {
             "default": {
@@ -61,7 +175,7 @@
         },
         "failover_when_all_unreg": {
             "default": false,
-            "description": "ecallmgr failover_when_all_unreg",
+            "description": "failover only when all devices are offline",
             "type": "boolean"
         },
         "fax_file_path": {
@@ -69,10 +183,40 @@
             "description": "ecallmgr fax file path",
             "type": "string"
         },
+        "fetch_timeout": {
+            "default": 2600,
+            "description": "ecallmgr fetch timeout",
+            "type": "integer"
+        },
         "freeswitch_context": {
             "default": "context_2",
             "description": "ecallmgr freeswitch context",
             "type": "string"
+        },
+        "fs_cmds": {
+            "default": [
+                {
+                    "load": "mod_sofia"
+                },
+                {
+                    "reloadacl": ""
+                }
+            ],
+            "description": "ecallmgr fs cmds",
+            "items": {
+                "type": "object"
+            },
+            "type": "array"
+        },
+        "fs_cmds_wait_ms": {
+            "default": 5000,
+            "description": "ecallmgr fs cmds wait in milliseconds",
+            "type": "integer"
+        },
+        "fs_node_uptime_s": {
+            "default": 600,
+            "description": "ecallmgr fs node uptime in seconds",
+            "type": "integer"
         },
         "fs_nodes": {
             "default": [],
@@ -81,6 +225,23 @@
                 "type": "string"
             },
             "type": "array"
+        },
+        "fs_profiles": {
+            "default": {},
+            "description": "ecallmgr fs profiles",
+            "type": "object"
+        },
+        "fs_reconnect_cmds": {
+            "description": "ecallmgr fs reconnect cmds",
+            "items": {
+                "type": "object"
+            },
+            "type": "array"
+        },
+        "gateways": {
+            "default": {},
+            "description": "ecallmgr gateways",
+            "type": "object"
         },
         "insert_fetched_registration_locally": {
             "default": false,
@@ -111,6 +272,16 @@
             "default": {},
             "description": "ecallmgr network map",
             "type": "object"
+        },
+        "node_down_grace_period": {
+            "default": 10000,
+            "description": "ecallmgr node down grace period",
+            "type": "integer"
+        },
+        "process_gateways": {
+            "default": false,
+            "description": "ecallmgr process gateways",
+            "type": "boolean"
         },
         "publish_channel_reconnect": {
             "default": false,
@@ -147,6 +318,11 @@
             "description": "ecallmgr redirect via proxy",
             "type": "boolean"
         },
+        "restrict_channel_event_publisher": {
+            "default": true,
+            "description": "ecallmgr restrict_channel_event_publisher",
+            "type": "boolean"
+        },
         "sanitize_fs_value_regex": {
             "default": "[^0-9\\w\\s-]",
             "description": "ecallmgr sanitize_fs_value_regex",
@@ -156,6 +332,16 @@
             "default": false,
             "description": "ecallmgr should detect inband dtmf",
             "type": "boolean"
+        },
+        "sofia_conf": {
+            "default": false,
+            "description": "ecallmgr sofia conf",
+            "type": "boolean"
+        },
+        "tcp_packet_type": {
+            "default": 2,
+            "description": "ecallmgr tcp packet type",
+            "type": "integer"
         },
         "use_bypass_media_after_bridge": {
             "default": false,

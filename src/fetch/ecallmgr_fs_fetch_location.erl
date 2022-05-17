@@ -70,9 +70,9 @@ location_not_found(#{fetch_id := FetchId, node := Node, payload := JObj} = Conte
 
 -spec fetch_registration(map(), tuple()) -> fs_handlecall_ret().
 fetch_registration(Context, {EndpointId, AccountId}) ->
-    case kz_app_config:get_boolean(?APP, <<"use_proxy_contact_api">>, false) of
-        true -> fetch_from_proxy(Context, AccountId, EndpointId);
-        false -> fetch_from_registrar(Context, AccountId, EndpointId)
+    case kz_app_config:get_boolean(?APP, <<"use_proxy_contact_api">>, 'false') of
+        'true' -> fetch_from_proxy(Context, AccountId, EndpointId);
+        'false' -> fetch_from_registrar(Context, AccountId, EndpointId)
     end;
 fetch_registration(#{fetch_id := FetchId, node := Node, payload := JObj}=Context, _) ->
     lager:debug("location format not expected from ~s => ~p on request ~s"

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2021, 2600Hz
+%%% @copyright (C) 2012-2022, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -40,9 +40,9 @@
 %%------------------------------------------------------------------------------
 -spec start_link() -> kz_types:startlink_ret().
 start_link() ->
-    case kz_app_config:get_boolean(?APP, <<"enable_discovery_server">>, false) of
-        true -> gen_server:start_link({'local', ?SERVER}, ?MODULE, [], []);
-        false -> ignore
+    case kz_app_config:get_boolean(?APP, <<"enable_discovery_server">>, 'false') of
+        'true' -> gen_server:start_link({'local', ?SERVER}, ?MODULE, [], []);
+        'false' -> 'ignore'
     end.
 
 %%%=============================================================================

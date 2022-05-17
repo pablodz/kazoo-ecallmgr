@@ -189,14 +189,14 @@ collect_continue(ACLs, PidRefs, Ref, Pid, Reason, Timeout, Errors) ->
             collect(ACLs, NewPidRefs, Timeout, collect_errors(Reason, Errors))
     end.
 
-collect_errors(normal, Errors) -> Errors;
+collect_errors('normal', Errors) -> Errors;
 collect_errors(_, Errors) -> Errors + 1.
 
--spec collect_system_config_acls(pid(), atom() | kz_term:ne_binary()) -> ok.
+-spec collect_system_config_acls(pid(), atom() | kz_term:ne_binary()) -> 'ok'.
 collect_system_config_acls(Collector, Node) ->
     ACLs = system_config_acls(Node),
     Collector ! ?ACL_RESULT_MERGE(ACLs),
-    ok.
+    'ok'.
 
 -spec system_config_acls(atom() | kz_term:ne_binary()) -> acls().
 system_config_acls(Node) ->
@@ -265,11 +265,11 @@ trusted_acls(Node) ->
         JObj -> resolve(kz_json:filtermap(fun trusted_acl/2, JObj))
     end.
 
--spec collect_trusted_acls(pid(), atom() | kz_term:ne_binary()) -> ok.
+-spec collect_trusted_acls(pid(), atom() | kz_term:ne_binary()) -> 'ok'.
 collect_trusted_acls(Collector, Node) ->
     ACLs = trusted_acls(Node),
     Collector ! ?ACL_RESULT_MERGE(ACLs),
-    ok.
+    'ok'.
 
 -spec trusted_acl(kz_term:ne_binary(), kz_json:object()) -> boolean() | {'true', kz_json:object()}.
 trusted_acl(K, V) ->

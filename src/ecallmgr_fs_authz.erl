@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2021, 2600Hz
+%%% @copyright (C) 2011-2022, 2600Hz
 %%% @doc Make a request for authorization, and answer queries about the CallID
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -80,8 +80,8 @@ is_mobile_device(Data) ->
 
 -spec is_endpoint(kzd_freeswitch:data()) -> authz_reply().
 is_endpoint(Data) ->
-    kzd_freeswitch:authorizing_id(Data) =/= undefined
-        andalso kzd_freeswitch:resource_id(Data) =:= undefined.
+    kzd_freeswitch:authorizing_id(Data) =/= 'undefined'
+        andalso kzd_freeswitch:resource_id(Data) =:= 'undefined'.
 
 -spec maybe_authorized_channel(kzd_freeswitch:data(), atom()) -> authz_reply().
 maybe_authorized_channel(Data, Node) ->

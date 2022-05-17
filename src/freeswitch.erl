@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2021, 2600Hz
+%%% @copyright (C) 2010-2022, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -218,7 +218,7 @@ bgapi4(Node, Cmd, Args, Fun, CallBackParams) -> ?FS_MODULE:bgapi4(Node, Cmd, Arg
 release(Node)
   when is_atom(Node) ->
     case version(Node) of
-        {ok, Version} -> release(Version);
+        {'ok', Version} -> release(Version);
         Else -> Else
     end;
 release(Version)
@@ -271,8 +271,8 @@ contact_api(Node) -> ?FS_MODULE:contact_api().
 
 -spec call_cmd_sync() -> boolean().
 call_cmd_sync() ->
-    kz_term:is_true(erlang:get(kz_fs_sync_app)).
+    kz_term:is_true(erlang:get('kz_fs_sync_app')).
 
--spec call_cmd_sync(boolean()) -> boolean() | undefined.
+-spec call_cmd_sync(boolean()) -> kz_term:api_boolean().
 call_cmd_sync(Value) ->
-    erlang:put(kz_fs_sync_app, Value).
+    erlang:put('kz_fs_sync_app', Value).

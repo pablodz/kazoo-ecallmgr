@@ -32,7 +32,7 @@
         <field name="Application-Response" type="first-of"
             value="variable_originate_failed_cause|variable_last_bridge_hangup_cause|variable_bridge_hangup_cause|variable_hangup_cause|Hangup-Cause|variable_originate_disposition|variable_endpoint_disposition|#NONE">
 	        <filters>
-	            <filter name="Application" type="include" compare="value" value="bridge" />
+                   <filter name="Application" type="include" compare="contains" value="bridge"/>
 	        </filters>
 
         </field>

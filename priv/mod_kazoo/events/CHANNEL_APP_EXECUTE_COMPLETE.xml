@@ -7,7 +7,7 @@
 	-->
 
 	<filters>
-		<filter type="exclude" name="Application" value="bridge">
+		<filter type="exclude" name="Application" compare="contains" value="bridge">
 			<filters>
 				<filter name="Application-Response" type="exclude" value="NONE" />
 				<filter name="Channel-Flags" type="exclude" compare="contains" value="TRANSFER" />

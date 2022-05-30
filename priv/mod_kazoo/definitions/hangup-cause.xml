@@ -64,4 +64,12 @@
 		</filters>
 	</field>
 
+	<field name="Hangup-Cause" type="static" value="ATTENDED_TRANSFER">
+		<filters>
+			<filter name="Channel-Flags" type="include" compare="contains" value="ORIGINATING_XFER" />
+		</filters>
+	</field>
+
+	<field name="XFER-Hangup-Cause" as="Hangup-Cause"/>
+
 </definition>

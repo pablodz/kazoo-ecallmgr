@@ -3,4 +3,7 @@
 	<field name="Channel-Call-State" />
 	<field name="Channel-Name" />
 	<field name="Answer-State" as="Channel-Answer-State" />
+
+	<field name="XFER-Channel-Answer-State" as="Channel-Answer-State" />
+
 </definition>

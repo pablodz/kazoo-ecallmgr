@@ -8,17 +8,42 @@
 
 	<filters>
 		<filter type="exclude" name="Application" compare="contains" value="bridge">
-			<filters>
-				<filter name="Application-Response" type="exclude" value="NONE" />
-				<filter name="Channel-Flags" type="exclude" compare="contains" value="TRANSFER" />
+			<filters scope="any">
+				<filter name="Channel-Flags" type="exclude" compare="contains" value="XFER_ZOMBIE" />
+				<filter name="Channel-Flags" type="exclude" compare="contains" value="TRANSFER">
+					<filters scope="any">
+						<filter name="Channel-Flags" type="include" compare="contains" value="ORIGINATING_XFER" />
+					</filters>
+				</filter>
 				<filter name="Channel-Flags" type="exclude" compare="contains" value="REDIRECT" />
 				<filter name="Channel-Flags" type="exclude" compare="contains" value="INTERCEPTED" />
+				<filter name="Application-Response" type="exclude" value="NONE" />
 			</filters>
 		</filter>
 	</filters>
 
 
 	<fields>
+
+		<!--
+			* attended transfer on origination
+			we replace the Unique-ID to the value of the transfer destination
+			so that bridge app can be completed
+		-->
+
+		<field name="origination-xfer-setup" type="group">
+			<filters>
+				<filter type="include" name="Application" compare="contains" value="bridge"/>
+				<filter type="include" name="Channel-Flags" compare="contains" value="ORIGINATING_XFER" />
+			</filters>
+			<fields>
+				<field name="variable_satt_uuid" as="Unique-ID" target="input"/>
+				<field name="XFER-Hangup-Code" type="first-of" value="variable_last_bridge_proto_specific_hangup_cause|#sip:480" target="input"/>
+				<field name="XFER-Hangup-Cause" type="first-of" value="variable_last_bridge_hangup_cause|#NO_ANSWER" target="input"/>
+				<field name="XFER-Channel-Answer-State" type="expand" value="${kz_uuid_answer_state(${variable_satt_uuid})}" target="input"/>
+			</fields>
+		</field>
+
 		<field name="call_event_headers" type="reference" />
 		<field name="Event-Name" type="static" value="CHANNEL_EXECUTE_COMPLETE" />
 		<field name="application-uuid" type="reference" />

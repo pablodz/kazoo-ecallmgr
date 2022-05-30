@@ -1,5 +1,6 @@
 <definition name="hangup-code">
-	<field name="Hangup-Code" type="first-of" value="variable_proto_specific_hangup_cause|variable_last_bridge_proto_specific_hangup_cause" />
+
+	<field name="Hangup-Code" type="first-of" value="variable_last_bridge_proto_specific_hangup_cause|variable_proto_specific_hangup_cause" />
 
 	<!-- code for loopback channels -->
 	<field name="Hangup-Code" type="static" value="sip:200">
@@ -11,5 +12,7 @@
 			<filter name="variable_bridge_hangup_cause" type="include" compare="value" value="NORMAL_CLEARING"/>
 		</filters>
 	</field>
+
+	<field name="XFER-Hangup-Code" as="Hangup-Code"/>
 
 </definition>

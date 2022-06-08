@@ -33,8 +33,8 @@
 -type state() :: #state{}.
 
 -define(SHARED_BINDINGS, [{'resource', [{'restrict_to', ['originate']}]}]).
--define(NODE_BINDINGS(N), [{'resource', [{'restrict_to', ['originate']}, {'node', N}, federate]}]).
--define(SELF_BINDINGS, [{self, []}]).
+-define(NODE_BINDINGS(N), [{'resource', [{'restrict_to', ['originate']}, {'node', N}, 'federate']}]).
+-define(SELF_BINDINGS, [{'self', []}]).
 
 -define(RESPONDERS, [{{?MODULE, 'handle_originate_req'}, [{<<"resource">>, <<"originate_req">>}]}]).
 
@@ -42,15 +42,15 @@
 -define(SHARED_QUEUE_NAME, <<"ecallmgr_fs_resource">>).
 -define(SHARED_QUEUE_OPTIONS, [{'exclusive', 'false'}]).
 -define(SHARED_QUEUE_CONSUME_OPTIONS, [{'exclusive', 'false'}]).
--define(SHARED_QUEUE_PARAMS, [{queue_options, ?SHARED_QUEUE_OPTIONS}
-                             ,{consume_options, ?SHARED_QUEUE_CONSUME_OPTIONS}
+-define(SHARED_QUEUE_PARAMS, [{'queue_options', ?SHARED_QUEUE_OPTIONS}
+                             ,{'consume_options', ?SHARED_QUEUE_CONSUME_OPTIONS}
                              ]).
 
 -define(NODE_QUEUE_NAME(N), <<"ecallmgr_fs_resource_", (kz_term:to_binary(N))/binary>>).
 -define(NODE_QUEUE_OPTIONS, [{'exclusive', 'false'}]).
 -define(NODE_QUEUE_CONSUME_OPTIONS, [{'exclusive', 'false'}]).
--define(NODE_QUEUE_PARAMS, [{queue_options, ?NODE_QUEUE_OPTIONS}
-                           ,{consume_options, ?NODE_QUEUE_CONSUME_OPTIONS}
+-define(NODE_QUEUE_PARAMS, [{'queue_options', ?NODE_QUEUE_OPTIONS}
+                           ,{'consume_options', ?NODE_QUEUE_CONSUME_OPTIONS}
                            ]).
 
 -define(SELF_QUEUE_NAME, <<>>).

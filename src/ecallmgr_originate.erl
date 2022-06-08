@@ -55,10 +55,14 @@
 %% @doc Starts the server.
 %% @end
 %%------------------------------------------------------------------------------
--spec start_link(map()) -> kz_types:startlink_ret().
+-type originate_args() :: #{node := node() %% FS node from ecallmgr_fs_resource handler
+                           ,queue := pid() %% gen_listener pid for ecallmgr_fs_resource
+                           ,payload := kapi_resource:originate_req()
+                           ,channel := pid() %% AMQP channel pid
+                           }.
+-spec start_link(originate_args()) -> kz_types:startlink_ret().
 start_link(Map) ->
     gen_server:start_link(?SERVER, [Map], []).
-
 
 %%%=============================================================================
 %%% gen_server callbacks
@@ -68,13 +72,14 @@ start_link(Map) ->
 %% @doc Initializes the server.
 %% @end
 %%------------------------------------------------------------------------------
--spec init([map()]) -> {'stop', 'normal'} | {'ok', state()}.
-init([Map]) ->
-    #{payload := JObj
-     ,node := Node
-     ,queue := Queue
-     ,channel := Channel
-     } = Map,
+-spec init([originate_args()]) ->
+          {'ok', state()} |
+          {'stop', 'normal'}.
+init([#{payload := JObj
+       ,node := Node
+       ,queue := Queue
+       ,channel := Channel
+       }]) ->
     _ = kz_log:put_callid(JObj),
     kz_amqp_channel:consumer_channel(Channel),
     ServerId = kz_api:server_id(JObj),
@@ -88,7 +93,7 @@ init([Map]) ->
             ControllerQ = kz_api:queue_id(JObj),
             bind_to_originate_events(Node, OriginateUUID),
             gen_server:cast(self(), 'originate_action'),
-            {'ok', #state{node=Node
+            {'ok', #state{node=fs_node_to_use(JObj, Node)
                          ,originate_req=JObj
                          ,server_id=ServerId
                          ,controller_q = ControllerQ
@@ -96,6 +101,24 @@ init([Map]) ->
                          ,originate_uuid = OriginateUUID
                          ,start_control_process = kz_json:is_true(<<"Start-Control-Process">>, JObj, 'true')
                          }}
+    end.
+
+fs_node_to_use(JObj, Node) ->
+    case kz_json:get_binary_value(<<"Existing-Call-ID">>, JObj) of
+        'undefined' ->
+            lager:info("using configured media node ~s", [Node]),
+            Node;
+        ExistingCallId ->
+            case ecallmgr_fs_channel:node(ExistingCallId) of
+                {'ok', FSNode} ->
+                    lager:info("existing call_id ~s on ~s, using that", [ExistingCallId, FSNode]),
+                    FSNode;
+                {'error', 'not_found'} ->
+                    lager:info("existing call_id ~s not found, using configured node ~s"
+                              ,[ExistingCallId, Node]
+                              ),
+                    Node
+            end
     end.
 
 -spec bind_to_originate_events(atom(), kz_term:ne_binary()) -> 'ok'.
@@ -329,7 +352,7 @@ get_transfer_action(JObj, Route) ->
     UnsetVars = get_unset_vars(JObj),
     list_to_binary(
       ["'m:^:", UnsetVars
-      ,"transfer:", Route
+      ," transfer:", Route
       ," XML ", Context, "' inline"
       ]
      ).
@@ -450,8 +473,16 @@ get_unset_vars(JObj) ->
                                     ),
                    ([K, _] = string:tokens(binary_to_list(KV), "=")) =/= 'undefined'
              ],
+
+    %% Maintain CAVs on b-legs
+    WithoutCAVs = kz_json:delete_key(<<"Custom-Application-Vars">>, JObj),
+    VarsToUnset = lists:foldr(fun ecallmgr_fs_xml:kazoo_var_to_fs_var/2
+                             ,[]
+                             ,kz_json:to_proplist(WithoutCAVs)
+                             ),
+
     case ["unset:" ++ K
-          || KV <- lists:foldr(fun ecallmgr_fs_xml:kazoo_var_to_fs_var/2, [], kz_json:to_proplist(JObj))
+          || KV <- VarsToUnset
                  ,not lists:member(begin [K, _] = string:tokens(binary_to_list(KV), "="), K end, Export)]
     of
         [] -> "";

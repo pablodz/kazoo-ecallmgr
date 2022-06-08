@@ -731,7 +731,8 @@ handle_dialplan(JObj, #state{call_id=CallId
                             ,is_node_up=INU
                             ,command_q=CmdQ
                             ,current_cmd_uuid=CurrCmdId
-                            }=State) ->
+                            }=State
+               ) ->
     At = kz_term:to_atom(kz_json:get_value(<<"Insert-At">>, JObj, 'tail')),
     lager:debug("received dialpan cmd ~s to execute at ~s", [kapi_dialplan:application_name(JObj), At]),
     NewCmdQ = try
@@ -754,7 +755,7 @@ handle_dialplan(JObj, #state{call_id=CallId
                        }
     end.
 
-%% execute all commands in JObj immediately, irregardless of what is running (if anything).
+%% execute all commands in JObj immediately, regardless of what is running (if anything).
 -spec insert_command(state(), insert_at_options(), kz_json:object()) -> queue:queue().
 insert_command(#state{node=Node
                      ,call_id=CallId

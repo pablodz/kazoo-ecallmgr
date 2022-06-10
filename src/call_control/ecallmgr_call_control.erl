@@ -605,7 +605,7 @@ handle_execute_complete(AppName, EventUUID, JObj, #state{current_app=AppName
                                                         ,current_cmd_uuid=EventUUID
                                                         }=State) ->
     lager:debug("~s execute complete, advancing control queue : ~s", [AppName, EventUUID]),
-    handle_execute_complete(JObj, State);
+    handle_execute_complete(AppName, JObj, State);
 handle_execute_complete(AppName, EventUUID, JObj, #state{current_app=CurrApp
                                                         ,current_cmd_uuid=EventUUID
                                                         }=State) ->
@@ -623,18 +623,61 @@ handle_execute_complete(_AppName, _EventUUID, _JObj, #state{current_app=_CurrApp
                                                            }=State) ->
     State.
 
-handle_execute_complete(JObj, State) ->
+handle_execute_complete(AppName, JObj, State) ->
     Routines = [fun handle_execute_complete_error/2
+               ,fun handle_playback_complete/3
                ,fun forward_queue/1
                ],
-    lists:foldl(handle_execute_complete_fun(JObj), State, Routines).
+    lists:foldl(handle_execute_complete_fun(AppName, JObj), State, Routines).
 
-handle_execute_complete_fun(JObj) ->
+handle_execute_complete_fun(AppName, JObj) ->
     fun(F, State) when is_function(F, 1) ->
             F(State);
        (F, State) when is_function(F, 2) ->
-            F(JObj, State)
+            F(JObj, State);
+       (F, State) when is_function(F, 3) ->
+            F(AppName, JObj, State)
     end.
+
+-spec play_apps() -> kz_term:ne_binaries().
+play_apps() -> [<<"play">>
+               ,<<"playback">>
+               ,<<"tts">>
+               ].
+
+-spec is_play_app(kz_term:ne_binary()) -> boolean().
+is_play_app(AppName) -> lists:member(AppName, play_apps()).
+
+-spec handle_playback_complete(kz_term:ne_binary(), kz_json:object(), state()) -> state().
+handle_playback_complete(AppName, JObj, State) ->
+    case is_play_app(AppName) of
+        true -> handle_playback_flush(AppName, JObj, State);
+        false -> State
+    end.
+
+-spec handle_playback_flush(kz_term:ne_binary(), kz_json:object(), state()) -> state().
+handle_playback_flush(AppName, JObj, #state{command_q=CmdQ}=State) ->
+    lager:debug("~s finished, checking for group-id/DTMF termination", [AppName]),
+    case kz_json:get_ne_binary_value(<<"DTMF-Digit">>, JObj) of
+        undefined -> State;
+        _DTMF ->
+            GroupId = kz_json:get_ne_binary_value(<<"Group-ID">>, JObj),
+            lager:debug("DTMF ~s terminated playback, flushing all with group id ~s"
+                       ,[_DTMF, GroupId]
+                       ),
+            State#state{command_q=flush_group_id(CmdQ, GroupId, AppName)}
+    end.
+
+-spec flush_group_id(queue:queue(), kz_term:api_binary(), kz_term:ne_binary()) -> queue:queue().
+flush_group_id(CmdQ, 'undefined', _) -> CmdQ;
+flush_group_id(CmdQ, GroupId, AppName) ->
+    lager:debug("filtering commands ~s for group-id ~s", [AppName, GroupId]),
+    Filter = kz_json:from_list([{<<"Application-Name">>, AppName}
+                               ,{<<"Group-ID">>, GroupId}
+                               ,{<<"Fields">>, kz_json:from_list([{<<"Group-ID">>, GroupId}])}
+                               ]),
+    maybe_filter_queue([Filter], CmdQ).
+
 
 execute_complete_error_message(JObj) ->
     kz_call_event:application_error_message(JObj, <<"unspecified error">>).
@@ -683,7 +726,7 @@ handle_sofia_replaced(<<ReplacedBy/binary>>
                             ,command_q=CommandQ
                             }=State
                      )->
-    lager:debug("channel replaced by ~s for ~s in ~s", [ReplacedBy, CallId, Node]),
+    lager:debug("channel replaced by ~s in ~s", [ReplacedBy, Node]),
     unbind(Node, CallId),
     bind(Node, ReplacedBy),
     lager:info("...call id updated, continuing post-transfer"),
@@ -1116,11 +1159,10 @@ handle_sync(JObj, #state{fetch_id=FetchId
           {'noreply', state()}.
 handle_transferee(JObj, #state{fetch_id=FetchId
                               ,node=_Node
-                              ,call_id=CallId
                               }=State) ->
     case kz_call_event:custom_channel_var(JObj, <<"Fetch-ID">>) of
         FetchId ->
-            lager:info("we (~s) have been transferred, terminate immediately", [CallId]),
+            lager:info("we have been transferred, terminate immediately"),
             {'stop', 'normal', State};
         _Else ->
             lager:info("we were a different instance of this transferred call ~s : ~s", [FetchId, _Else]),
@@ -1130,11 +1172,10 @@ handle_transferee(JObj, #state{fetch_id=FetchId
 -spec handle_transferor(kz_json:object(), state()) ->
           {'noreply', state()}.
 handle_transferor(JObj, #state{fetch_id=FetchId
-                              ,call_id=CallId
                               }=State) ->
     case kz_call_event:custom_channel_var(JObj, <<"Fetch-ID">>) of
         FetchId ->
-            lager:info("we (~s) transferred the call, terminate immediately", [CallId]),
+            lager:info("we transferred the call, terminate immediately"),
             {'stop', 'normal', State};
         _Else ->
             lager:info("we were a different instance of this transferror call ~s : ~s", [FetchId, _Else]),
@@ -1159,7 +1200,7 @@ handle_event_info(CallId, JObj, #state{call_id=CallId}=State) ->
         <<"CHANNEL_REPLACED">> ->
             handle_replaced(JObj, State);
         <<"CHANNEL_DIRECT">> ->
-            lager:info("this call control is the target of a direct bowout, terminate immediately", [CallId]),
+            lager:info("this call control is the target of a direct bowout, terminate immediately"),
             {'stop', 'normal', State};
         <<"CHANNEL_EXECUTE">> when Application =:= <<"redirect">> ->
             {'stop', 'normal', State};

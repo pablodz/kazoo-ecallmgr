@@ -77,6 +77,8 @@
 		<field name="Custom-Channel-Vars" type="reference" />
 		<field name="Custom-Application-Vars" type="reference" />
 		<field name="Custom-SIP-Headers" type="reference" />
+		<field name="variable_playback_terminator_used" as="DTMF-Digit" />
+		<field name="variable_media_group_id" as="Group-ID" />
 
 		<field name="debug-call" type="reference" />
 	</fields>

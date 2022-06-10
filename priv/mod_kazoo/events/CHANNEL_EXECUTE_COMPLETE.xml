@@ -44,6 +44,8 @@
 		<field name="hangup-cause" type="reference" />
         <field name="hangup-code" type="reference" />
 		<field name="Disposition" type="first-of" value="variable_endpoint_disposition|variable_originate_disposition" />
+		<field name="variable_playback_terminator_used" as="DTMF-Digit" />
+		<field name="variable_media_group_id" as="Group-ID" />
 
 		<field name="debug-call" type="reference" />
 	</fields>

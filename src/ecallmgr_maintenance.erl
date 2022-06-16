@@ -588,7 +588,7 @@ get_fs_nodes(Node) ->
 -spec modify_acls(kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object(), acl_fun(), config_fun()) ->
           'no_return'.
 modify_acls(Name, IP0, ACLS, BuildACLFun, ConfigFun) ->
-    case kz_network_utils:resolve(IP0) of
+    case kz_network_utils:resolve(IP0, ecallmgr_util:get_resolve_options()) of
         [] ->
             Identities = [{'cidr', kz_network_utils:is_cidr(IP0)}
                          ,{'ip', kz_network_utils:is_ip(IP0)}

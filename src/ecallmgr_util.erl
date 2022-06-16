@@ -59,6 +59,8 @@
 
 -export([dialplan_application/1]).
 
+-export([get_resolve_options/0]).
+
 -ifdef(TEST).
 -export([endpoint_jobjs_to_records/1
         ,maybe_filter_failover_channels/2
@@ -1601,9 +1603,17 @@ maybe_use_kz_moh(Media, JObj) ->
 -spec use_kz_moh(kz_term:ne_binary(), kz_json:object()) -> kz_term:ne_binary().
 use_kz_moh(Media, JObj) ->
     case kz_json:is_true(?KZ_MOH_RANDOM_START_OPTION_KEY, JObj, ?KZ_MOH_RANDOM_START_OPTION_DEFAULT) of
-        false -> list_to_binary(["kz_moh::", Media]);
-        true -> list_to_binary(["kz_moh::%[moh_playback_random=true]", Media])
+        'false' -> list_to_binary(["kz_moh::", Media]);
+        'true' -> list_to_binary(["kz_moh::%[moh_playback_random=true]", Media])
     end.
 
 -spec set_prefix() -> kz_term:ne_binary().
 set_prefix() -> list_to_binary([?FS_MULTI_VAR_SEP_PREFIX, ?FS_MULTI_VAR_SEP]).
+
+
+-spec get_resolve_options() -> kz_term:proplist().
+get_resolve_options() ->
+    case kapps_config:is_true(?APP_NAME, <<"use_tcp">>, 'false') of
+        'true' -> kz_network_utils:default_options();
+        'false' -> props:set_value('usevc', 'false', kz_network_utils:default_options())
+    end.

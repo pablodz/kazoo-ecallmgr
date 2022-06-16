@@ -228,7 +228,7 @@ resolve_cidr(CIDR) ->
         'true' ->
             kz_network_utils:to_cidr(CIDR);
         'false' ->
-            IPs = kz_network_utils:resolve(CIDR),
+            IPs = kz_network_utils:resolve(CIDR, ecallmgr_util:get_resolve_options()),
             [kz_network_utils:to_cidr(IP) || IP <- IPs]
     end.
 
@@ -377,7 +377,7 @@ resolve_hostname(Collector, ResolveMe, Resource, ACLBuilderFun, Host, Port) ->
         'true' ->
             maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun, Port);
         'false' ->
-            case kz_network_utils:resolve(Host) of
+            case kz_network_utils:resolve(Host, ecallmgr_util:get_resolve_options()) of
                 [] ->
                     lager:debug("no IPs returned, checking for raw IP"),
                     maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun, Port);

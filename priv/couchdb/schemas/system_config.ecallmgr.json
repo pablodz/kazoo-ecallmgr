@@ -358,6 +358,11 @@
             "description": "ecallmgr use shout",
             "type": "boolean"
         },
+        "use_tcp": {
+            "default": false,
+            "description": "appex_client use_tcp for dns query",
+            "type": "boolean"
+        },
         "use_vlc": {
             "default": false,
             "description": "ecallmgr use vlc",

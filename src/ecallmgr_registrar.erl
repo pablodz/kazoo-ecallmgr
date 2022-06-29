@@ -1325,8 +1325,7 @@ no_registrar_in_reg_zone(Zone) ->
 
 -spec oldest_registrar(boolean()) -> boolean().
 oldest_registrar(Federated) ->
-    kz_nodes:whapp_zone_count(?APP_NAME) =:= 1
-        orelse kz_nodes:whapp_oldest_node(?APP_NAME, Federated) =:= node().
+    kz_nodes:whapp_oldest_node(?APP_NAME, Federated) =:= node().
 
 -spec get_fs_contact(kzd_freeswitch:data()) -> kz_term:ne_binary().
 get_fs_contact(FSJObj) ->

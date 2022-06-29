@@ -1,0 +1,8 @@
+<event name="RECORD_UNMASK">
+	<fields>
+		<field name="call_event" type="reference" />
+		<field name="recording" type="reference" />
+
+		<field name="debug-call" type="reference" />
+	</fields>
+</event>

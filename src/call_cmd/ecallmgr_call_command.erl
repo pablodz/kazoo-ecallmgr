@@ -1144,6 +1144,18 @@ record_call(_UUID, <<"unmask">>, JObj) ->
                         MediaName -> ecallmgr_util:recording_filename(MediaName)
                     end,
     {<<"record_session_unmask">>, RecordingName};
+record_call(_UUID, <<"pause">>, JObj) ->
+    RecordingName = case kz_json:get_ne_binary_value(<<"Media-Name">>, JObj) of
+                        'undefined' -> <<"${Media-Recordings-Name[0]}">>;
+                        MediaName -> ecallmgr_util:recording_filename(MediaName)
+                    end,
+    {<<"record_session_pause">>, RecordingName};
+record_call(_UUID, <<"resume">>, JObj) ->
+    RecordingName = case kz_json:get_ne_binary_value(<<"Media-Name">>, JObj) of
+                        'undefined' -> <<"${Media-Recordings-Name[0]}">>;
+                        MediaName -> ecallmgr_util:recording_filename(MediaName)
+                    end,
+    {<<"record_session_resume">>, RecordingName};
 record_call(UUID, <<"start">>, JObj) ->
     ScopeVariables = record_call_vars(UUID, JObj),
     TimeLimit = record_call_limit(JObj),

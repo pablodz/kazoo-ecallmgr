@@ -110,9 +110,13 @@
        ,kapps_config:get_boolean(?APP_NAME, <<"failover_when_all_unreg">>, 'false')
        ).
 
--define(KZ_MOH_KEY, <<"Hold-Media-Preserve-Position">>).
--define(KZ_MOH_CONFIG_KEY, kz_json:normalize_key(?KZ_MOH_KEY)).
--define(KZ_MOH_DEFAULT, kapps_config:get_boolean(?APP_NAME, ?KZ_MOH_CONFIG_KEY, 'true')).
+-define(KZ_MOH_PRESERVE_POSITION_OPTION_KEY, <<"Hold-Media-Preserve-Position">>).
+-define(KZ_MOH_PRESERVE_POSITION_OPTION_CONFIG_KEY, kz_json:normalize_key(?KZ_MOH_PRESERVE_POSITION_OPTION_KEY)).
+-define(KZ_MOH_PRESERVE_POSITION_OPTION_DEFAULT, kapps_config:get_boolean(?APP_NAME, ?KZ_MOH_PRESERVE_POSITION_OPTION_CONFIG_KEY, 'true')).
+
+-define(KZ_MOH_RANDOM_START_OPTION_KEY, <<"Hold-Media-Random-Start-Position">>).
+-define(KZ_MOH_RANDOM_START_OPTION_CONFIG_KEY, kz_json:normalize_key(?KZ_MOH_RANDOM_START_OPTION_KEY)).
+-define(KZ_MOH_RANDOM_START_OPTION_DEFAULT, kapps_config:get_boolean(?APP_NAME, ?KZ_MOH_RANDOM_START_OPTION_CONFIG_KEY, 'false')).
 
 -type send_cmd_ret() :: fs_sendmsg_ret() | fs_api_ret().
 -export_type([send_cmd_ret/0]).
@@ -1589,9 +1593,16 @@ moh_media_path(Media, Types, UUID, JObj) ->
 
 -spec maybe_use_kz_moh(kz_term:ne_binary(), kz_json:object()) -> kz_term:ne_binary().
 maybe_use_kz_moh(Media, JObj) ->
-    case kz_json:is_true(?KZ_MOH_KEY, JObj, ?KZ_MOH_DEFAULT) of
-        'true' -> list_to_binary(["kz_moh::", Media]);
+    case kz_json:is_true(?KZ_MOH_PRESERVE_POSITION_OPTION_KEY, JObj, ?KZ_MOH_PRESERVE_POSITION_OPTION_DEFAULT) of
+        'true' -> use_kz_moh(Media, JObj);
         'false' -> Media
+    end.
+
+-spec use_kz_moh(kz_term:ne_binary(), kz_json:object()) -> kz_term:ne_binary().
+use_kz_moh(Media, JObj) ->
+    case kz_json:is_true(?KZ_MOH_RANDOM_START_OPTION_KEY, JObj, ?KZ_MOH_RANDOM_START_OPTION_DEFAULT) of
+        false -> list_to_binary(["kz_moh::", Media]);
+        true -> list_to_binary(["kz_moh::%[moh_playback_random=true]", Media])
     end.
 
 -spec set_prefix() -> kz_term:ne_binary().

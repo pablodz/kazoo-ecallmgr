@@ -56,7 +56,7 @@
 %% @end
 %%------------------------------------------------------------------------------
 -type originate_args() :: #{node := node() %% FS node from ecallmgr_fs_resource handler
-                           ,queue := pid() %% gen_listener pid for ecallmgr_fs_resource
+                           ,queue := kz_term:ne_binary() %% gen_listener targeted queue for ecallmgr_fs_resource
                            ,payload := kapi_resource:originate_req()
                            ,channel := pid() %% AMQP channel pid
                            }.

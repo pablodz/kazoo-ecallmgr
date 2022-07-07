@@ -57,6 +57,7 @@ process(#{payload := FetchJObj, channel := Channel}=Map) ->
     Routines = [{fun add_time_marker/2, 'request_ready'}
                ,fun control_p/1
                ,fun request/1
+               ,fun request_headers/1
                ,fun block_call_routines/1
                ,fun apply_formatters/1
                ,fun timeout_reply/1
@@ -68,6 +69,15 @@ process(#{payload := FetchJObj, channel := Channel}=Map) ->
 request(#{request := _Request}=Map) -> Map;
 request(#{control_q := ControlQ, control_p := ControlP, payload := FetchJObj}=Map) ->
     Map#{request => kz_json:set_value(?KEY_SERVER_ID, kapi:encode_pid(ControlQ, ControlP), FetchJObj)}.
+
+-spec request_headers(dialplan_context()) -> dialplan_context().
+request_headers(#{request_headers := _}=Map) -> Map;
+request_headers(#{call_id := CallId, core_uuid := CoreUUID}=Map) ->
+    Headers = [{<<"call-id">>, 'binary', CallId}
+              ,{<<"core-uuid">>, 'binary', kz_term:to_binary(CoreUUID)}
+              ],
+    KAPIHeaders = [{'headers', Headers}],
+    Map#{request_headers => KAPIHeaders}.
 
 -spec control_p(dialplan_context()) -> dialplan_context().
 control_p(#{control_p := _Pid}=Map) -> Map;
@@ -121,8 +131,8 @@ maybe_expired(Map) ->
 -spec maybe_blocked(dialplan_context()) -> {'ok', dialplan_context()}.
 maybe_blocked(#{blocked := 'true'}=Map) ->
     send_reply(Map);
-maybe_blocked(#{request := Request}=Map) ->
-    kapi_route:publish_req(Request),
+maybe_blocked(#{request := Request, request_headers := Headers}=Map) ->
+    kapi_route:publish_req(Request, Headers),
     wait_for_route_resp(add_time_marker(Map, 'request_sent')).
 
 -spec wait_for_route_resp(dialplan_context()) -> {'ok', dialplan_context()}.

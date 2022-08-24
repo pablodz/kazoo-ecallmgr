@@ -65,8 +65,9 @@ get(Node) ->
                ],
     Args = [self(), Node],
     PidRefs = collector_spawn(Routines, Args),
+    {'ok', Master} = kapps_util:get_master_account_id(),
     lager:debug("collecting ACLs in ~p", [PidRefs]),
-    collect(kz_json:new(), PidRefs).
+    collect(Master, kz_json:new(), PidRefs).
 
 -spec media_acls() -> acls().
 media_acls() ->
@@ -106,9 +107,10 @@ edge(Node) ->
                ,fun sip_auth_ips/1
                ],
     Args = [self(), Node],
+    {'ok', Master} = kapps_util:get_master_account_id(),
     PidRefs = collector_spawn(Routines, Args),
     lager:debug("collecting ACLs in ~p", [PidRefs]),
-    token(cidrs(collect(kz_json:new(), PidRefs))).
+    token(cidrs(collect(Master, kz_json:new(), PidRefs))).
 
 %%------------------------------------------------------------------------------
 %% @doc Fetches just the system_config ACLs
@@ -136,57 +138,77 @@ collector_routine_spawn(Routine, [Collector , Arg2, Arg3 | _])
   when is_function(Routine, 3) ->
     kz_process:spawn_monitor(Routine, [Collector, Arg2, Arg3]).
 
--spec collect(kz_json:object(), kz_term:pid_refs()) ->
+-spec collect(kz_term:ne_binary(), kz_json:object(), kz_term:pid_refs()) ->
           kz_json:object().
-collect(ACLs, PidRefs) ->
-    collect(ACLs, PidRefs, request_timeout(), 0).
+collect(Master, ACLs, PidRefs) ->
+    collect(Master, ACLs, PidRefs, request_timeout(), 0).
 
 -spec request_timeout() -> pos_integer().
 request_timeout() ->
     ?REQUEST_TIMEOUT + ?REQUEST_TIMEOUT_FUDGE.
 
--spec collect(kz_json:object(), kz_term:pid_refs(), timeout(), integer()) ->
+-spec collect(kz_term:ne_binary(), kz_json:object(), kz_term:pid_refs(), timeout(), integer()) ->
           kz_json:object().
-collect(ACLs, [], _Timeout, 0) ->
+collect(_Master, ACLs, [], _Timeout, 0) ->
     lager:debug("acls built with ~p ms to spare", [_Timeout]),
     ACLs;
-collect(_ACLs, [], _Timeout, Errors) ->
+collect(_Master, _ACLs, [], _Timeout, Errors) ->
     throw(io_lib:format("got ~b error(s) collecting ACLs", [Errors]));
-collect(_ACLs, _PidRefs, Timeout, _Errors) when Timeout < 0 ->
+collect(_Master, _ACLs, _PidRefs, Timeout, _Errors) when Timeout < 0 ->
     throw("timed out waiting for ACLs");
-collect(ACLs, PidRefs, Timeout, Errors) ->
+collect(Master, ACLs, PidRefs, Timeout, Errors) ->
     Start = kz_time:start_time(),
 
     receive
         ?ACL_RESULT(ACLName, ACL) ->
-            lager:info("adding acl for '~s' to network list ~s"
-                      ,[ACLName, kzd_acls:network_list_name(ACL)]
-                      ),
-            collect(kz_json:set_value(ACLName, ACL, ACLs)
+            collect(Master
+                   ,process_collect_result(Master, ACLName, ACL, ACLs)
                    ,PidRefs
                    ,kz_time:decr_timeout(Timeout, Start)
                    ,Errors
                    );
         ?ACL_RESULT_MERGE(ACL) ->
             lager:info("merging acl"),
-            collect(kz_json:merge(ACL, ACLs)
+            collect(Master
+                   ,kz_json:merge(ACL, ACLs)
                    ,PidRefs
                    ,kz_time:decr_timeout(Timeout, Start)
                    ,Errors
                    );
         {'DOWN', Ref, 'process', Pid, Reason} ->
-            collect_continue(ACLs, PidRefs, Ref, Pid, Reason, kz_time:decr_timeout(Timeout, Start), Errors)
+            collect_continue(Master, ACLs, PidRefs, Ref, Pid, Reason, kz_time:decr_timeout(Timeout, Start), Errors)
     after Timeout ->
             throw("timed out collecting acls")
     end.
 
-collect_continue(ACLs, PidRefs, Ref, Pid, Reason, Timeout, Errors) ->
+process_collect_result(Master, ACLName, ACL, ACLs) ->
+    case kz_json:get_value(ACLName, ACLs) of
+        undefined -> process_collect_result_add_acl(ACLName, ACL, ACLs);
+        Existing -> process_collect_result_check_existing_acl(Master, ACLName, ACL, ACLs, Existing)
+    end.
+
+process_collect_result_add_acl(ACLName, ACL, ACLs) ->
+    NetworkName = kzd_acls:network_list_name(ACL),
+    lager:info("adding acl for '~s' to network list ~s", [ACLName, NetworkName]),
+    kz_json:set_value(ACLName, ACL, ACLs).
+
+process_collect_result_check_existing_acl(Master, ACLName, ACL, ACLs, Existing) ->
+    NewAccountId = kz_json:get_ne_binary_value(<<"account_id">>, ACL),
+    ExistingAccountId = kz_json:get_ne_binary_value(<<"account_id">>, Existing),
+    case NewAccountId =:= Master
+        orelse ExistingAccountId =/= Master
+    of
+        true -> process_collect_result_add_acl(ACLName, ACL, ACLs);
+        false -> ACLs
+    end.
+
+collect_continue(Master, ACLs, PidRefs, Ref, Pid, Reason, Timeout, Errors) ->
     case lists:keytake(Pid, 1, PidRefs) of
         'false' ->
-            collect(ACLs, PidRefs, Timeout, Errors);
+            collect(Master, ACLs, PidRefs, Timeout, Errors);
         {'value', {Pid, Ref}, NewPidRefs} ->
             lager:info("collect process ~p ended => ~p", [Pid, Reason]),
-            collect(ACLs, NewPidRefs, Timeout, collect_errors(Reason, Errors))
+            collect(Master, ACLs, NewPidRefs, Timeout, collect_errors(Reason, Errors))
     end.
 
 collect_errors('normal', Errors) -> Errors;
@@ -277,8 +299,10 @@ trusted_acl(K, V) ->
         'false' -> 'false';
         'true' ->
             {'ok', Master} = kapps_util:get_master_account_id(),
-            KVs = [{<<"account_id">>, kz_json:get_ne_binary_value(<<"account_id">>, V, Master)}
-                  ,{<<"authorizing_id">>, kz_json:get_ne_binary_value(<<"authorizing_id">>, V, kz_binary:rand_hex(16))}
+            AccountId = kz_json:get_ne_binary_value(<<"account_id">>, V, Master),
+            AuthorizingId = kz_json:get_ne_binary_value(<<"authorizing_id">>, V, AccountId),
+            KVs = [{<<"account_id">>, AccountId}
+                  ,{<<"authorizing_id">>, AuthorizingId}
                   ],
             JObj = kz_json:set_values(KVs, V),
             {'true', {K, JObj}}

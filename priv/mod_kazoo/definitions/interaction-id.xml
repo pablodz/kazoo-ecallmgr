@@ -1,7 +1,7 @@
 <definition name="interaction-id">
 	<filters>
-		<filter name="variable_Call-Interaction-ID" type="include" compare="exists"/>
+		<filter name="Call-Interaction-ID" type="include" compare="exists"/>
 	</filters>
-	<field name="variable_Call-Interaction-ID" as="Call-Interaction-ID" />
-	<field name="Call-Interaction-Is-Root" type="expand" value="${cond(${variable_Call-Interaction-ID} == ${variable_Original-Call-Interaction-ID} ? true : false)}" serialize-as="boolean"/>
+	<field name="Call-Interaction-ID" />
+	<field name="Call-Interaction-Is-Root" serialize-as="boolean"/>
 </definition>

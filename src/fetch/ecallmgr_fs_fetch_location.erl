@@ -62,7 +62,7 @@ endpoint(JObj) ->
 
 -spec location_not_found(map()) -> fs_handlecall_ret().
 location_not_found(#{fetch_id := FetchId, node := Node, payload := JObj} = Context) ->
-    {'ok', Xml} = ecallmgr_fs_xml:not_found(),
+    {'ok', Xml} = ecallmgr_fs_xml:not_found(<<"location">>),
     lager:debug("sending directory location (~s) not found XML to ~w for request ~s"
                ,[kzd_fetch:fetch_key_value(JObj), Node, FetchId]
                ),

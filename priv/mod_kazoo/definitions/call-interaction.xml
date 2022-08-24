@@ -1,10 +1,10 @@
 <definition name="call-interaction">
     <field name="Call-Interaction" type="static" serialize-as="object">
-       <fields>
-            <field name="variable_Call-Interaction-ID" as="Id" />
-            <field name="Key" type="expand" value="${regex(${variable_Call-Interaction-ID}|([^-]*)-(.*)|%2)}" />
-            <field name="Timestamp" type="expand" value="${regex(${variable_Call-Interaction-ID}|([^-]*)-(.*)|%1)}" serialize-as="number"/>
-			<field name="Is-Root" type="expand" value="${cond(${variable_Call-Interaction-ID} == ${variable_Original-Call-Interaction-ID} ? true : false)}" serialize-as="boolean"/>
-       </fields>
-    </field>
+    <fields>
+        <field name="Call-Interaction-ID" as="Id" />
+        <field name="Call-Interaction-Key" as="Key" />
+        <field name="Call-Interaction-Timestamp" as="Timestamp" serialize-as="number"/>
+        <field name="Call-Interaction-Is-Root" as="Is-Root" serialize-as="boolean"/>
+   </fields>
+</field>
 </definition>

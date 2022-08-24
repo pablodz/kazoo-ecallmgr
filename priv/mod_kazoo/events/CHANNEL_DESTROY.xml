@@ -12,6 +12,7 @@
 		<field name="transfer-history" type="reference" />
 		<field name="originated-legs" type="reference" />
 		<field name="fax_info" type="reference" />
+		<field name="call-interaction" type="reference" />
 	</fields>
 	<filters>
 		<!-- <filter name="variable_hangup_cause" type="exclude" compare="value"	value="CALL_REJECTED" /> -->

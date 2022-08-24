@@ -235,6 +235,8 @@ conference_profile_param({<<"extra-settings">>, JObj}, Acc) ->
 conference_profile_param({<<"conference-variables">>, JObj}, Acc) ->
     VariablesEls = variables_el([variable_el(K, V) || {K, V} <- kz_json:to_proplist(JObj)]),
     Acc ++ [VariablesEls];
+conference_profile_param({K, Array}, Acc) when is_list(Array) ->
+    [param_el(K, kz_term:to_binary(V)) || V <- Array] ++ Acc;
 conference_profile_param({K, V}, Acc) ->
     [param_el(K, kz_term:to_binary(V)) | Acc].
 
@@ -1727,7 +1729,7 @@ directory_resp_group_ep_xml(_Node, Endpoint, JObj) ->
                                Id = kz_json:get_ne_binary_value(<<"id">>, EP, <<"error">>),
                                Delay = kz_json:get_integer_value(<<"delay">>, EP, 0),
                                Timeout = kz_json:get_integer_value(<<"timeout">>, EP, 120),
-                               D = list_to_binary(["["
+                               D = list_to_binary(["["
                                                   ,"leg_delay_start=", kz_term:to_binary(Delay)
                                                   ,",leg_timeout=", kz_term:to_binary(Timeout)
                                                   ,"]",

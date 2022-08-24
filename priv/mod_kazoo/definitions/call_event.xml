@@ -1,6 +1,6 @@
 <definition name="call_event">
 	<field name="call_event_headers" type="reference" />
-	<field name="application-all" type="reference" />
+	<!--<field name="application-all" type="reference" />-->
 	<field name="call-direction" type="reference" />
 	<field name="channel-state" type="reference" />
 	<field name="caller-id" type="reference" />

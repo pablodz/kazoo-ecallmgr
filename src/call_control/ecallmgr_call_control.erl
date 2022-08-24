@@ -1229,6 +1229,8 @@ maybe_query_state(_Node, _CallId, 'nosession') ->
     {<<"DOWN">>, <<"DOWN">>};
 maybe_query_state(_Node, _CallId, 'timeout') ->
     {<<"DOWN">>, <<"DOWN">>};
+maybe_query_state(_Node, _CallId, <<"invalid session", _/binary>>) ->
+    {<<"DOWN">>, <<"DOWN">>};
 maybe_query_state(Node, CallId, _Error) ->
     query_state(Node, CallId).
 

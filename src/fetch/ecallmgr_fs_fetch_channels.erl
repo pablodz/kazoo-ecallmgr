@@ -169,5 +169,5 @@ try_channel_resp(#{node := Node, fetch_id := FetchId} = Context, Props) ->
 
 -spec channel_not_found(map()) -> 'ok'.
 channel_not_found(Context) ->
-    {'ok', Resp} = ecallmgr_fs_xml:not_found(),
+    {'ok', Resp} = ecallmgr_fs_xml:not_found(<<"channel">>),
     freeswitch:fetch_reply(Context#{reply => iolist_to_binary(Resp)}).

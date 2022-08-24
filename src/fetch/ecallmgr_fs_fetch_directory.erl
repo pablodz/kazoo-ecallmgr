@@ -79,7 +79,7 @@ lookup_directory(_EndpointId, _Realm, Context) ->
 
 -spec directory_not_found(map()) -> fs_handlecall_ret().
 directory_not_found(#{node := Node, fetch_id := FetchId} = Context) ->
-    {'ok', Xml} = ecallmgr_fs_xml:not_found(),
+    {'ok', Xml} = ecallmgr_fs_xml:not_found(<<"directory">>),
     lager:debug("sending directory not found XML to ~w as reply for ~s"
                ,[Node, FetchId]
                ),

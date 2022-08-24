@@ -2,8 +2,7 @@
 	<field name="Conference-Vars" type="static" serialize-as="object">
 		<fields>
 			<field name="Conference-" type="prefix" exclude-prefix="true" />
-			<field name="Account-ID" type="first-of"
-				value="Account-ID|Conference-Account-ID|variable_ecallmgr_Account-ID" />
+			<field name="Account-ID" type="first-of" value="Account-ID|Conference-Account-ID|variable_ecallmgr_Account-ID" />
 		</fields>
 	</field>
 </definition>

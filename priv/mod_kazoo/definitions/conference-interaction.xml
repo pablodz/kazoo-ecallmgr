@@ -2,8 +2,8 @@
     <field name="Call-Interaction" type="static" serialize-as="object">
        <fields>
             <field name="Conference-Interaction-ID" as="Id" />
-            <field name="Key" type="expand" value="${regex(${Conference-Interaction-ID}|([^-]*)-(.*)|%2)}" />
-            <field name="Timestamp" type="expand" value="${regex(${Conference-Interaction-ID}|([^-]*)-(.*)|%1)}" serialize-as="number"/>
+            <field name="Conference-Interaction-Key" as="Key" />
+            <field name="Conference-Interaction-Timestamp" as="Timestamp" serialize-as="number"/>
        </fields>
     </field>
 </definition>

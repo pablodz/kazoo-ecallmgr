@@ -269,11 +269,23 @@ publish_resp(JObj, BaseResps) ->
                        ,fun(P) -> kapi_conference:publish_dial_resp(kz_api:server_id(JObj), P) end
                        ).
 
+-spec publish_error(kapi_conference:doc(), kz_term:ne_binary(), kz_term:ne_binary()) -> 'ok'.
+publish_error(JObj, ConferenceId, Error) ->
+    Resp = [{<<"Msg-ID">>, kz_api:msg_id(JObj)}
+           ,{<<"Conference-ID">>, ConferenceId}
+           ,{<<"Error-Message">>, Error}
+           ,{<<"Request">>, kz_api:remove_defaults(JObj)}
+           | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+           ],
+    kapi_conference:publish_error(kz_api:server_id(JObj), Resp).
+
 -spec maybe_start_conference(kapi_conference:doc(), kz_term:ne_binary()) -> 'ok'.
 maybe_start_conference(JObj, ConferenceId) ->
     lager:info("conference ~s is not running yet", [ConferenceId]),
     case find_media_server(kz_json:get_ne_binary_value(<<"Target-Call-ID">>, JObj), kz_api:node(JObj)) of
-        'undefined' -> lager:info("no node found for the dial command, ignoring");
+        'undefined' ->
+            lager:info("no node found for the dial command, sending error"),
+            publish_error(JObj, ConferenceId, <<"no media servers available">>);
         MediaServer ->
             lager:info("starting conference ~s on ~s and dialing out", [ConferenceId, MediaServer]),
             exec_dial(MediaServer, ConferenceId, JObj)
@@ -344,5 +356,7 @@ query_cluster_for_call(CallId) ->
 
 -spec choose_random_media_server() -> atom().
 choose_random_media_server() ->
-    [Server|_] = kz_term:shuffle_list(ecallmgr_fs_nodes:connected()),
-    Server.
+    case ecallmgr_fs_nodes:connected() of
+        [] -> undefined;
+        Servers -> hd(kz_term:shuffle_list(Servers))
+    end.

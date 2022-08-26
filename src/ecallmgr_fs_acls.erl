@@ -293,6 +293,10 @@ collect_trusted_acls(Collector, Node) ->
     Collector ! ?ACL_RESULT_MERGE(ACLs),
     'ok'.
 
+-spec trusted_default_authorization_id() -> kz_term:ne_binary().
+trusted_default_authorization_id() ->
+    kapps_config:get_ne_binary(?APP_NAME, <<"trusted_authorizing_id">>, kz_binary:rand_hex(16)).
+
 -spec trusted_acl(kz_term:ne_binary(), kz_json:object()) -> boolean() | {'true', kz_json:object()}.
 trusted_acl(K, V) ->
     case filter_trusted_acl({K,V}) of
@@ -300,7 +304,7 @@ trusted_acl(K, V) ->
         'true' ->
             {'ok', Master} = kapps_util:get_master_account_id(),
             AccountId = kz_json:get_ne_binary_value(<<"account_id">>, V, Master),
-            AuthorizingId = kz_json:get_ne_binary_value(<<"authorizing_id">>, V, AccountId),
+            AuthorizingId = kz_json:get_ne_binary_value(<<"authorizing_id">>, V, trusted_default_authorization_id()),
             KVs = [{<<"account_id">>, AccountId}
                   ,{<<"authorizing_id">>, AuthorizingId}
                   ],

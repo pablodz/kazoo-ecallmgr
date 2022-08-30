@@ -1,6 +1,7 @@
 ---
 name: kazoo-application-ecallmgr
 base_branch: origin/master
+exposure: private
 metapackage:
   - name: meta-kazoo-applications
     type: required
@@ -21,5 +22,5 @@ package:
     group: Productivity/Telephony
     url: https://2600hz.org/
     vendor: 2600Hz
-    
-    
+
+

@@ -288,6 +288,11 @@
             "description": "ecallmgr publish channel reconnect",
             "type": "boolean"
         },
+        "quickroute_expiry_s": {
+            "default": 300,
+            "description": "ecallmgr quickroute_expiry_s",
+            "type": "integer"
+        },
         "record_sample_rate": {
             "default": 8000,
             "description": "ecallmgr record sample rate",

@@ -559,7 +559,7 @@
                              ,request => kapi_route:req()
                              ,route_resp_xml_fun => dialplan_xml_fun()
                              ,winner => dialplan_winner()
-                             ,blocked => boolean()
+                             ,blocked => boolean() %% whether call progress has been blocked
                              ,request_headers => kz_term:proplist()
                              }.
 

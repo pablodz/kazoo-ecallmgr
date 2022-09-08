@@ -374,7 +374,7 @@ handle_call_control(JObj) ->
         {<<"conference">>, <<"command">>} -> handle_conference_command(JObj);
         {_Category, _Event} ->
             lager:debug_unsafe("event ~s : ~s not handled : ~s"
-                              ,[_Category, _Event, kz_json:encode(JObj, ['pretty'])]
+                              ,[_Category, _Event, kz_json:encode(JObj)]
                               )
     end.
 
@@ -587,10 +587,10 @@ handle_execute_complete(_AppName, <<"null">>, _JObj, State) ->
     lager:debug_unsafe("ignoring ~s completion", [_AppName]),
     State;
 handle_execute_complete('undefined', _, _JObj, State) ->
-    %% lager:debug_unsafe("call control received undefined : ~s", [kz_json:encode(_JObj, ['pretty'])]),
+    %% lager:debug_unsafe("call control received undefined : ~s", [kz_json:encode(_JObj)]),
     State;
 handle_execute_complete(_, 'undefined', _JObj, State) ->
-    %% lager:debug_unsafe("call control received undefined : ~s", [kz_json:encode(_JObj, ['pretty'])]),
+    %% lager:debug_unsafe("call control received undefined : ~s", [kz_json:encode(_JObj)]),
     State;
 handle_execute_complete(_AppName, EventUUID, _JObj, #state{current_cmd_uuid='undefined'
                                                           ,event_uuids=EventUUIDs

@@ -40,7 +40,7 @@ publish_presence(#{call_id := UUID, payload := _JObj} = Ctx) ->
         'false' -> 'ok'
     end;
 publish_presence(#{payload := JObj}) ->
-    lager:debug_unsafe("PRESENCE NO CALLID ~s", [kz_json:encode(JObj, ['pretty'])]).
+    lager:debug_unsafe("PRESENCE NO CALLID ~s", [kz_json:encode(JObj)]).
 
 -spec check_proto(map()) -> boolean().
 check_proto(#{payload := JObj}) ->

@@ -107,7 +107,7 @@ set_conference_interaction_id(_Node, _JObj, 'false') -> 'ok';
 set_conference_interaction_id(Node, JObj, 'true') ->
     InteractionId = kzd_interaction:id(JObj),
     ConferenceId = kz_conference_event:conference_id(JObj),
-    Args = list_to_binary([ConferenceId, " set_var conference-interaction-id ", InteractionId]),
+    Args = list_to_binary([ConferenceId, " set_var Conference-Interaction-ID ", InteractionId]),
     kz_process:spawn(fun freeswitch:api/3, [Node, 'conference', Args]).
 
 -spec set_participant_interaction_id(atom(), kz_json:object()) -> 'ok' | pid().
@@ -119,5 +119,5 @@ set_participant_interaction_id(_Node, _JObj, 'false') -> 'ok';
 set_participant_interaction_id(Node, JObj, 'true') ->
     ConferenceId = kz_conference_event:conference_id(JObj),
     CallId = kz_conference_event:call_id(JObj),
-    Args = list_to_binary([CallId, " ", ?CALL_INTERACTION_ID, " ${conference(", ConferenceId, " get_var conference-interaction-id)}"]),
+    Args = list_to_binary([CallId, " ", ?CALL_INTERACTION_ID, " ${conference(", ConferenceId, " get_var Conference-Interaction-ID)}"]),
     kz_process:spawn(fun freeswitch:api/3, [Node, 'kz_uuid_setvar', Args]).

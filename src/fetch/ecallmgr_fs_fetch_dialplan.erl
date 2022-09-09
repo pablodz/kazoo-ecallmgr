@@ -48,7 +48,6 @@ dialplan(#{node := Node, fetch_id := FetchId, payload := FetchJObj}=Map) ->
     {'ok', kz_maps:exec(Routines, Map)}.
 
 init_kazoo(M) ->
-    lager:info("init KAZOO: ~p", [M]),
     M1 = M#{channel => kz_amqp_channel:consumer_channel()
            ,callback => fun process/1
            ,options => []
@@ -66,7 +65,6 @@ process(#{payload := FetchJObj, channel := Channel}=Map) ->
                ,fun is_quickrouted/1
                ,fun block_call_routines/1
                ,fun apply_formatters/1
-               ,fun timeout_reply/1
                ,fun maybe_authz/1
                ],
     maybe_expired(kz_maps:exec(Routines, Map)).
@@ -142,7 +140,7 @@ maybe_blocked(#{reply := #{payload := _Payload}}=Map) ->
     send_reply(Map);
 maybe_blocked(#{request := Request, request_headers := Headers}=Map) ->
     kapi_route:publish_req(Request, Headers),
-    wait_for_route_resp(add_time_marker(Map, 'request_sent')).
+    wait_for_route_resp(add_time_marker(timeout_reply(Map), 'request_sent')).
 
 -spec wait_for_route_resp(dialplan_context()) -> {'ok', dialplan_context()}.
 wait_for_route_resp(#{timeout := TimeoutMs, fetch_id := FetchId}=Map) ->

@@ -892,6 +892,8 @@ get_profile_params(JObj) ->
        ) ++ [{<<"Context">>, ?DEFAULT_FREESWITCH_CONTEXT}]).
 
 -spec get_profile_param(tuple(), kz_term:proplist()) -> kz_term:proplist().
+get_profile_param({<<"Endpoint-Tag-Rules">> = Key, Val}, Acc) ->
+    [{Key, kz_json:encode(Val)} | Acc];
 get_profile_param({Key, Val}, Acc) ->
     case lists:keyfind(Key, 1, ?CALLER_PROFILE_VARS) of
         'false' -> [{Key, Val} | Acc];
@@ -899,6 +901,8 @@ get_profile_param({Key, Val}, Acc) ->
     end.
 
 -spec get_profile_vars_fold(kz_json:key(), kz_json:json_term(), iolist()) -> iolist().
+get_profile_vars_fold(<<"Endpoint-Tag-Rules">> = Key, Val, Acc) ->
+    [list_to_binary([Key, "='", kz_json:encode(Val), "'"]) | Acc];
 get_profile_vars_fold(K, V, Acc) ->
     case lists:keyfind(K, 1, ?CALLER_PROFILE_VARS) of
         'false' ->

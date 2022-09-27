@@ -17,7 +17,6 @@
 
 -include("ecallmgr.hrl").
 
-
 -define(MEMBER_UPDATE_EVENTS, [<<"stop-talking">>
                               ,<<"start-talking">>
                               ,<<"mute-member">>

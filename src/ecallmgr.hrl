@@ -137,6 +137,7 @@
                     ,origin_node :: atom() | '_'
                     ,control_node :: atom() | '_'
                     ,interaction_id :: kz_term:api_binary() | '_'
+                    ,custom_conference_vars :: kz_term:api_object() | '_'
                     }).
 
 -type conference() :: #conference{}.

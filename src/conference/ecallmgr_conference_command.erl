@@ -12,9 +12,14 @@
 
 -export([exec_cmd/3
         ,dial/4
+        ,maybe_notify_participant/1
         ]).
 
 -include("ecallmgr.hrl").
+
+-define(SHOULD_NOTIFY_PARTICIPANTS
+       ,kapps_config:is_true(?APP_NAME, <<"should_notify_participants">>, 'false')
+       ).
 
 -type api_response() :: 'ok' |
                         'error' |
@@ -30,6 +35,7 @@ exec_cmd(Node, ConferenceId, JObj, ConferenceId) ->
     App = kz_json:get_value(<<"Application-Name">>, JObj),
     case get_conf_command(App, ConferenceId, JObj) of
         {'error', Msg} -> throw({'msg', Msg});
+        {_Cmd, 'noop'} -> 'ok';
         {_, _}=Cmd -> api(Node, ConferenceId, Cmd)
     end;
 exec_cmd(_Node, _ConferenceId, JObj, _DestId) ->
@@ -256,9 +262,101 @@ get_conf_command(<<"participant_volume_out">>, _ConferenceId, JObj) ->
             {<<"volume_out">>, Args}
     end;
 
+get_conf_command(<<"vars">>, ConferenceId, JObj) ->
+    case kapi_conference:vars_v(JObj) of
+        'false' ->
+            {'error', <<"conference custom_application_vars failed to execute as JObj did not validate.">>};
+        'true' ->
+            _ = update_conference_vars(ConferenceId, JObj),
+            {<<"vars">>, 'noop'}
+    end;
+
 get_conf_command(Cmd, _ConferenceId, _JObj) ->
     lager:debug("unknown conference command ~s", [Cmd]),
     {'error', list_to_binary([<<"unknown conference command: ">>, Cmd])}.
+
+
+custom_conference_vars(ConferenceId) ->
+    case ecallmgr_fs_conferences:conference(ConferenceId) of
+        {'ok', #conference{uuid=InstanceId
+                          ,custom_conference_vars=Vars
+                          }
+        } ->
+            {'ok', InstanceId, Vars};
+        {'error', 'not_found'}=Error -> Error
+    end.
+
+update_conference_vars(ConferenceId, JObj) ->
+    case custom_conference_vars(ConferenceId) of
+        {'ok', InstanceId, Vars} ->
+            update_conference_vars(ConferenceId, JObj, InstanceId, Vars);
+        {'error', 'not_found'} ->
+            lager:info("failed to find conference by name ~s", [ConferenceId]),
+            {'error', <<"conference not found">>}
+    end.
+
+update_conference_vars(ConferenceId, JObj, InstanceId, Vars) ->
+    NewVars = kz_json:get_json_value(<<"Custom-Conference-Vars">>, JObj, kz_json:new()),
+    Update = kz_json:merge(Vars, NewVars),
+
+    ecallmgr_fs_conferences:update(InstanceId
+                                  ,{#conference.custom_conference_vars
+                                   ,Update
+                                   }),
+    lager:info("updated conference ~s(~s) vars", [ConferenceId, InstanceId]),
+    maybe_send_notify(ConferenceId, Update, ?SHOULD_NOTIFY_PARTICIPANTS).
+
+maybe_send_notify(_ConferenceId, _Vars, 'false') -> 'ok';
+maybe_send_notify(ConferenceId, Vars, 'true') ->
+    NotifyJObj = vars_to_notify_jobj(Vars),
+    _Sent = [maybe_notify_participant(Participant, NotifyJObj)
+             || Participant <- ecallmgr_fs_conferences:participants(ConferenceId)
+            ],
+    'ok'.
+
+vars_to_notify_jobj(Vars) ->
+    case header_vars(Vars) of
+        'undefined' -> 'undefined';
+        HeaderValue ->
+            kz_json:from_list([{<<"Custom-SIP-Headers">>
+                               ,kz_json:from_list([{<<"X-Conference-Vars">>, HeaderValue}])
+                               }
+                              ,{<<"Event">>, <<"conference-vars">>}
+                              ]
+                             )
+    end.
+
+header_vars(Vars) ->
+    case kz_binary:join(kz_json:foldr(fun encode_kv/3, [], Vars)
+                       ,<<";">>
+                       )
+    of
+        <<>> -> 'undefined';
+        HeaderVars -> HeaderVars
+    end.
+
+-spec maybe_notify_participant(participant()) -> 'ok' | {'error', 'not_found'}.
+maybe_notify_participant(Participant) ->
+    maybe_notify_participant(Participant, ?SHOULD_NOTIFY_PARTICIPANTS).
+
+maybe_notify_participant(#participant{}, 'false') -> 'ok';
+maybe_notify_participant(#participant{}, 'undefined') -> 'ok';
+maybe_notify_participant(#participant{conference_name=ConferenceId}=Participant, 'true') ->
+    case custom_conference_vars(ConferenceId) of
+        {'ok', _InstanceId, Vars} ->
+            maybe_notify_participant(Participant, vars_to_notify_jobj(Vars));
+        {'error', 'not_found'}=Error -> Error
+    end;
+maybe_notify_participant(#participant{uuid=CallId}, NotifyJObj) ->
+    case ets:lookup(?CHANNELS_TBL, CallId) of
+        [] -> {'error', <<"No channel found">>};
+        [#channel{username=Username
+                 ,realm=Realm
+                 }
+        ] ->
+            ecallmgr_fs_notify:maybe_send_notify(Username, Realm, NotifyJObj),
+            'ok'
+    end.
 
 -spec dial(atom(), kz_term:ne_binary(), kz_json:object(), kz_json:object() | kz_json:objects()) ->
           api_response().
@@ -283,3 +381,5 @@ caller_id('undefined', 'undefined') -> "";
 caller_id('undefined', Name) -> [" ", $',$', " ", $', Name, $'];
 caller_id(Number, 'undefined') -> [" ", Number];
 caller_id(Number, Name) -> [" ", Number, " ", $', Name, $'].
+
+encode_kv(K, V, Acc) -> [<<K/binary, "=", V/binary>> | Acc].

@@ -24,6 +24,7 @@
 -export([update/2]).
 -export([destroy/1]).
 -export([conference/1]).
+-export([conference_ccvs/1]).
 -export([node/1]).
 -export([participants/1]).
 -export([participants_to_json/1]).
@@ -156,8 +157,20 @@ conference(UUID) ->
         %%     {'error', 'multiple_conferences'
         %%      ,[Node || #conference{node=Node} <- Conferences]
         %%     };
-        _ -> {'error', 'not_found'}
+        _ ->
+            case ets:match_object(?CONFERENCES_TBL, #conference{name=UUID, _='_'}) of
+                [#conference{}=Conference|_] -> {'ok', Conference};
+                _ -> {'error', 'not_found'}
+            end
     end.
+
+-spec conference_ccvs(conference() | kz_term:proplist() | kz_json:object()) -> kz_term:proplist().
+conference_ccvs(#conference{custom_conference_vars='undefined'}) -> [];
+conference_ccvs(#conference{custom_conference_vars=CCVs}) -> kz_json:to_proplist(CCVs);
+conference_ccvs([_|_]=Props) ->
+    kz_json:to_proplist(props:get_value(<<"custom_conference_vars">>, Props, kz_json:new()));
+conference_ccvs(JObj) ->
+    kz_json:to_proplist(<<"Custom-Conference-Vars">>, JObj).
 
 -spec participants(conference() | kz_term:ne_binary()) -> participants().
 participants(#conference{name=Name}) -> participants(Name);
@@ -171,7 +184,9 @@ participants_to_json(Participants) ->
 
 -spec participant_create(kz_evt_freeswitch:payload(), atom()) -> participant().
 participant_create(Props, Node) ->
-    gen_server:call(?SERVER, {'participant_create', Props, Node}).
+    Participant = gen_server:call(?SERVER, {'participant_create', Props, Node}),
+    _ = ecallmgr_conference_command:maybe_notify_participant(Participant),
+    Participant.
 
 -spec participant_update(kz_term:ne_binary(), kz_term:proplist()) -> 'ok'.
 participant_update(CallId, Update) ->
@@ -208,33 +223,15 @@ handle_search_conference(JObj, _Props, Name) ->
     lager:info("received search request for conference name ~s", [Name]),
     case ets:match_object(?CONFERENCES_TBL, #conference{name=Name, _ = '_'}) of
         %% TODO: this ignores conferences on multiple nodes until big-conferences
-        [#conference{uuid=UUID
-                    ,start_time=StartTime
-                    ,locked=Locked
-                    ,switch_hostname=Hostname
-                    ,switch_url=SwitchURL
-                    ,switch_external_ip=ExternalIP
-                    ,interaction_id=InteractionId
-                    }
-        | _Conferences
-        ] ->
+        [#conference{}=Conference | _Conferences] ->
+            {Name, ConfResp} = conference_resp(Conference),
             lager:debug("sending affirmative search response for conference ~s", [Name]),
-            Participants = participants(Name),
-            Resp = [{<<"Conference-ID">>, Name}
-                   ,{<<"Locked">>, Locked}
-                   ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
-                   ,{<<"Participant-Count">>, length(Participants)}
-                   ,{<<"Participants">>, participants_to_json(Participants)}
-                   ,{<<"Run-Time">>, kz_time:now_s() - StartTime}
-                   ,{<<"Start-Time">>, StartTime}
-                   ,{<<"Switch-External-IP">>, ExternalIP}
-                   ,{<<"Switch-Hostname">>, Hostname}
-                   ,{<<"Switch-URL">>, SwitchURL}
-                   ,{<<"UUID">>, UUID}
-                   ,{<<"Zone">>, kz_config:zone('binary')}
-                   ,{<<?CALL_INTERACTION_ID>>, InteractionId}
-                   | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
-                   ],
+
+            Resp = kz_json:set_values([{<<"Msg-ID">>, kz_api:msg_id(JObj)}
+                                      | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+                                      ]
+                                     ,ConfResp
+                                     ),
             kapi_conference:publish_search_resp(kz_api:server_id(JObj), Resp);
         [] ->
             lager:debug("sending error search response, conference not found"),
@@ -280,19 +277,24 @@ conference_resp(#conference{uuid=UUID
                            ,switch_url=SwitchURL
                            ,switch_external_ip=ExternalIP
                            ,interaction_id=InteractionId
+                           ,custom_conference_vars=ConfVars
                            }) ->
     Participants = participants(Name),
     {Moderators, Members} = lists:partition(fun is_moderator/1, Participants),
-    Resp = [{<<"UUID">>, UUID}
+    Resp = [{<<"Conference-ID">>, Name}
+           ,{<<"Custom-Conference-Vars">>, ConfVars}
+           ,{<<"Locked">>, Locked}
+           ,{<<"Members">>, length(Members)}
+           ,{<<"Moderators">>, length(Moderators)}
+           ,{<<"Participant-Count">>, length(Participants)}
+           ,{<<"Participants">>, participants_to_json(Participants)}
            ,{<<"Run-Time">>, kz_time:now_s() - StartTime}
            ,{<<"Start-Time">>, StartTime}
-           ,{<<"Is-Locked">>, Locked}
+           ,{<<"Switch-External-IP">>, ExternalIP}
            ,{<<"Switch-Hostname">>, Hostname}
            ,{<<"Switch-URL">>, SwitchURL}
-           ,{<<"Switch-External-IP">>, ExternalIP}
-           ,{<<"Participant-Count">>, length(Participants)}
-           ,{<<"Moderators">>, length(Moderators)}
-           ,{<<"Members">>, length(Members)}
+           ,{<<"UUID">>, UUID}
+           ,{<<"Zone">>, kz_config:zone('binary')}
            ,{<<?CALL_INTERACTION_ID>>, InteractionId}
            ],
     {Name, kz_json:from_list(Resp)}.
@@ -491,6 +493,7 @@ conference_to_props(#conference{name=Name
                                ,account_id=AccountId
                                ,locked=Locked
                                ,handling_locally=IsLocal
+                               ,custom_conference_vars=CCVs
                                }) ->
     props:filter_undefined(
       [{<<"Name">>, Name}
@@ -512,6 +515,7 @@ conference_to_props(#conference{name=Name
       ,{<<"Account-ID">>, AccountId}
       ,{<<"Locked">>, Locked}
       ,{<<"Is-Local">>, IsLocal}
+      ,{<<"Custom-Conference-Vars">>, CCVs}
       ]).
 
 -spec list_conferences(atom()) -> conferences() | participants().
@@ -753,6 +757,12 @@ print_details({[#conference{name=Name}=Conference]
     _ = [io:format("~-19s: ~s~n", [K, kz_term:to_binary(V)])
          || {K, V} <- conference_to_props(Conference)
         ],
+    _ = case conference_ccvs(Conference) of
+            [] -> io:format("Vars               : 0~n");
+            CCVs ->
+                io:format("CCVs               : ~B", [length(CCVs)]),
+                print_custom_conference_vars(CCVs)
+        end,
     _ = case participants(Name) of
             [] -> io:format("Participants       : 0~n");
             Participants ->
@@ -760,6 +770,11 @@ print_details({[#conference{name=Name}=Conference]
                 print_participant_details(Participants)
         end,
     print_details(ets:select(Continuation), Count + 1).
+
+print_custom_conference_vars([]) -> io:format("~n");
+print_custom_conference_vars([{K, V} | CCVs]) ->
+    io:format("~n    [~s] ~-52s:", [K, V]),
+    print_custom_conference_vars(CCVs).
 
 print_participant_details([]) -> io:format("~n");
 print_participant_details([#participant{uuid=UUID
@@ -799,6 +814,7 @@ conference_from_jobj(JObj, Node, Conference) ->
                          ,origin_node = CtrlNode
                          ,control_node = CtrlNode
                          ,interaction_id = kzd_interaction:id(JObj)
+                         ,custom_conference_vars = kz_json:new()
                          }.
 
 -spec switch_url(atom(), kz_json:object()) -> kz_term:ne_binary().

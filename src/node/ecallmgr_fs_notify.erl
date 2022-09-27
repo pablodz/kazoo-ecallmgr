@@ -13,7 +13,9 @@
 -behaviour(gen_listener).
 
 -export([start_link/1, start_link/2]).
--export([maybe_presence_probe/2]).
+-export([maybe_presence_probe/2
+        ,maybe_send_notify/3
+        ]).
 -export([notify_api/2, notify/3]).
 -export([mwi_update/2]).
 -export([register_overwrite/2]).
@@ -154,7 +156,7 @@ maybe_send_notify(Username, Realm, JObj) ->
 -spec send_notify(atom(), kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object(), kz_term:ne_binary()) -> 'ok'.
 send_notify(Node, Username, Realm, JObj, Contact) ->
     AOR = To = From = kzsip_uri:ruri(#uri{user=Username, domain=Realm}),
-    SIPHeaders = notify_x_headers(AOR),
+    SIPHeaders = notify_x_headers(AOR, JObj),
     Event = kz_json:get_ne_binary_value(<<"Event">>, JObj),
     Body = kz_json:get_ne_binary_value(<<"Body">>, JObj),
     ContentType = kz_json:get_ne_binary_value(<<"Content-Type">>, JObj),
@@ -165,12 +167,14 @@ send_notify(Node, Username, Realm, JObj, Contact) ->
                 ,{<<"event-string">>, Event}
                 ,{<<"extra-headers">>, SIPHeaders}
                 ,{<<"from-uri">>, From}
-                ,{<<"profile">>, <<?DEFAULT_FS_PROFILE>>}
+                ,{<<"profile">>, kz_json:get_ne_binary_value(<<"Profile">>, JObj, <<?DEFAULT_FS_PROFILE>>)}
                 ,{<<"to-uri">>, To}
                 ]),
+    lager:info("sendevent ~p", [Headers]),
     Resp = freeswitch:sendevent(Node, 'NOTIFY', Headers),
-    lager:info("send NOTIFY with Event '~s' (has body? ~w) to '~s@~s' via ~s: ~p"
-              ,[Event, (Body =/= 'undefined'), Username, Realm, Node, Resp]).
+    lager:info("send NOTIFY with Event '~s' (has body? ~w) to '~s@~s' via ~s (contact ~s): ~p"
+              ,[Event, (Body =/= 'undefined'), Username, Realm, Node, Contact, Resp]
+              ).
 
 -spec mwi_update(kz_json:object(), kz_term:proplist()) -> no_return().
 mwi_update(JObj, Props) ->
@@ -208,7 +212,7 @@ send_mwi_update(JObj, Username, Realm, Node, Registration) ->
         'undefined' ->
             lager:error("invalid contact : ~p : ~p", [RegistrationContact, Registration]);
         Contact ->
-            SIPHeaders = notify_x_headers(ToAccount),
+            SIPHeaders = notify_x_headers(ToAccount, JObj),
             Headers = [{<<"profile">>, <<?DEFAULT_FS_PROFILE>>}
                       ,{<<"contact-uri">>, Contact}
                       ,{<<"extra-headers">>, SIPHeaders}
@@ -359,9 +363,21 @@ code_change(_OldVsn, State, _Extra) ->
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
-notify_x_headers(AOR) ->
-    SIPHeaders = [<<"X-KAZOO-AOR: ", AOR/binary>>
+notify_x_headers(AOR, JObj) ->
+    CSHs = kz_json:get_json_value(<<"Custom-SIP-Headers">>, JObj, kz_json:new()),
+
+    AORHeaders = [<<"X-KAZOO-AOR: ", AOR/binary>>
                  ,<<"X-KAZOO-INVITE-FORMAT: username">>
                  ,<<>>
                  ],
+
+    SIPHeaders = kz_json:foldl(fun csh_to_header/3, AORHeaders, CSHs),
+
     kz_binary:join(SIPHeaders, <<"\r\n">>).
+
+csh_to_header(<<"X-", _/binary>>=Key, Value, Headers) ->
+    [<<Key/binary, ": ", Value/binary>> | Headers];
+csh_to_header(<<"x-", _/binary>>=Key, Value, Headers) ->
+    [<<Key/binary, ": ", Value/binary>> | Headers];
+csh_to_header(Key, Value, Headers) ->
+    [<<"X-", Key/binary, ": ", Value/binary>> | Headers].

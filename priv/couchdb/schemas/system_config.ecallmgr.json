@@ -338,6 +338,11 @@
             "description": "ecallmgr should detect inband dtmf",
             "type": "boolean"
         },
+        "should_notify_participants": {
+            "default": false,
+            "description": "Should KAZOO send SIP NOTIFY packets to conference participants with custom conference variables",
+            "type": "boolean"
+        },
         "sofia_conf": {
             "default": false,
             "description": "ecallmgr sofia conf",

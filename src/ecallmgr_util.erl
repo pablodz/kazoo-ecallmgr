@@ -554,7 +554,7 @@ process_fs_kv(UUID, [K|KVs], 'unset'=Action)
                ).
 
 process_fs_kv_fold(UUID, {K, V}, Action, Acc) ->
-    [format_fs_kv(K, V, UUID, Action) | Acc];
+    format_fs_kv(K, V, UUID, Action) ++ Acc;
 process_fs_kv_fold(_UUID, K, 'unset', Acc)
   when is_binary(K) ->
     Key = get_fs_key(K),

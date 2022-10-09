@@ -17,10 +17,18 @@
 
 	<field name="Channel-Presence-ID" />
 	<field name="Member-ID" as="Participant-ID" serialize-as="number" />
-	<field name="Custom-Channel-Vars" type="reference" />
+	<field name="Custom-Channel-Vars" type="reference">
+		<filters>
+			<filter name="ecallmgr" type="include" compare="prefixes" value="ecallmgr_|variable_ecallmgr_" />
+		</filters>
+	</field>
 	<field name="Custom-Application-Vars" type="reference" />
 	<field name="conference-vars" type="reference" />
-	<field name="conference-channel-vars" type="reference" />
+	<field name="conference-channel-vars" type="reference">
+		<filters>
+			<filter name="Member-ID" type="include"  />
+		</filters>
+	</field>
 	<field name="conference-bgdial" type="reference" />
 	<field name="call-interaction" type="reference">
 		<filters>

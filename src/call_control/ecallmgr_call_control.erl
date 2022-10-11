@@ -1243,7 +1243,7 @@ query_state(Node, CallId) ->
                          ,"|"
                          ,"\\${regex(\\${Channel-State}|CS_(.*)|%1)}"
                          ]),
-    case freeswitch:api(Node, 'eval', API) of
+    case freeswitch:api(Node, 'kz_expand', API) of
         {'ok', <<"|">>} ->
             {<<"DOWN">>, <<"DOWN">>};
         {'ok', Reply} ->

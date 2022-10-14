@@ -40,23 +40,93 @@ init() ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec fetch_directory(map()) -> fs_handlecall_ret().
-fetch_directory(#{node := Node, fetch_id := FetchId, payload := JObj}=Context) ->
+fetch_directory(#{fetch_id := FetchId, payload := JObj}=Context) ->
     kz_log:put_callid(JObj),
-    lager:debug("received directory ~s fetch request ~s from ~s"
-               ,[kzd_fetch:fetch_action(JObj, <<"sip_auth">>), FetchId, Node]
-               ),
-
-    case kzd_fetch:fetch_action(JObj, <<"sip_auth">>) of
+    FetchAction = kzd_fetch:fetch_action(JObj, <<"sip_auth">>),
+    log_directory_fetch(FetchAction, Context),
+    case FetchAction of
         <<"sip_auth">> -> lookup_directory(Context);
         <<"sip_auth_token">> -> validate_token(Context);
         <<"jsonrpc-authenticate">> -> validate_rpc_token(Context);
         <<"user_call">> -> lookup_registrar(Context);
         <<"group_call">> -> lookup_directory(kzd_fetch:fetch_group(JObj), Context);
         _Other ->
-            lager:debug("unhandled action '~s' in request ~s"
+            lager:error("unhandled action '~s' in request ~s"
                        ,[_Other, FetchId]
                        ),
             directory_not_found(Context)
+    end.
+
+-spec log_directory_fetch(kz_term:ne_binary(), map()) -> 'ok'.
+log_directory_fetch(FetchAction, #{node := Node, fetch_id := FetchId} = Context) ->
+    lager:info("received ~s fetch from ~s for request ~s"
+              ,[FetchAction, Node, FetchId]
+              ),
+    log_directory_cauth_details(FetchAction, Context).
+
+-spec log_directory_cauth_details(kz_term:ne_binary(), map()) -> 'ok'.
+log_directory_cauth_details(FetchAction, #{fetch_id := FetchId} = Context) ->
+    Routines = [fun maybe_log_directory_cauth_ip/2
+               ,fun maybe_log_directory_cauth_port/2
+               ,fun maybe_log_directory_cauth_from_user/2
+               ,fun maybe_log_directory_cauth_uri/2
+               ,fun maybe_log_directory_cauth_token/2
+               ],
+    Log = lists:foldl(fun(F, Log) ->
+                              case F(FetchAction, Context) of
+                                  'undefined' -> Log;
+                                  Details -> <<Log/binary, Details/binary>>
+                              end
+                      end
+                     ,<<>>
+                     ,Routines
+                     ),
+    case kz_term:is_empty(Log) of
+        'true' -> 'ok';
+        'false' ->
+            lager:debug("authorization~s for request ~s~n"
+                       ,[Log, FetchId]
+                       )
+    end.
+
+-spec maybe_log_directory_cauth_ip(kz_term:ne_binary(), map()) -> kz_term:api_ne_binary().
+maybe_log_directory_cauth_ip(_FetchAction, #{payload := JObj}) ->
+    case kz_json:get_ne_binary_value(<<"IP">>, kzd_fetch:cauth(JObj)) of
+        'undefined' -> 'undefined';
+        IP -> <<" ip ", IP/binary>>
+    end.
+
+-spec maybe_log_directory_cauth_port(kz_term:ne_binary(), map()) -> kz_term:api_ne_binary().
+maybe_log_directory_cauth_port(_FetchAction, #{payload := JObj}) ->
+    case kz_json:get_ne_binary_value(<<"PORT">>, kzd_fetch:cauth(JObj)) of
+        'undefined' -> 'undefined';
+        Port -> <<":", Port/binary>>
+    end.
+
+-spec maybe_log_directory_cauth_from_user(kz_term:ne_binary(), map()) -> kz_term:api_ne_binary().
+maybe_log_directory_cauth_from_user(_FetchAction, #{payload := JObj}) ->
+    case kz_json:get_ne_binary_value(<<"From-User">>, kzd_fetch:cauth(JObj)) of
+        'undefined' -> 'undefined';
+        User -> <<" from ", User/binary>>
+    end.
+
+-spec maybe_log_directory_cauth_uri(kz_term:ne_binary(), map()) -> kz_term:api_ne_binary().
+maybe_log_directory_cauth_uri(_FetchAction, #{payload := JObj}) ->
+    CAuth = kzd_fetch:cauth(JObj),
+    User = kz_json:get_ne_binary_value(<<"URI-User">>, CAuth),
+    Realm = kz_json:get_ne_binary_value(<<"URI-Realm">>, CAuth),
+    case {User, Realm} of
+        {'undefined', 'undefined'} -> 'undefined';
+        {'undefined', Realm} -> <<" to ", Realm/binary>>;
+        {User, 'undefined'} -> <<" to ", User/binary>>;
+        {User, Realm} -> <<" to ", User/binary, "@", Realm/binary>>
+    end.
+
+-spec maybe_log_directory_cauth_token(kz_term:ne_binary(), map()) -> kz_term:api_ne_binary().
+maybe_log_directory_cauth_token(_FetchAction, #{payload := JObj}) ->
+    case kz_json:get_ne_binary_value(<<"Token">>, kzd_fetch:cauth(JObj)) of
+        'undefined' -> 'undefined';
+        Token -> <<" with token ", Token/binary>>
     end.
 
 -spec lookup_directory(map()) -> fs_handlecall_ret().
@@ -68,27 +138,40 @@ lookup_directory(EndpointId, #{payload := JObj} = Context) ->
     lookup_directory(EndpointId, kzd_fetch:fetch_key_value(JObj), Context).
 
 -spec lookup_directory(kz_term:api_ne_binary(), kz_term:api_ne_binary(), map()) -> fs_handlecall_ret().
-lookup_directory('undefined', _AccountId, Context) ->
+lookup_directory('undefined', _AccountId, #{fetch_id := FetchId} = Context) ->
+    lager:info("directory lookup unable to progress because the endpoint id is not present for request ~s"
+              ,[FetchId]
+              ),
     directory_not_found(Context);
-lookup_directory(_EndpointId, 'undefined', Context) ->
+lookup_directory(_EndpointId, 'undefined', #{fetch_id := FetchId} = Context) ->
+    lager:info("directory lookup unable to progress because the account id is not present for request ~s"
+              ,[FetchId]
+              ),
     directory_not_found(Context);
 lookup_directory(EndpointId, ?MATCH_ACCOUNT_RAW(AccountId), Context) ->
     fetch_directory(EndpointId, AccountId, Context);
-lookup_directory(_EndpointId, _Realm, Context) ->
+lookup_directory(_EndpointId, _AccountId, #{fetch_id := FetchId} = Context) ->
+    lager:info("directory lookup unable to progress because the account id ~s is not a 32 byte UUID for request ~s"
+              ,[_AccountId, FetchId]
+              ),
     directory_not_found(Context).
 
 -spec directory_not_found(map()) -> fs_handlecall_ret().
 directory_not_found(#{node := Node, fetch_id := FetchId} = Context) ->
     {'ok', Xml} = ecallmgr_fs_xml:not_found(<<"directory">>),
-    lager:debug("sending directory not found XML to ~w as reply for ~s"
-               ,[Node, FetchId]
-               ),
+    lager:warning("sending directory not found to ~w as reply for request ~s"
+                 ,[Node, FetchId]
+                 ),
     freeswitch:fetch_reply(Context#{reply => iolist_to_binary(Xml)}).
 
 -spec validate_token(map()) -> fs_handlecall_ret().
-validate_token(#{payload := JObj}=Context) ->
+validate_token(#{fetch_id := FetchId, payload := JObj}=Context) ->
     case kz_json:get_ne_binary_value(<<"JWT-Token">>, kzd_fetch:cauth(JObj)) of
-        'undefined' -> directory_not_found(Context);
+        'undefined' ->
+            lager:info("directory lookup unable to progress because the JWT token was not present on request ~s"
+                      ,[FetchId]
+                      ),
+            directory_not_found(Context);
         Token -> validate_token(Context#{auth_token => Token}, kz_auth:validate_token(Token))
     end.
 
@@ -96,9 +179,9 @@ validate_token(#{payload := JObj}=Context) ->
 
 -spec validate_token(map(), validate_token_result()) -> fs_handlecall_ret().
 validate_token(#{fetch_id := FetchId}=Context, {'error', Error}) ->
-    lager:warning("fetch request ~s has an invalid token : ~s"
-                 ,[FetchId, Error]
-                 ),
+    lager:info("fetch request ~s has an invalid token: ~s"
+              ,[FetchId, Error]
+              ),
     directory_not_found(Context);
 validate_token(#{payload := JObj, auth_token := Token} = Context, {'ok', Claims}) ->
     Sub = kz_json:get_ne_binary_value(<<"sub">>, Claims),
@@ -114,9 +197,13 @@ validate_token(#{payload := JObj, auth_token := Token} = Context, {'ok', Claims}
     fetch_directory(EndpointId, AccountId, Ctx, Options).
 
 -spec validate_rpc_token(map()) -> fs_handlecall_ret().
-validate_rpc_token(#{payload := JObj}=Context) ->
+validate_rpc_token(#{fetch_id := FetchId, payload := JObj}=Context) ->
     case kz_json:get_ne_binary_value(<<"Token">>, kzd_fetch:cauth(JObj)) of
-        'undefined' -> directory_not_found(Context);
+        'undefined' ->
+            lager:info("directory lookup unable to progress because the RPC token was invalid on request ~s"
+                      ,[FetchId]
+                      ),
+            directory_not_found(Context);
         Token -> validate_rpc_token(Context, kz_auth:validate_token(Token))
     end.
 
@@ -124,9 +211,9 @@ validate_rpc_token(#{payload := JObj}=Context) ->
 
 -spec validate_rpc_token(map(), validate_rpc_token_result()) -> fs_handlecall_ret().
 validate_rpc_token(#{fetch_id := FetchId}=Context, {'error', Error}) ->
-    lager:warning("fetch request ~s has an invalid token : ~s"
-                 ,[FetchId, Error]
-                 ),
+    lager:info("fetch request ~s has an invalid token: ~p"
+              ,[FetchId, Error]
+              ),
     directory_not_found(Context);
 validate_rpc_token(#{payload := JObj} = Context, {'ok', Claims}) ->
     AccountId = kz_json:get_ne_binary_value(<<"account_id">>, Claims),
@@ -158,22 +245,22 @@ fetch_directory(EndpointId, AccountId, Context) ->
 
 fetch_directory(EndpointId, AccountId, #{payload := JObj, node := Node, fetch_id := FetchId} = Context, Options) ->
     Opts = props:set_values(Options, fetch_options(Context)),
-    lager:debug("fetching directory for ~s : ~s for request ~s"
-               ,[EndpointId, AccountId, FetchId]
-               ),
     case kz_directory:lookup(EndpointId, AccountId, Opts) of
         {'ok', Endpoint} ->
+            lager:debug("found profile ~s@~s for request ~s"
+                       ,[EndpointId, AccountId, FetchId]
+                       ),
             {'ok', Xml} = ecallmgr_fs_xml:directory_resp_endpoint_xml(Node, Endpoint, JObj),
             send_reply(Context#{reply => iolist_to_binary(Xml)});
         {'error', _Err} ->
-            lager:debug("error getting profile for ~s@~s for request ~s : ~p"
-                       ,[EndpointId, AccountId, FetchId, _Err]
-                       ),
+            lager:notice("unable to get profile ~s@~s for request ~s: ~p"
+                        ,[EndpointId, AccountId, FetchId, _Err]
+                        ),
             directory_not_found(Context)
     end.
 
 send_reply(#{node := Node, fetch_id := FetchId} = Context) ->
-    lager:debug("sending directory fetch reply for ~w ~s"
+    lager:debug("sending directory fetch reply to ~w for request ~s"
                ,[Node, FetchId]
                ),
     freeswitch:fetch_reply(Context).
@@ -190,11 +277,16 @@ lookup_registrar(#{payload := JObj}=Context) ->
                     ,AccountId
                     ).
 
-lookup_registrar(Context, EndpointId, AccountId) ->
-    lager:debug("lookup registration for endpoint: ~s / ~s", [EndpointId, AccountId]),
+lookup_registrar(#{fetch_id := FetchId} = Context, EndpointId, AccountId) ->
     case ecallmgr_registrar:lookup_endpoint(EndpointId, AccountId) of
         {'error', 'not_found'} ->
+            lager:info("unable to find registration ~s@~s for request ~s"
+                      ,[EndpointId, AccountId, FetchId]
+                      ),
             lookup_directory(Context);
         {'ok', Endpoint} ->
+            lager:debug("found registration ~s@~s for request ~s"
+                       ,[EndpointId, AccountId, FetchId]
+                       ),
             fetch_directory(EndpointId, AccountId, Context, [{'endpoint', kz_json:from_list(Endpoint)}])
     end.

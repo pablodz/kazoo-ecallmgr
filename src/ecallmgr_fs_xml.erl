@@ -302,6 +302,10 @@ route_resp_xml(<<"bridge">>, Routes, JObj, DialplanContext) ->
     lager:debug("creating a bridge XML response"),
     Bridge = [route_resp_progress(JObj)
              ,route_resp_log_winning_node()
+             ,route_resp_set_winning_node()
+             ,route_resp_bridge_id()
+             ,route_resp_ccvs(JObj)
+             ,route_resp_cavs(JObj)
              ,route_resp_ringback(JObj)
              ,route_resp_transfer_ringback(JObj)
              ],
@@ -338,6 +342,8 @@ route_resp_xml(<<"dialplan_error">>, _Routes, JObj, DialplanContext) ->
             ,route_resp_bridge_id()
             ,route_resp_ringback(JObj)
             ,route_resp_transfer_ringback(JObj)
+            ,route_resp_ccvs(JObj)
+            ,route_resp_cavs(JObj)
             ,action_el(<<"respond">>, [ErrCode, ErrMsg])
             ],
     ErrExtEl = extension_el([condition_el(Exten)]),
@@ -349,7 +355,13 @@ route_resp_xml(<<"dialplan_error">>, _Routes, JObj, DialplanContext) ->
 route_resp_xml(<<"chatplan_error">>, _Routes, JObj, _DialplanContext) ->
     ErrCode = kz_json:get_value(<<"Route-Error-Code">>, JObj),
     ErrMsg = [" ", kz_json:get_value(<<"Route-Error-Message">>, JObj, <<>>)],
-    Exten = [action_el(<<"reply">>, [ErrCode, ErrMsg])],
+    Exten = [route_resp_log_winning_node()
+            ,route_resp_set_winning_node()
+            ,route_resp_bridge_id()
+            ,route_resp_ccvs(JObj)
+            ,route_resp_cavs(JObj)
+            ,action_el(<<"reply">>, [ErrCode, ErrMsg])
+            ],
     ErrExtEl = extension_el([condition_el(Exten)]),
     ContextEl = context_el(?DEFAULT_FREESWITCH_CONTEXT, [ErrExtEl]),
     SectionEl = section_el(<<"chatplan">>, <<"Route Error Response">>, ContextEl),
@@ -369,6 +381,9 @@ route_resp_xml(<<"sms_error">>, _Routes, JObj, _DialplanContext) ->
     ErrMsg = [" ", kz_json:get_value(<<"Route-Error-Message">>, JObj, <<>>)],
     Exten = [route_resp_log_winning_node()
             ,route_resp_set_winning_node()
+            ,route_resp_bridge_id()
+            ,route_resp_ccvs(JObj)
+            ,route_resp_cavs(JObj)
             ,action_el(<<"respond">>, [ErrCode, ErrMsg])
             ],
     ErrExtEl = extension_el([condition_el(Exten)]),

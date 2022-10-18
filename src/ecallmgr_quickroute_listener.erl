@@ -14,9 +14,11 @@
 
 -export([start_link/0
         ,cache_name/0
-        ,get_quickroute/1
+        ,get_quickroutes/0, get_quickroute/1
         ,handle_quickroute/2
         ,add_quickroute/3, add_quickroute/4
+
+        ,handle_quickroutes_query/2
         ]).
 
 -export([init/1
@@ -35,9 +37,12 @@
 -record(state, {}).
 -type state() :: #state{}.
 
--define(BINDINGS, [{'route', [{'restrict_to', ['quickroute']}, 'federate']}]).
+-define(BINDINGS, [{'route', [{'restrict_to', ['quickroute', 'query_quickroutes_req']}, 'federate']}]).
 -define(RESPONDERS, [{{?MODULE, 'handle_quickroute'}
                      ,[{<<"dialplan">>, <<"quickroute">>}]
+                     }
+                    ,{{?MODULE, 'handle_quickroutes_query'}
+                     ,[{<<"dialplan">>, <<"query_quickroutes_req">>}]
                      }
                     ]).
 -define(QUEUE_NAME, <<>>).
@@ -45,6 +50,8 @@
 -define(CONSUME_OPTIONS, []).
 
 -define(DEFAULT_EXPIRY, kapps_config:get_integer(?APP_NAME, <<"quickroute_expiry_s">>, 300)).
+
+-define(CACHE_KEY(Number), {?MODULE, Number}).
 
 %%%=============================================================================
 %%% API
@@ -85,6 +92,27 @@ get_quickroute([Number | Numbers]) ->
             lager:info("found quickroute for ~s", [Number]),
             QuickRoute
     end.
+
+-spec get_quickroutes() -> kz_json:objects().
+get_quickroutes() ->
+    kz_cache:map_local(cache_name(), fun export_quickroute/2).
+
+export_quickroute(?CACHE_KEY(Number), QuickRoute) ->
+    kz_json:set_value(<<"Number">>, Number, export_quickroute(QuickRoute)).
+
+export_quickroute(QuickRoute) ->
+    Routes = kz_json:get_list_value(<<"Routes">>, QuickRoute, []),
+    kz_json:from_list([{<<"Routes">>, [export_route(Route) || Route <- Routes]}]).
+
+export_route(Route) ->
+    export_route(Route, kz_json:get_ne_binary_value(<<"Invite-Format">>, Route)).
+
+export_route(Route, <<"endpoint">>) ->
+    URI = kz_json:get_ne_binary_value(<<"Endpoint-URI">>, Route),
+    [EndpointId, AccountId] = binary:split(URI, <<"@">>),
+    kz_json:from_list([{<<"Endpoint-ID">>, EndpointId}
+                      ,{<<"Account-ID">>, AccountId}
+                      ]).
 
 %% @doc add a quickroute for a number to an endpoint
 -spec add_quickroute(kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binary()) -> 'ok'.
@@ -129,7 +157,35 @@ to_dialplan_route(Endpoint) ->
                       ,{<<"Invite-Format">>, <<"endpoint">>}
                       ]).
 
-cache_key(Number) -> {?MODULE, Number}.
+cache_key(Number) -> ?CACHE_KEY(Number).
+
+-spec handle_quickroutes_query(kapi_route:quickroutes_query(), kz_term:proplist()) -> 'ok'.
+handle_quickroutes_query(Req, _Props) ->
+    'true' = kapi_route:query_quickroutes_req_v(Req),
+    AccountId = kz_json:get_ne_binary_value(<<"Account-ID">>, Req),
+
+    AccountQRs = kz_cache:filter_local(cache_name(), fun(_CacheKey, CacheValue) -> filter_quickroutes(AccountId, CacheValue) end),
+    lager:info("account ~s qrs: ~p", [AccountId, AccountQRs]),
+    quickroutes_resp(Req, AccountQRs).
+
+filter_quickroutes(AccountId, QuickRoute) ->
+    lists:any(fun(Route) -> does_route_matches_account(AccountId, Route) end
+             ,kz_json:get_list_value(<<"Routes">>, QuickRoute, [])
+             ).
+
+does_route_matches_account(AccountId, Route) ->
+    case binary:split(kz_json:get_ne_binary_value(<<"Endpoint-URI">>, Route), <<"@">>) of
+        [_EndpointId, AccountId] -> 'true';
+        _ -> 'false'
+    end.
+
+-spec quickroutes_resp(kapi_route:quickroute_query_req(), kz_json:objects()) -> 'ok'.
+quickroutes_resp(Req, QuickRoutes) ->
+    Resp = [{<<"Quickroutes">>, [export_quickroute(Number, QuickRoute) || {Number, QuickRoute} <- QuickRoutes]}
+           ,{<<"Msg-ID">>, kz_api:msg_id(Req)}
+           | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+           ],
+    kapi_route:publish_query_quickroutes_resp(kz_api:server_id(Req), Resp).
 
 %%%=============================================================================
 %%% gen_server callbacks

@@ -267,6 +267,7 @@
                               ,{<<"From-URI">>, <<"sip_from_uri">>}
                               ,{<<"From-User">>, <<"sip_from_user">>}
                               ,{<<"Hangup-After-Pickup">>, <<"hangup_after_bridge">>}
+                              ,{<<"Hangup-After-Bridge">>, <<"hangup_after_bridge">>}
                               ,{<<"Hold-Media">>, <<"hold_music">>}
                               ,{<<"Custom-Hold-Media">>, <<"temp_hold_music">>}
                               ,{<<"Ignore-Completed-Elsewhere">>, <<"ignore_completed_elsewhere">>}

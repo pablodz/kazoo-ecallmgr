@@ -1158,11 +1158,13 @@ handle_sync(JObj, #state{fetch_id=FetchId
 -spec handle_transferee(kz_json:object(), state()) ->
           {'noreply', state()}.
 handle_transferee(JObj, #state{fetch_id=FetchId
-                              ,node=_Node
+                              ,node=Node
+                              ,call_id=UUID
                               }=State) ->
     case kz_call_event:custom_channel_var(JObj, <<"Fetch-ID">>) of
         FetchId ->
             lager:info("we have been transferred, terminate immediately"),
+            ecallmgr_fs_command:set(Node, UUID, [{<<"Hangup-After-Bridge">>, <<"true">>}]),
             {'stop', 'normal', State};
         _Else ->
             lager:info("we were a different instance of this transferred call ~s : ~s", [FetchId, _Else]),

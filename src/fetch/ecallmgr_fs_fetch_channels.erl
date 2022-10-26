@@ -49,6 +49,7 @@ channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Context) ->
     Channel = ecallmgr_fs_channel:fetch_channel(UUID),
     case Channel =/= 'undefined'
         andalso TargetChannel =/= 'undefined'
+        andalso props:get_ne_binary_value(<<"switch_url">>, TargetChannel) =/= 'undefined'
     of
         'false' ->
             channel_not_found(Context);
@@ -56,44 +57,33 @@ channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Context) ->
             SwitchURL = props:get_ne_binary_value(<<"switch_url">>, TargetChannel),
             ToUser = kz_json:get_ne_binary_value(<<"refer-to-user">>, JObj),
             ToRealm = props:get_ne_binary_value(<<"realm">>, Channel),
-            case build_sip_url(SwitchURL, ToUser, ToRealm) of
+            case build_sip_url(ToUser, ToRealm) of
                 'undefined' ->
-                    lager:notice_unsafe("fetch ~s context => ~p"
-                                       ,[FetchId, Context]
-                                       ),
-                    lager:notice_unsafe("fetch ~s channel => ~p"
-                                       ,[FetchId, Channel]
-                                       ),
-                    lager:notice_unsafe("fetch ~s target channel => ~p"
-                                       ,[FetchId, TargetChannel]
-                                       ),
+                    lager:notice("sip_url not build (~s/~s) ~s", [ToUser, ToRealm, kz_json:encode(JObj)]),
                     channel_not_found(Context);
                 URL ->
                     CCVs = ecallmgr_fs_channel:channel_ccvs(Channel),
                     ForChannelCCVs = ecallmgr_fs_channel:channel_ccvs(ForChannel),
-                    DialPrefix = channel_resp_dialprefix(JObj, Channel, CCVs, ForChannelCCVs),
+                    DialPrefix = channel_resp_dialprefix(SwitchURL, JObj, Channel, CCVs, ForChannelCCVs),
                     build_channel_resp(Context#{url => URL, dial_prefix => DialPrefix})
             end
     end.
 
--spec build_sip_url(kz_term:api_ne_binary(), kz_term:api_ne_binary(), kz_term:api_ne_binary()) -> kz_term:api_ne_binary().
-build_sip_url('undefined', _ToUser, _ToRealm) -> 'undefined';
-build_sip_url(_SwitchURL, 'undefined', _ToRealm) -> 'undefined';
-build_sip_url(_SwitchURL, _ToUser, 'undefined') -> 'undefined';
-build_sip_url(SwitchURL, ToUser, ToRealm) ->
+-spec build_sip_url(kz_term:api_ne_binary(), kz_term:api_ne_binary()) -> kz_term:api_ne_binary().
+build_sip_url('undefined', _ToRealm) -> 'undefined';
+build_sip_url(_ToUser, 'undefined') -> 'undefined';
+build_sip_url(ToUser, ToRealm) ->
+    kzsip_uri:ruri(#uri{scheme=sip, user=ToUser, domain=ToRealm}).
+
+switch_url_transport(SwitchURL) ->
     try kzsip_uri:uris(SwitchURL) of
-        [URI] ->
-            NewURI = #uri{user=ToUser
-                         ,domain=ToRealm
-                         ,opts=[{<<"fs_path">>, kzsip_uri:ruri(URI#uri{user= <<>>})}]
-                         },
-            kzsip_uri:ruri(NewURI);
-        _ -> 'undefined'
+        [#uri{opts = Opts, ext_opts = ExtOpts}] ->
+            props:get_binary_value(<<"transport">>, Opts ++ ExtOpts, <<"udp">>)
     catch
         _E:_R:_ST ->
             lager:error("error building sip url => ~p / ~p", [_E, _R]),
             kz_log:log_stacktrace(_ST),
-            'undefined'
+            <<"udp">>
     end.
 
 -spec build_channel_resp(map()) -> 'ok'.
@@ -110,15 +100,19 @@ build_channel_resp(#{url := URL, dial_prefix := DialPrefix} = Context) ->
              ]),
     try_channel_resp(Context, Resp).
 
--spec channel_resp_dialprefix(kz_json:object(), kz_term:proplist(), kz_term:proplist(), kz_term:proplist()) -> kz_term:ne_binary().
-channel_resp_dialprefix(JObj, Channel, ChannelVars, ForChannelCCVs) ->
-    props:to_log(Channel, <<"TARGET CHANNEL">>),
+-spec channel_resp_dialprefix(kz_term:api_ne_binary(), kz_json:object(), kz_term:proplist(), kz_term:proplist(), kz_term:proplist()) -> kz_term:ne_binary().
+channel_resp_dialprefix(SwitchURL, JObj, Channel, ChannelVars, ForChannelCCVs) ->
     CallId = kz_binary:rand_hex(16),
     Props = props:filter_undefined(
               [{<<"sip_invite_domain">>, props:get_value(<<"Realm">>, ChannelVars)}
               ,{<<"sip_origination_call_id">>, CallId}
+              ,{<<"bypass_proxy">>, <<"true">>}
+              ,{<<"sip_route_uri">>, SwitchURL}
+              ,{<<"sip_contact_user">>, kz_json:get_ne_binary_value(<<"refer-to-user">>, JObj)}
+              ,{<<"sip_transport">>, switch_url_transport(SwitchURL)}
 
               ,{<<"ecallmgr_", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, ChannelVars)}
+              ,{<<?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, ChannelVars)}
               ,{<<"ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, ChannelVars)}
               ,{<<"ecallmgr_Realm">>, props:get_value(<<"Realm">>, ChannelVars)}
               ,{<<"ecallmgr_Authorizing-Type">>, props:get_value(<<"Authorizing-Type">>, ChannelVars)}

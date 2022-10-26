@@ -1,0 +1,18 @@
+<definition name="fetch-channels">
+
+	<field name="fetch-info" type="reference" />
+
+	<field name="Event-Category" type="static" value="channels" />
+	<field name="Event-Name" type="static" value="channel_req" />
+
+	<field name="purpose" />
+	<field name="profile" />
+	<field name="refer-to-user" />
+	<field name="refer-to-host" />
+	<field name="refer-to-params" />
+	<field name="refer-to-headers" />
+	<field name="replaces-call-id" />
+	<field name="refer-from-channel-id" />
+	<field name="refer-for-channel-id" />
+
+</definition>

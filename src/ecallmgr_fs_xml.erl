@@ -665,13 +665,13 @@ create_asserted_identity_header(Name, Number, Realm) ->
 
 -spec kazoo_vars_to_fs_vars(channel_var_fold() | kz_term:proplist()) -> channel_var_fold().
 kazoo_vars_to_fs_vars({Props, Results}) ->
-    {[], lists:foldr(fun kazoo_var_to_fs_var/2, Results, Props)};
+    {[], lists:foldr(fun kazoo_var_to_fs_var/2, Results, kazoo_merge_vars(Props))};
 kazoo_vars_to_fs_vars(Props) ->
     kazoo_vars_to_fs_vars({Props, []}).
 
 -spec kazoo_var_to_fs_var({binary(), binary() | kz_json:object()}, kz_term:ne_binaries()) -> iolist().
 kazoo_var_to_fs_var({<<"Custom-Channel-Vars">>, JObj}, Vars) ->
-    kz_json:foldl(fun kazoo_var_to_fs_var_fold/3, Vars, JObj);
+    kz_json:foldl(fun kazoo_var_to_fs_var_fold/3, Vars, kazoo_merge_vars(JObj));
 
 kazoo_var_to_fs_var({<<"Custom-Application-Vars">>, JObj}, Vars) ->
     kz_json:foldl(fun kazoo_cavs_to_fs_vars_fold/3, Vars, JObj);
@@ -701,6 +701,10 @@ kazoo_var_to_fs_var({<<"Caller-ID-Type">>, <<"pid">>}, Vars) ->
 
 kazoo_var_to_fs_var({<<"origination_uuid">> = K, UUID}, Vars) ->
     [encode_fs_val(K, UUID) | Vars];
+
+kazoo_var_to_fs_var({<<"Merged-Hold-Media">>, JObj}, Vars) ->
+    MediaPath = ecallmgr_util:moh_media_path('extant', get('callid'), JObj),
+    [encode_fs_val("hold_music", MediaPath) | Vars];
 
 kazoo_var_to_fs_var({<<"Hold-Media">>, Media}, Vars) ->
     MediaPath = ecallmgr_util:moh_media_path(Media, 'extant', get('callid'), kz_json:new()),
@@ -768,6 +772,30 @@ kazoo_var_to_fs_var({AMQPHeader, V}, Vars) ->
             [encode_fs_val(Prefix, Val) | Vars]
     end;
 kazoo_var_to_fs_var(_, Vars) -> Vars.
+
+
+kazoo_merge_vars(Props) when is_list(Props) ->
+    kz_json:to_proplist(kazoo_merge_vars(kz_json:from_list(Props)));
+kazoo_merge_vars(JObj) ->
+    Routines = [fun kazoo_merge_hold_media/1
+               ],
+    lists:foldl(fun kazoo_merge_vars_fold/2, JObj, Routines).
+
+kazoo_merge_vars_fold(Fun, JObj) -> Fun(JObj).
+
+kazoo_merge_hold_media(JObj) ->
+    Keys = [{<<"Hold-Media">>, [<<"Merged-Hold-Media">>, <<"Hold-Media">>]}
+           ,{<<"Hold-Media-Options">>, [<<"Merged-Hold-Media">>, <<"Hold-Media-Options">>]}
+           ,{<<"Custom-Hold-Media">>, [<<"Merged-Custom-Hold-Media">>, <<"Hold-Media">>]}
+           ,{<<"Custom-Hold-Media-Options">>, [<<"Merged-Custom-Hold-Media">>, <<"Hold-Media-Options">>]}
+           ],
+    lists:foldl(fun kazoo_merge_hold_media_fold/2, JObj, Keys).
+
+kazoo_merge_hold_media_fold({Key, NewKey}, JObj) ->
+    case kz_json:get_value(Key, JObj) of
+        undefined -> JObj;
+        Value -> kz_json:set_value(NewKey, Value, kz_json:delete_key(Key, JObj))
+    end.
 
 -spec participant_flags_to_var(kz_term:ne_binaries()) -> kz_term:ne_binary().
 participant_flags_to_var(Flags) ->
@@ -931,7 +959,7 @@ get_profile_vars_fold(K, V, Acc) ->
 
 -spec get_channel_params(kz_json:object() | kz_term:proplist()) -> kz_term:proplist().
 get_channel_params(Props) when is_list(Props) ->
-    lists:foldl(fun get_channel_params/2, [], Props);
+    lists:foldl(fun get_channel_params/2, [], kazoo_merge_vars(Props));
 get_channel_params(JObj) ->
     get_channel_params(
       kz_json:to_proplist(
@@ -947,6 +975,10 @@ get_channel_params({<<"Media-Control">>, JObj}, Acc) ->
 get_channel_params({K, V}, Acc) ->
     [get_channel_param(K, V) | Acc].
 
+get_channel_param(<<"Merged-Hold-Media">>, JObj) ->
+    {ecallmgr_util:get_fs_key(<<"Hold-Media">>), ecallmgr_util:moh_media_path('extant', kz_log:get_callid(), JObj)};
+get_channel_param(<<"Merged-Custom-Hold-Media">>, JObj) ->
+    {ecallmgr_util:get_fs_key(<<"Custom-Hold-Media">>), ecallmgr_util:moh_media_path('extant', kz_log:get_callid(), JObj)};
 get_channel_param(<<"Hold-Media">>=Key, Media) ->
     {ecallmgr_util:get_fs_key(Key), ecallmgr_util:moh_media_path(Media, 'extant', kz_log:get_callid(), kz_json:new())};
 get_channel_param(<<"Custom-Hold-Media">>=Key, Media) ->
@@ -1738,7 +1770,6 @@ directory_resp_user_xml(_Node, Endpoint, JObj) ->
 
 -spec directory_resp_group_ep_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
 directory_resp_group_ep_xml(_Node, Endpoint, JObj) ->
-    lager:warning_unsafe("GROUP => ~s", [kz_json:encode(Endpoint, ['pretty'])]),
     DomainName = directory_resp_domain(Endpoint, JObj),
     GroupId = directory_resp_user_id(Endpoint, JObj),
     GroupProps = user_el_default_props(GroupId),
@@ -1898,7 +1929,7 @@ get_directory_variables(<<"Codecs">>, Endpoint, Acc) ->
     codecs_els(Endpoint) ++ Acc;
 get_directory_variables(ObjectKey, JObj, Acc) ->
     Props = kz_json:to_proplist(ObjectKey, JObj),
-    get_directory_variables(Props, Acc).
+    get_directory_variables(kazoo_merge_vars(Props), Acc).
 
 -spec get_directory_variables(kz_term:api_terms(), kz_types:xml_els()) -> kz_types:xml_els().
 get_directory_variables(Props, Acc)
@@ -1912,6 +1943,8 @@ get_directory_variables(JObj, Acc) ->
     get_directory_variables(Props, Acc).
 
 -spec get_directory_variables_fold(kz_json:key(), kz_json:json_term()) -> kz_types:xml_el().
+get_directory_variables_fold(<<"Merged-", _/binary>> = Key, Value) ->
+    get_directory_variable(Key, Value);
 get_directory_variables_fold(Key, Value) ->
     case kz_json:is_json_object(Value)
         andalso not lists:member(Key, ?EXCLUDE_VARIABLE_GROUPS)

@@ -40,7 +40,7 @@
 -export([build_bridge_channels/1, build_simple_channels/1]).
 -export([create_masquerade_event/2, create_masquerade_event/3]).
 -export([media_path/1, media_path/2, media_path/3, media_path/4
-        ,moh_media_path/4
+        ,moh_media_path/3, moh_media_path/4
         ,lookup_media/4
         ,request_media_url/4
         ]).
@@ -112,13 +112,12 @@
        ,kapps_config:get_boolean(?APP_NAME, <<"failover_when_all_unreg">>, 'false')
        ).
 
--define(KZ_MOH_PRESERVE_POSITION_OPTION_KEY, <<"Hold-Media-Preserve-Position">>).
--define(KZ_MOH_PRESERVE_POSITION_OPTION_CONFIG_KEY, kz_json:normalize_key(?KZ_MOH_PRESERVE_POSITION_OPTION_KEY)).
--define(KZ_MOH_PRESERVE_POSITION_OPTION_DEFAULT, kapps_config:get_boolean(?APP_NAME, ?KZ_MOH_PRESERVE_POSITION_OPTION_CONFIG_KEY, 'true')).
-
--define(KZ_MOH_RANDOM_START_OPTION_KEY, <<"Hold-Media-Random-Start-Position">>).
--define(KZ_MOH_RANDOM_START_OPTION_CONFIG_KEY, kz_json:normalize_key(?KZ_MOH_RANDOM_START_OPTION_KEY)).
--define(KZ_MOH_RANDOM_START_OPTION_DEFAULT, kapps_config:get_boolean(?APP_NAME, ?KZ_MOH_RANDOM_START_OPTION_CONFIG_KEY, 'false')).
+-define(KZ_MOH_OPTIONS_KEY, <<"Hold-Media-Options">>).
+-define(KZ_MOH_OPTION_PRESERVE_POSITION, <<"preserve-position">>).
+-define(KZ_MOH_OPTION_RANDOM_START, <<"random-start">>).
+-define(KZ_MOH_OPTIONS, [?KZ_MOH_OPTION_PRESERVE_POSITION, ?KZ_MOH_OPTION_RANDOM_START]).
+-define(KZ_MOH_OPTION_DEFAULT_KEY(Option), [kz_json:normalize_key(HoldMediaOption) || HoldMediaOption <- [?KZ_MOH_OPTIONS_KEY, Option]]).
+-define(KZ_MOH_OPTION_DEFAULT(Option,Default), kapps_config:get_boolean(?APP_NAME, ?KZ_MOH_OPTION_DEFAULT_KEY(Option), Default)).
 
 -type send_cmd_ret() :: fs_sendmsg_ret() | fs_api_ret().
 -export_type([send_cmd_ret/0]).
@@ -582,6 +581,12 @@ get_fs_kv(Key, Value) ->
     get_fs_kv(Key, Value, 'undefined').
 
 -spec get_fs_kv(kz_term:ne_binary(), kz_term:ne_binary(), kz_term:api_binary()) -> binary().
+get_fs_kv(<<"Merged-Hold-Media">>, JObj, UUID) ->
+    MediaPath = moh_media_path('extant', UUID, JObj),
+    list_to_binary(["hold_music=", MediaPath]);
+get_fs_kv(<<"Merged-Custom-Hold-Media">>, JObj, UUID) ->
+    MediaPath = moh_media_path('extant', UUID, JObj),
+    list_to_binary(["temp_hold_music=", MediaPath]);
 get_fs_kv(<<"Hold-Media">>, Media, UUID) ->
     MediaPath = moh_media_path(Media, 'extant', UUID, kz_json:new()),
     list_to_binary(["hold_music=", MediaPath]);
@@ -615,6 +620,12 @@ get_fs_key(Key) ->
           {kz_term:ne_binary(), binary()} |
           [{kz_term:ne_binary(), binary()}] |
           'skip'.
+get_fs_key_and_value(<<"Merged-Hold-Media">>, JObj, UUID) ->
+    MediaPath = moh_media_path('extant', UUID, JObj),
+    {get_fs_key(<<"Hold-Media">>), MediaPath};
+get_fs_key_and_value(<<"Merged-Custom-Hold-Media">>, JObj, UUID) ->
+    MediaPath = moh_media_path('extant', UUID, JObj),
+    {get_fs_key(<<"Custom-Hold-Media">>), MediaPath};
 get_fs_key_and_value(<<"Hold-Media">>=Key, Media, UUID) ->
     MediaPath = moh_media_path(Media, 'extant', UUID, kz_json:new()),
     {get_fs_key(Key), MediaPath};
@@ -1586,6 +1597,11 @@ fix_contact([Contact | Options], Username, Realm) ->
         _Else -> 'undefined'
     end.
 
+-spec moh_media_path(media_types(), kz_term:ne_binary(), kz_json:object()) -> kz_term:ne_binary().
+moh_media_path(Types, UUID, JObj) ->
+    Media = kz_json:get_ne_binary_value(<<"Hold-Media">>, JObj),
+    moh_media_path(Media, Types, UUID, JObj).
+
 -spec moh_media_path(kz_term:api_binary(), media_types(), kz_term:ne_binary(), kz_json:object()) -> kz_term:ne_binary().
 moh_media_path(Media, Types, UUID, JObj) ->
     case media_path(Media, Types, UUID, JObj) of
@@ -1595,17 +1611,43 @@ moh_media_path(Media, Types, UUID, JObj) ->
 
 -spec maybe_use_kz_moh(kz_term:ne_binary(), kz_json:object()) -> kz_term:ne_binary().
 maybe_use_kz_moh(Media, JObj) ->
-    case kz_json:is_true(?KZ_MOH_PRESERVE_POSITION_OPTION_KEY, JObj, ?KZ_MOH_PRESERVE_POSITION_OPTION_DEFAULT) of
-        'true' -> use_kz_moh(Media, JObj);
-        'false' -> Media
+    case kz_moh_options(JObj) of
+        [] -> Media;
+        Options -> use_kz_moh(Media, Options)
     end.
 
--spec use_kz_moh(kz_term:ne_binary(), kz_json:object()) -> kz_term:ne_binary().
-use_kz_moh(Media, JObj) ->
-    case kz_json:is_true(?KZ_MOH_RANDOM_START_OPTION_KEY, JObj, ?KZ_MOH_RANDOM_START_OPTION_DEFAULT) of
-        'false' -> list_to_binary(["kz_moh::", Media]);
-        'true' -> list_to_binary(["kz_moh::%[moh_playback_random=true]", Media])
+-spec kz_moh_options(kz_json:object()) -> kz_term:ne_binaries().
+kz_moh_options(JObj) ->
+    case kz_json:get_ne_binaries(?KZ_MOH_OPTIONS_KEY, JObj) of
+        undefined -> kz_moh_default_options();
+        Options -> Options
     end.
+
+-spec kz_moh_default_options() -> kz_term:ne_binaries().
+kz_moh_default_options() ->
+    lists:foldl(fun kz_moh_default_option_fold/2, [], ?KZ_MOH_OPTIONS).
+
+kz_moh_default_option_fold(?KZ_MOH_OPTION_PRESERVE_POSITION = Key, Acc) ->
+    case ?KZ_MOH_OPTION_DEFAULT(Key, true) of
+        false -> Acc;
+        true -> [Key | Acc]
+    end;
+kz_moh_default_option_fold(Key, Acc) ->
+    case ?KZ_MOH_OPTION_DEFAULT(Key, false) of
+        false -> Acc;
+        true -> [Key | Acc]
+    end.
+
+-spec use_kz_moh(kz_term:ne_binary(), kz_term:ne_binaries()) -> kz_term:ne_binary().
+use_kz_moh(Media, Options) ->
+    case lists:foldl(fun kz_moh_option_to_arg_fold/2, [], Options) of
+        [] -> list_to_binary(["kz_moh::", Media]);
+        Args -> list_to_binary(["kz_moh::%^[", kz_binary:join(Args, <<"^">>), "]", Media])
+    end.
+
+kz_moh_option_to_arg_fold(<<"random-start">>, Args) -> [<<"moh_playback_random=true">> | Args];
+kz_moh_option_to_arg_fold(<<"preserve-position">>, Args) -> [<<"moh_playback_preserve_position=true">> | Args];
+kz_moh_option_to_arg_fold(_Option, Args) -> Args.
 
 -spec set_prefix() -> kz_term:ne_binary().
 set_prefix() -> list_to_binary([?FS_MULTI_VAR_SEP_PREFIX, ?FS_MULTI_VAR_SEP]).

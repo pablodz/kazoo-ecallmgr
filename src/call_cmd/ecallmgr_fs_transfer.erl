@@ -72,11 +72,11 @@ blind(UUID, JObj) ->
 
     KVs = [{<<"SIP-Refer-To">>, <<"<sip:", TransferTo/binary, "@", Realm/binary, ">">>}
           ,{<<"SIP-Referred-By">>, transfer_referred(UUID, TransferLeg)}
-          ,{<<"Signal-Bridge-To">>, UUID}
+          ,{<<"Signal-Bridge-To">>, transfer_signal_callid(UUID, TransferLeg)}
           ],
     AppArgs = ecallmgr_util:multi_set_args(TargetUUID, props:filter_undefined(KVs)),
     [{<<"kz_uuid_multiset_encoded">>, list_to_binary([TargetUUID, " ", AppArgs])}
-    ,{<<"blind_xfer">>, list_to_binary([TransferLeg, " ", TransferTo, <<" XML ">>, transfer_context(JObj)])}
+    ,{<<"blind_xfer">>, kz_binary:strip(list_to_binary([TransferLeg, " ", TransferTo, <<" XML ">>, transfer_context(JObj)]))}
     ].
 
 -spec transfer_keys(kz_term:ne_binary(), kz_json:object()) -> binary().
@@ -107,6 +107,16 @@ add_transfer_ccv_to_vars(<<"Authorizing-Type">>=K, V, Vars) -> [{K, V} | Vars];
 add_transfer_ccv_to_vars(<<"Channel-Authorized">>=K, V, Vars) -> [{K, V} | Vars];
 add_transfer_ccv_to_vars(_Key, _Value, Vars) -> Vars.
 
+-spec transfer_signal_callid(kz_term:ne_binary(), binary()) -> kz_term:ne_binary().
+transfer_signal_callid(_UUID, <<"-both">>) -> undefined;
+transfer_signal_callid(UUID, <<"-bleg">>) -> UUID;
+transfer_signal_callid(UUID, _) ->
+    case ecallmgr_fs_channel:fetch(UUID, record) of
+        {ok, #channel{other_leg=undefined}} -> undefined;
+        {ok, #channel{other_leg=OtherUUID}} -> OtherUUID;
+        _ -> undefined
+    end.
+
 -spec transfer_realm(kz_term:ne_binary()) -> kz_term:ne_binary().
 transfer_realm(UUID) ->
     case ecallmgr_fs_channel:fetch(UUID, 'record') of
@@ -136,8 +146,7 @@ transfer_set_callid(UUID, _) -> UUID.
 -spec transfer_referred(kz_term:ne_binary(), binary()) -> kz_term:api_binary().
 transfer_referred(UUID, <<"-bleg">>) ->
     case ecallmgr_fs_channel:fetch(UUID, 'record') of
-        {'ok', #channel{username='undefined'}=C} ->
-            lager:debug_unsafe("USER UNDEFINED : ~p", [C]),
+        {'ok', #channel{username='undefined'}} ->
             'undefined';
         {'ok', #channel{username=Username
                        ,realm=Realm
@@ -149,8 +158,7 @@ transfer_referred(UUID, <<"-bleg">>) ->
     end;
 transfer_referred(UUID, _) ->
     case ecallmgr_fs_channel:fetch_other_leg(UUID, 'record') of
-        {'ok', #channel{username='undefined'}=C} ->
-            lager:debug_unsafe("USER UNDEFINED : ~p", [C]),
+        {'ok', #channel{username='undefined'}} ->
             'undefined';
         {'ok', #channel{username=Username
                        ,realm=Realm

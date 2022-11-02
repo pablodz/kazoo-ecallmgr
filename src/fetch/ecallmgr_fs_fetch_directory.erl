@@ -50,10 +50,9 @@ fetch_directory(#{fetch_id := FetchId, payload := JObj}=Context) ->
         <<"jsonrpc-authenticate">> -> validate_rpc_token(Context);
         <<"user_call">> -> lookup_registrar(Context);
         <<"group_call">> -> lookup_directory(kzd_fetch:fetch_group(JObj), Context);
+        <<"reverse-auth-lookup">> -> reverse_auth(Context);
         _Other ->
-            lager:error("unhandled action '~s' in request ~s"
-                       ,[_Other, FetchId]
-                       ),
+            lager:error_unsafe("unhandled action '~s' in request ~s => ~s", [_Other, FetchId, kz_json:encode(JObj)]),
             directory_not_found(Context)
     end.
 
@@ -289,4 +288,21 @@ lookup_registrar(#{fetch_id := FetchId} = Context, EndpointId, AccountId) ->
                        ,[EndpointId, AccountId, FetchId]
                        ),
             fetch_directory(EndpointId, AccountId, Context, [{'endpoint', kz_json:from_list(Endpoint)}])
+    end.
+
+reverse_auth(#{payload := JObj}=Context) ->
+    Username = kzd_fetch:fetch_user(JObj),
+    Realm = kzd_fetch:fetch_key_value(JObj),
+    Method = kzd_fetch:auth_method(JObj, <<"password">>),
+    KVs = [{<<"User-ID">>, Username}
+          ,{<<"Domain-Name">>, Realm}
+          ,{<<"Auth-Method">>, Method}
+          ,{<<"Auth-Username">>, Username}
+          ],
+    case kz_directory:lookup_by_user_realm(Username, Realm) of
+        {ok, Endpoint} ->
+            {'ok', Xml} = ecallmgr_fs_xml:reverse_authn_resp_xml(kz_json:set_values(KVs, kz_ccv:ccvs(Endpoint))),
+            send_reply(Context#{reply => iolist_to_binary(Xml)});
+        _Else ->
+            directory_not_found(Context)
     end.

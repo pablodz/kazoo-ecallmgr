@@ -1022,46 +1022,42 @@ execute_control_request(Cmd, #state{node=Node
             Msg = list_to_binary(["Session ", CallId
                                  ," not found for ", Application
                                  ]),
-            send_error_resp(Node, CallId, Cmd, 'baduuid', Msg),
-            'ok';
+            send_error_resp(Node, CallId, Cmd, 'baduuid', Msg);
         _:{'error', 'nosession'}:_ ->
             lager:debug("unable to execute command, no session"),
             Msg = list_to_binary(["Session ", CallId
                                  ," not found for ", Application
                                  ]),
-            send_error_resp(Node, CallId, Cmd, 'nosession', Msg),
-            'ok';
+            send_error_resp(Node, CallId, Cmd, 'nosession', Msg);
         'error':{'badmatch', {'error', 'nosession'}}:_ ->
             lager:debug("unable to execute command, no session"),
             Msg = list_to_binary(["Session ", CallId
                                  ," not found for ", Application
                                  ]),
-            send_error_resp(Node, CallId, Cmd, 'nosession', Msg),
-            'ok';
+            send_error_resp(Node, CallId, Cmd, 'nosession', Msg);
         'error':{'badmatch', {'error', ErrMsg}}:ST ->
             lager:debug("invalid command ~s: ~p", [Application, ErrMsg]),
             kz_log:log_stacktrace(ST),
-            send_error_resp(Node, CallId, Cmd, ErrMsg),
-            'ok';
+            send_error_resp(Node, CallId, Cmd, ErrMsg);
         'throw':{'msg', ErrMsg} ->
             lager:debug("error while executing command ~s: ~s", [Application, ErrMsg]),
-            send_error_resp(Node, CallId, Cmd, 'throw', ErrMsg),
-            'ok';
+            send_error_resp(Node, CallId, Cmd, 'throw', ErrMsg);
         'throw':{Error, Msg} ->
             lager:debug("failed to execute ~s: ~s : ~s", [Application, Error, Msg]),
-            send_error_resp(Node, CallId, Cmd, Error, Msg),
-            'ok';
+            send_error_resp(Node, CallId, Cmd, Error, Msg);
         'throw':Msg ->
             lager:debug("failed to execute ~s: ~s", [Application, Msg]),
             lager:debug("only handling call id(s): ~p", [[CallId | OtherLegs]]),
 
-            send_error_resp(Node, CallId, Cmd, 'throw', Msg),
-            'ok';
+            send_error_resp(Node, CallId, Cmd, 'throw', Msg);
+        'exit':{{'nodedown',FSNode}, {'gen_server', 'call', Args}}:ST ->
+            lager:error("lost the connection to ~s when sending it ~p", [FSNode, Args]),
+            kz_log:log_stacktrace(ST),
+            send_error_resp(Node, CallId, Cmd, 'exit');
         _A:Error:ST ->
             lager:debug("exception (~s) while executing ~s: ~p", [_A, Application, Error]),
             kz_log:log_stacktrace(ST),
-            send_error_resp(Node, CallId, Cmd, Error),
-            'ok'
+            send_error_resp(Node, CallId, Cmd, Error)
     end.
 
 -spec which_call_leg(kz_term:ne_binary(), kz_term:ne_binaries(), kz_term:ne_binary()) -> kz_term:ne_binary().
@@ -1164,7 +1160,7 @@ handle_transferee(JObj, #state{fetch_id=FetchId
     case kz_call_event:custom_channel_var(JObj, <<"Fetch-ID">>) of
         FetchId ->
             lager:info("we have been transferred, terminate immediately"),
-            ecallmgr_fs_command:set(Node, UUID, [{<<"Hangup-After-Bridge">>, <<"true">>}]),
+            _ = ecallmgr_fs_command:set(Node, UUID, [{<<"Hangup-After-Bridge">>, <<"true">>}]),
             {'stop', 'normal', State};
         _Else ->
             lager:info("we were a different instance of this transferred call ~s : ~s", [FetchId, _Else]),

@@ -10,6 +10,8 @@
 			<field name="variable_loopback_bowout" as="Channel-Loopback-Bowout"	serialize-as="boolean" />
 			<field name="variable_loopback_bowout_on_execute" as="Channel-Loopback-Bowout-Execute"	serialize-as="boolean" />
 			<field name="variable_hangup_cause" as="Channel-Loopback-Hangup-Cause" />
+			<field name="variable_loopback_bowout_used" as="Channel-Loopback-Bowout-Used" serialize-as="boolean" />
+			<field name="variable_loopback_cross_boundary" as="Channel-Loopback-Cross-Boundary" serialize-as="boolean" />
 		</fields>
 	</field>
 </definition>

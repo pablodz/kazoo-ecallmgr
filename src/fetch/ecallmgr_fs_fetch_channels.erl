@@ -134,7 +134,6 @@ channel_resp_dialprefix(SwitchURL, JObj, FromChannel, ForChannel) ->
               ,{<<"sip_route_uri">>, SwitchURL}
               ,{<<"sip_contact_user">>, kz_json:get_ne_binary_value(<<"refer-to-user">>, JObj)}
               ,{<<"sip_transport">>, switch_url_transport(SwitchURL)}
-
               ,{<<"ecallmgr_", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, FromChannelCCVs)}
               ,{<<?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, FromChannelCCVs)}
               ,{<<"ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, FromChannelCCVs)}
@@ -143,37 +142,26 @@ channel_resp_dialprefix(SwitchURL, JObj, FromChannel, ForChannel) ->
               ,{<<"ecallmgr_Authorizing-ID">>, props:get_value(<<"Authorizing-ID">>, FromChannelCCVs)}
               ,{<<"ecallmgr_Owner-ID">>, props:get_value(<<"Owner-ID">>, FromChannelCCVs)}
               ,{<<"presence_id">>, props:get_value(<<"Presence-ID">>, FromChannelCCVs)}
-
-              ,{<<"sip_h_X-FS-AUTH-Token">>, nightmare_auth_token(ForChannel)}
               ,{<<"sip_h_X-FS-", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, FromChannelCCVs)}
               ,{<<"sip_h_X-ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, FromChannelCCVs)}
               ,{<<"sip_h_X-FS-From-Core-UUID">>, kz_json:get_value(<<"Core-UUID">>, JObj)}
               ,{<<"sip_h_X-FS-Refer-Partner-UUID">>, props:get_value(<<"other_leg">>, FromChannel)}
+              | nightmare_auth_token(ForChannel)
               ]),
     fs_props_to_binary(Props).
 
 -spec nightmare_auth_token(kz_term:proplist()) -> kz_term:api_ne_binary().
 nightmare_auth_token(Channel) ->
-    ChannelCSH = ecallmgr_fs_channel:channel_cshs(Channel),
-    Token = props:get_value(<<"X-AUTH-Token">>, ChannelCSH),
+    CAHs = ecallmgr_fs_channel:channel_cahs(Channel),
+    case lists:foldl(fun nightmare_auth_token_args_fold/2, [], CAHs) of
+        [] -> error(<<"no token available for channel">>);
+        Args -> Args
+    end.
 
-    ChannelCCVs = ecallmgr_fs_channel:channel_ccvs(Channel),
-    AuthorizingId = props:get_value(<<"Authorizing-ID">>, ChannelCCVs),
-    AccountId = props:get_value(<<"Account-ID">>, ChannelCCVs),
-
-    nightmare_auth_token(Token, AuthorizingId, AccountId).
-
--spec nightmare_auth_token(kz_term:api_ne_binary(), kz_term:api_ne_binary(), kz_term:api_ne_binary()) -> kz_term:api_ne_binary().
-nightmare_auth_token(undefined, undefined, _AccountId) ->
-    error(<<"Token is undefined and Authorizing-ID for Token is undefined">>);
-nightmare_auth_token(undefined, _AuthorizingId, undefined) ->
-    error(<<"Token is undefined and Account-ID for Token is undefined">>);
-nightmare_auth_token(undefined, AuthorizingId, AccountId) ->
-    lager:debug("building token from ~s/~s", [AuthorizingId, AccountId]),
-    list_to_binary([AuthorizingId, "@", AccountId]);
-nightmare_auth_token(Token, _AuthorizingId, _AccountId) ->
-    lager:debug("token ~s retrieved from channel", [Token]),
-    Token.
+nightmare_auth_token_args_fold({<<"PORT">>, _Value}, Acc) -> Acc;
+nightmare_auth_token_args_fold({<<"IP">>, _Value}, Acc) -> Acc;
+nightmare_auth_token_args_fold({Key, Value}, Acc) ->
+    [{<<"sip_h_X-FS-AUTH-", Key/binary>>, Value} | Acc].
 
 -spec fs_props_to_binary(kz_term:proplist()) -> kz_term:ne_binary().
 fs_props_to_binary([{Hk,Hv}|T]) ->

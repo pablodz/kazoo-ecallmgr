@@ -2,7 +2,8 @@
 	<field name="Custom-SIP-Headers" type="static" serialize-as="object">
 		<filters>
 			<!-- excluding any csh that starts with X-AUTH because of the way we do auth from kamailio and we don't want to leak those into channel ets -->
-			<filter name="ecallmgr" type="include" compare="prefix" value="variable_sip_h_" except-field-prefix="variable_sip_h_X-AUTH">
+			<filter name="ecallmgr" type="include" compare="prefix" value="variable_sip_h_" exclude-prefix="true">
+				<prefix-exception value="variable_sip_h_X-AUTH"/>
 				<prefix-exception value="variable_sip_h_X-Proxy-Core"/>
 				<prefix-exception value="variable_sip_h_X-FS-"/>
 				<prefix-exception value="variable_sip_h_Referred-By"/>

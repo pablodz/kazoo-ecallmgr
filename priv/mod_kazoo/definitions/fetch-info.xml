@@ -23,7 +23,6 @@
 	<field name="Kazoo-Release"/>
 	-->
 
-	<!--<field name="fetch-info-csh" type="reference" />-->
 	<field name="Custom-Channel-Vars" type="reference" />
 	<field name="Custom-Application-Vars" type="reference" />
 	<field name="freeswitch-url" type="reference" />

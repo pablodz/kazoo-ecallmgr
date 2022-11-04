@@ -40,32 +40,35 @@ channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Context) ->
     lager:debug("received channel fetch request ~s from ~s for ~s"
                ,[FetchId, Node, TargetUUID]
                ),
-    UUID = kz_json:get_ne_binary_value(<<"refer-from-channel-id">>, JObj),
+    FromUUID = kz_json:get_ne_binary_value(<<"refer-from-channel-id">>, JObj),
     ForUUID = kz_json:get_ne_binary_value(<<"refer-for-channel-id">>, JObj),
-    lager:info("request ~s is looking call ~s on ~s"
-              ,[FetchId, TargetUUID, Node]),
-    {'ok', ForChannel} = ecallmgr_fs_channel:fetch(ForUUID, 'proplist'),
+    lager:info("request ~s is looking call ~s from/for (~s/~s) on ~s"
+              ,[FetchId, TargetUUID, FromUUID, ForUUID, Node]),
+    FromChannel = ecallmgr_fs_channel:fetch_channel(FromUUID),
+    ForChannel = ecallmgr_fs_channel:fetch_channel(ForUUID),
     TargetChannel = ecallmgr_fs_channel:fetch_channel(TargetUUID),
-    Channel = ecallmgr_fs_channel:fetch_channel(UUID),
-    case Channel =/= 'undefined'
+    case FromChannel =/= 'undefined'
+        andalso ForChannel =/= 'undefined'
         andalso TargetChannel =/= 'undefined'
         andalso props:get_ne_binary_value(<<"switch_url">>, TargetChannel) =/= 'undefined'
     of
         'false' ->
+            lager:error_unsafe("fetch channel failed => ~p => ~p => ~p", [TargetChannel, FromChannel, ForChannel]),
             channel_not_found(Context);
         'true' ->
             SwitchURL = props:get_ne_binary_value(<<"switch_url">>, TargetChannel),
             ToUser = kz_json:get_ne_binary_value(<<"refer-to-user">>, JObj),
-            ToRealm = props:get_ne_binary_value(<<"realm">>, Channel),
+            ToRealm = props:get_ne_binary_value(<<"realm">>, FromChannel),
             case build_sip_url(ToUser, ToRealm) of
                 'undefined' ->
                     lager:notice("sip_url not build (~s/~s) ~s", [ToUser, ToRealm, kz_json:encode(JObj)]),
                     channel_not_found(Context);
                 URL ->
-                    CCVs = ecallmgr_fs_channel:channel_ccvs(Channel),
-                    ForChannelCCVs = ecallmgr_fs_channel:channel_ccvs(ForChannel),
-                    DialPrefix = channel_resp_dialprefix(SwitchURL, JObj, Channel, CCVs, ForChannelCCVs),
-                    build_channel_resp(Context#{url => URL, dial_prefix => DialPrefix})
+                    build_dialprefix(Context#{url => URL
+                                             ,switch_url => SwitchURL
+                                             ,from_channel => FromChannel
+                                             ,for_channel => ForChannel
+                                             })
             end
     end.
 
@@ -100,45 +103,77 @@ build_channel_resp(#{url := URL, dial_prefix := DialPrefix} = Context) ->
              ]),
     try_channel_resp(Context, Resp).
 
--spec channel_resp_dialprefix(kz_term:api_ne_binary(), kz_json:object(), kz_term:proplist(), kz_term:proplist(), kz_term:proplist()) -> kz_term:ne_binary().
-channel_resp_dialprefix(SwitchURL, JObj, Channel, ChannelVars, ForChannelCCVs) ->
+-spec build_dialprefix(map()) -> map() | ok.
+build_dialprefix(#{switch_url := SwitchURL
+                  ,payload := JObj
+                  ,from_channel := FromChannel
+                  ,for_channel := ForChannel
+                  } = Context) ->
+    try
+        DialPrefix = channel_resp_dialprefix(SwitchURL, JObj, FromChannel, ForChannel),
+        build_channel_resp(Context#{dial_prefix => DialPrefix})
+    catch
+        _E:_R:_ST ->
+            lager:error("error building dial prefix => ~p / ~p", [_E, _R]),
+            kz_log:log_stacktrace(_ST),
+            lager:error_unsafe("payload => ~s", [kz_json:encode(JObj)]),
+            props:to_log(FromChannel, <<"FROM-CHANNEL">>),
+            props:to_log(ForChannel, <<"FOR-CHANNEL">>),
+            channel_not_found(Context)
+    end.
+
+-spec channel_resp_dialprefix(kz_term:api_ne_binary(), kz_json:object(), kz_term:proplist(), kz_term:proplist()) -> kz_term:ne_binary().
+channel_resp_dialprefix(SwitchURL, JObj, FromChannel, ForChannel) ->
+    FromChannelCCVs = ecallmgr_fs_channel:channel_ccvs(FromChannel),
     CallId = kz_binary:rand_hex(16),
+    lager:debug("origination call_id for nightmare transfer => ~s", [CallId]),
     Props = props:filter_undefined(
-              [{<<"sip_invite_domain">>, props:get_value(<<"Realm">>, ChannelVars)}
+              [{<<"sip_invite_domain">>, props:get_value(<<"Realm">>, FromChannelCCVs)}
               ,{<<"sip_origination_call_id">>, CallId}
               ,{<<"bypass_proxy">>, <<"true">>}
               ,{<<"sip_route_uri">>, SwitchURL}
               ,{<<"sip_contact_user">>, kz_json:get_ne_binary_value(<<"refer-to-user">>, JObj)}
               ,{<<"sip_transport">>, switch_url_transport(SwitchURL)}
 
-              ,{<<"ecallmgr_", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, ChannelVars)}
-              ,{<<?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, ChannelVars)}
-              ,{<<"ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, ChannelVars)}
-              ,{<<"ecallmgr_Realm">>, props:get_value(<<"Realm">>, ChannelVars)}
-              ,{<<"ecallmgr_Authorizing-Type">>, props:get_value(<<"Authorizing-Type">>, ChannelVars)}
-              ,{<<"ecallmgr_Authorizing-ID">>, props:get_value(<<"Authorizing-ID">>, ChannelVars)}
-              ,{<<"ecallmgr_Owner-ID">>, props:get_value(<<"Owner-ID">>, ChannelVars)}
-              ,{<<"presence_id">>, props:get_value(<<"Presence-ID">>, ChannelVars)}
+              ,{<<"ecallmgr_", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, FromChannelCCVs)}
+              ,{<<?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, FromChannelCCVs)}
+              ,{<<"ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, FromChannelCCVs)}
+              ,{<<"ecallmgr_Realm">>, props:get_value(<<"Realm">>, FromChannelCCVs)}
+              ,{<<"ecallmgr_Authorizing-Type">>, props:get_value(<<"Authorizing-Type">>, FromChannelCCVs)}
+              ,{<<"ecallmgr_Authorizing-ID">>, props:get_value(<<"Authorizing-ID">>, FromChannelCCVs)}
+              ,{<<"ecallmgr_Owner-ID">>, props:get_value(<<"Owner-ID">>, FromChannelCCVs)}
+              ,{<<"presence_id">>, props:get_value(<<"Presence-ID">>, FromChannelCCVs)}
 
-              ,{<<"sip_h_X-FS-Auth-Token">>, nightmare_auth_token(ForChannelCCVs)}
-              ,{<<"sip_h_X-FS-", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, ChannelVars)}
-              ,{<<"sip_h_X-ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, ChannelVars)}
+              ,{<<"sip_h_X-FS-AUTH-Token">>, nightmare_auth_token(ForChannel)}
+              ,{<<"sip_h_X-FS-", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, FromChannelCCVs)}
+              ,{<<"sip_h_X-ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, FromChannelCCVs)}
               ,{<<"sip_h_X-FS-From-Core-UUID">>, kz_json:get_value(<<"Core-UUID">>, JObj)}
-              ,{<<"sip_h_X-FS-Refer-Partner-UUID">>, props:get_value(<<"other_leg">>, Channel)}
-
+              ,{<<"sip_h_X-FS-Refer-Partner-UUID">>, props:get_value(<<"other_leg">>, FromChannel)}
               ]),
     fs_props_to_binary(Props).
 
 -spec nightmare_auth_token(kz_term:proplist()) -> kz_term:api_ne_binary().
-nightmare_auth_token(ChannelVars) ->
-    case props:get_value(<<"Authorizing-ID">>, ChannelVars) of
-        'undefined' -> 'undefined';
-        AuthorizingID ->
-            list_to_binary([AuthorizingID
-                           ,"@"
-                           ,props:get_value(<<"Account-ID">>, ChannelVars)
-                           ])
-    end.
+nightmare_auth_token(Channel) ->
+    ChannelCSH = ecallmgr_fs_channel:channel_cshs(Channel),
+    Token = props:get_value(<<"X-AUTH-Token">>, ChannelCSH),
+
+    ChannelCCVs = ecallmgr_fs_channel:channel_ccvs(Channel),
+    AuthorizingId = props:get_value(<<"Authorizing-ID">>, ChannelCCVs),
+    AccountId = props:get_value(<<"Account-ID">>, ChannelCCVs),
+
+    nightmare_auth_token(Token, AuthorizingId, AccountId).
+
+-spec nightmare_auth_token(kz_term:api_ne_binary(), kz_term:api_ne_binary(), kz_term:api_ne_binary()) -> kz_term:api_ne_binary().
+nightmare_auth_token(undefined, undefined, _AccountId) ->
+    error(<<"Token is undefined and Authorizing-ID for Token is undefined">>);
+nightmare_auth_token(undefined, _AuthorizingId, undefined) ->
+    error(<<"Token is undefined and Account-ID for Token is undefined">>);
+nightmare_auth_token(undefined, AuthorizingId, AccountId) ->
+    lager:debug("building token from ~s/~s", [AuthorizingId, AccountId]),
+    list_to_binary([AuthorizingId, "@", AccountId]);
+nightmare_auth_token(Token, _AuthorizingId, _AccountId) ->
+    lager:debug("token ~s retrieved from channel", [Token]),
+    Token.
 
 -spec fs_props_to_binary(kz_term:proplist()) -> kz_term:ne_binary().
 fs_props_to_binary([{Hk,Hv}|T]) ->

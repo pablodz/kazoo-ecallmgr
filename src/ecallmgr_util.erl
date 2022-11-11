@@ -1619,7 +1619,7 @@ maybe_use_kz_moh(Media, JObj) ->
 -spec kz_moh_options(kz_json:object()) -> kz_term:ne_binaries().
 kz_moh_options(JObj) ->
     case kz_json:get_ne_binaries(?KZ_MOH_OPTIONS_KEY, JObj) of
-        undefined -> kz_moh_default_options();
+        'undefined' -> kz_moh_default_options();
         Options -> Options
     end.
 
@@ -1628,14 +1628,14 @@ kz_moh_default_options() ->
     lists:foldl(fun kz_moh_default_option_fold/2, [], ?KZ_MOH_OPTIONS).
 
 kz_moh_default_option_fold(?KZ_MOH_OPTION_PRESERVE_POSITION = Key, Acc) ->
-    case ?KZ_MOH_OPTION_DEFAULT(Key, true) of
-        false -> Acc;
-        true -> [Key | Acc]
+    case ?KZ_MOH_OPTION_DEFAULT(Key, 'true') of
+        'false' -> Acc;
+        'true' -> [Key | Acc]
     end;
 kz_moh_default_option_fold(Key, Acc) ->
-    case ?KZ_MOH_OPTION_DEFAULT(Key, false) of
-        false -> Acc;
-        true -> [Key | Acc]
+    case ?KZ_MOH_OPTION_DEFAULT(Key, 'false') of
+        'false' -> Acc;
+        'true' -> [Key | Acc]
     end.
 
 -spec use_kz_moh(kz_term:ne_binary(), kz_term:ne_binaries()) -> kz_term:ne_binary().

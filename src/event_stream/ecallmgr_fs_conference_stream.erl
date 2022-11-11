@@ -105,10 +105,10 @@ set_conference_interaction_id(Node, JObj) ->
 set_conference_interaction_id(_Node, _JObj, 'false') -> 'ok';
 set_conference_interaction_id(Node, JObj, 'true') ->
     case kzd_interaction:id(JObj) of
-        undefined -> ok;
+        'undefined' -> 'ok';
         ID -> set_conference_interaction_id(Node, JObj, ID)
     end;
-set_conference_interaction_id(_Node, _JObj, undefined) -> ok;
+set_conference_interaction_id(_Node, _JObj, 'undefined') -> 'ok';
 set_conference_interaction_id(Node, JObj, InteractionId) ->
     ConferenceId = kz_conference_event:conference_id(JObj),
     Args = list_to_binary([ConferenceId, " set_var Conference-Interaction-ID ", InteractionId]),
@@ -118,14 +118,13 @@ set_conference_interaction_id(Node, JObj, InteractionId) ->
 set_participant_interaction_id(Node, JObj) ->
     set_participant_interaction_id(Node, JObj, should_process_interaction()).
 
--spec set_participant_interaction_id(atom(), kz_json:object(), boolean() | kz_term:api_ne_binary()) -> 'ok' | pid().
+-spec set_participant_interaction_id(atom(), kz_json:object(), boolean() | kz_term:api_ne_binary()) ->
+          'ok' | pid().
 set_participant_interaction_id(_Node, _JObj, 'false') -> 'ok';
 set_participant_interaction_id(Node, JObj, 'true') ->
-    case conference_interaction_id(JObj) of
-        undefined -> lager:debug("conference interaction-id is undefined, not setting on participant");
-        ID -> set_participant_interaction_id(Node, JObj, ID)
-    end;
-set_participant_interaction_id(_Node, _JObj, undefined) -> ok;
+    set_participant_interaction_id(Node, JObj, conference_interaction_id(JObj));
+set_participant_interaction_id(_Node, _JObj, 'undefined') ->
+    lager:debug("conference interaction-id is undefined, not setting on participant");
 set_participant_interaction_id(Node, JObj, ID) ->
     CallId = kz_conference_event:call_id(JObj),
     Args = list_to_binary([CallId, " ", ?CALL_INTERACTION_ID, " ", ID]),
@@ -134,6 +133,6 @@ set_participant_interaction_id(Node, JObj, ID) ->
 -spec conference_interaction_id(kz_json:object()) -> kz_term:api_ne_binary().
 conference_interaction_id(JObj) ->
     case kz_conference_event:conference_vars(JObj) of
-        undefined -> undefined;
+        'undefined' -> 'undefined';
         Vars -> kz_json:get_ne_binary_value(<<"Interaction-ID">>, Vars)
     end.

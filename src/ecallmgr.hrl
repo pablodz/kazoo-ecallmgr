@@ -64,13 +64,13 @@
 -record(channel, {uuid :: kz_term:api_ne_binary() | '$1' | '$2' | '_'
                  ,destination :: kz_term:api_ne_binary() | '_'
                  ,request :: kz_term:api_ne_binary() | '_'
-                 ,direction :: kz_term:api_ne_binary() | '$1' | '_'
+                 ,direction :: kz_term:api_ne_binary() | '$1' | '$4' | '$5' | '_'
                  ,account_id :: kz_term:api_ne_binary() | '$1' | '$2' | '_'
                  ,account_billing :: kz_term:api_ne_binary() | '$7' | '_'
-                 ,authorizing_id :: kz_term:api_ne_binary() | '$1' | '$3' | '_'
+                 ,authorizing_id :: kz_term:api_ne_binary() | '$1' | '$2' | '$3' | '_'
                  ,authorizing_type :: kz_term:api_binary() | '_'
                  ,is_authorized :: kz_term:api_boolean() | '_'
-                 ,owner_id :: kz_term:api_ne_binary() | '$1' | '_'
+                 ,owner_id :: kz_term:api_ne_binary() | '$1' | '$3' | '$4' | '_'
                  ,resource_id :: kz_term:api_ne_binary() | '$4' | '_'
                  ,presence_id :: kz_term:api_ne_binary() | '$2' | '_'
                  ,fetch_id :: kz_term:api_ne_binary() | '$5' | '_'
@@ -543,29 +543,35 @@
 -type dialplan_context() :: #{amqp_worker => pid() %% AMQP Worker
                              ,authz_timeout => timeout()
                              ,authz_worker => kz_term:pid_ref()
-                             ,call_id => kz_term:ne_binary()
+                             ,basic => amqp_basic()
+                             ,blocked => boolean() %% whether call progress has been blocked
+                             ,call_id => kz_term:api_ne_binary()
                              ,callback => dialplan_callback()
                              ,channel => pid() %% AMQP Channel
-                             ,controller_q => kz_term:ne_binary() %% AMQP Queue of controller
                              ,control_p => pid() %% Ecallmgr control PID
                              ,control_q => kz_term:ne_binary() %% AMQP Control Queue
-                             ,core_uuid => kz_term:ne_binary() %% FS UUID
+                             ,controller_q => kz_term:ne_binary() %% AMQP Queue of controller
+                             ,core_uuid => kz_term:ne_binary() | atom() %% FS UUID
                              ,exit_fun => dialplan_exit_fun()
-                             ,fetch_id => kz_term:ne_binary()
-                             ,initial_ccvs => kz_json:object()
+                             ,fetch_id => kz_term:api_ne_binary()
                              ,init_fun => dialplan_init_fun()
+                             ,initial_ccvs => kz_json:object()
                              ,node => atom() %% FS Node
                              ,options => kz_term:proplist()
                              ,payload => kzd_fetch:data()
-                             ,start_result => {'ok', pid()} | {'error', any()}
-                             ,timer => dialplan_timers()
-                             ,timeout => non_neg_integer()
                              ,reply => dialplan_reply()
                              ,request => kapi_route:req()
-                             ,route_resp_xml_fun => dialplan_xml_fun()
-                             ,winner => dialplan_winner()
-                             ,blocked => boolean() %% whether call progress has been blocked
                              ,request_headers => kz_term:proplist()
+                             ,route_resp_xml_fun => dialplan_xml_fun()
+                             ,routing => kz_term:ne_binary()
+                             ,section => atom()
+                             ,server_id => kz_term:api_ne_binary()
+                             ,start_result => {'ok', pid()} | {'error', any()}
+                             ,tag => kz_term:api_ne_binary() | atom()
+                             ,timeout => non_neg_integer()
+                             ,timer => dialplan_timers()
+                             ,version => atom()
+                             ,winner => dialplan_winner()
                              }.
 
 -define(ECALLMGR_HRL, 'true').

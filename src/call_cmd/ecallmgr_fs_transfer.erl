@@ -107,14 +107,14 @@ add_transfer_ccv_to_vars(<<"Authorizing-Type">>=K, V, Vars) -> [{K, V} | Vars];
 add_transfer_ccv_to_vars(<<"Channel-Authorized">>=K, V, Vars) -> [{K, V} | Vars];
 add_transfer_ccv_to_vars(_Key, _Value, Vars) -> Vars.
 
--spec transfer_signal_callid(kz_term:ne_binary(), binary()) -> kz_term:ne_binary().
-transfer_signal_callid(_UUID, <<"-both">>) -> undefined;
+-spec transfer_signal_callid(kz_term:ne_binary(), binary()) -> kz_term:api_ne_binary().
+transfer_signal_callid(_UUID, <<"-both">>) -> 'undefined';
 transfer_signal_callid(UUID, <<"-bleg">>) -> UUID;
 transfer_signal_callid(UUID, _) ->
-    case ecallmgr_fs_channel:fetch(UUID, record) of
-        {ok, #channel{other_leg=undefined}} -> undefined;
-        {ok, #channel{other_leg=OtherUUID}} -> OtherUUID;
-        _ -> undefined
+    case ecallmgr_fs_channel:fetch(UUID, 'record') of
+        {'ok', #channel{other_leg='undefined'}} -> 'undefined';
+        {'ok', #channel{other_leg=OtherUUID}} -> OtherUUID;
+        _ -> 'undefined'
     end.
 
 -spec transfer_realm(kz_term:ne_binary()) -> kz_term:ne_binary().

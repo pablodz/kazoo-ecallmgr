@@ -47,6 +47,7 @@ dialplan(#{node := Node, fetch_id := FetchId, payload := FetchJObj}=Map) ->
                ],
     {'ok', kz_maps:exec(Routines, Map)}.
 
+-spec init_kazoo(dialplan_context()) -> dialplan_context().
 init_kazoo(M) ->
     M1 = M#{channel => kz_amqp_channel:consumer_channel()
            ,callback => fun process/1

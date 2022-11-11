@@ -78,7 +78,7 @@ channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Context) ->
 build_sip_url('undefined', _ToRealm) -> 'undefined';
 build_sip_url(_ToUser, 'undefined') -> 'undefined';
 build_sip_url(ToUser, ToRealm) ->
-    kzsip_uri:ruri(#uri{scheme=sip, user=ToUser, domain=ToRealm}).
+    kzsip_uri:ruri(#uri{scheme='sip', user=ToUser, domain=ToRealm}).
 
 switch_url_transport(SwitchURL) ->
     try kzsip_uri:uris(SwitchURL) of
@@ -105,7 +105,7 @@ build_channel_resp(#{url := URL, dial_prefix := DialPrefix} = Context) ->
              ]),
     try_channel_resp(Context, Resp).
 
--spec build_dialprefix(map()) -> map() | ok.
+-spec build_dialprefix(map()) -> map() | 'ok'.
 build_dialprefix(#{switch_url := SwitchURL
                   ,payload := JObj
                   ,from_channel := FromChannel
@@ -152,7 +152,7 @@ channel_resp_dialprefix(SwitchURL, JObj, FromChannel, ForChannel) ->
               ]),
     fs_props_to_binary(Props).
 
--spec nightmare_auth_token(kz_term:proplist()) -> kz_term:api_ne_binary().
+-spec nightmare_auth_token(kz_term:proplist()) -> kz_term:ne_binaries().
 nightmare_auth_token(Channel) ->
     CAHs = ecallmgr_fs_channel:channel_cahs(Channel),
     case lists:foldl(fun nightmare_auth_token_args_fold/2, [], CAHs) of

@@ -860,7 +860,7 @@ registered_names() ->
 -spec try_connect_to_default_fs() -> 'skip' | 'ok' | {'error', 'no_connection'}.
 try_connect_to_default_fs() ->
     FSNode = erlang:list_to_atom(default_fs_nodename()),
-    case proplists:is_defined(FSNode, registered_names()) of
+    case props:is_defined(FSNode, registered_names()) of
         'true' -> try_connect_to_default_fs(default_fs_node());
         'false' -> 'skip'
     end.

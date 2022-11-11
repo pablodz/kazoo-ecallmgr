@@ -328,7 +328,7 @@ from_api_props(Props) ->
             ,is_onhold = props:get_value(<<"Is-On-Hold">>, Props)
             ,loopback_leg_name = props:get_value(<<"Loopback-Leg-Name">>, Props)
             ,loopback_other_leg = props:get_value(<<"Loopback-Other-Leg">>, Props)
-            ,node = kz_term:to_atom(props:get_value(<<"Media-Node">>, Props), true)
+            ,node = kz_term:to_atom(props:get_value(<<"Media-Node">>, Props), 'true')
             ,other_leg = props:get_value(<<"Other-Leg-Call-ID">>, Props)
             ,owner_id = props:get_value(<<"Owner-ID">>, Props)
             ,precedence = props:get_value(<<"Precedence">>, Props)
@@ -414,8 +414,8 @@ fetch_remote(UUID, Format) ->
 -spec get_active_channel_status(kz_term:ne_binary()) -> kz_amqp_worker:request_return().
 get_active_channel_status(UUID) ->
     Command = [{<<"Call-ID">>, UUID}
-              ,{<<"Active-Only">>, true}
-              ,{<<"Channel-Record">>, true}
+              ,{<<"Active-Only">>, 'true'}
+              ,{<<"Channel-Record">>, 'true'}
               | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
               ],
     kz_amqp_worker:call(Command

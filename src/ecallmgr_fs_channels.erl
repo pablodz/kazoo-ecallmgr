@@ -391,11 +391,15 @@ handle_channel_status(JObj, _Props) ->
 
 -type api_status_node_info() :: {kz_term:ne_binary(), kz_term:ne_binary()}.
 
--spec api_status(kz_term:ne_binary()) -> {'ok', kz_term:proplist()} | {'error', _}.
+-spec api_status(kz_term:ne_binary()) ->
+          {'ok', kz_term:proplist()} |
+          {'error', 'not_found'}.
 api_status(CallId) ->
-    api_status(CallId, false).
+    api_status(CallId, 'false').
 
--spec api_status(kz_term:ne_binary(), boolean()) -> {'ok', kz_term:proplist()} | {'error', _}.
+-spec api_status(kz_term:ne_binary(), boolean()) ->
+          {'ok', kz_term:proplist()} |
+          {'error', 'not_found'}.
 api_status(CallId, ChannelRecord) ->
     case ecallmgr_fs_channel:fetch(CallId, 'api') of
         {'error', _} = Error -> Error;
@@ -403,14 +407,14 @@ api_status(CallId, ChannelRecord) ->
     end.
 
 -spec api_status_return(kz_term:ne_binary(), boolean(), kz_json:object()) -> {'ok', kz_term:proplist()}.
-api_status_return(CallId, true, Channel) ->
+api_status_return(CallId, 'true', Channel) ->
     api_status_log_node(Channel),
     Resp = [{<<"Call-ID">>, CallId}
            ,{<<"Status">>, <<"active">>}
            ,{<<"Channel-Record">>, Channel}
            ],
     {'ok', Resp ++ kz_api:default_headers(?APP_NAME, ?APP_VERSION)};
-api_status_return(CallId, false, Channel) ->
+api_status_return(CallId, 'false', Channel) ->
     {Node, Hostname} = api_status_node(Channel),
     lager:debug("channel is on ~s", [Hostname]),
     Profile = kz_json:get_binary_value(<<"Profile">>, Channel),
@@ -440,7 +444,7 @@ api_status_node(Channel) ->
                end,
     {Node, Hostname}.
 
--spec api_status_log_node(kz_term:object() | api_status_node_info()) -> ok.
+-spec api_status_log_node(kz_term:object() | api_status_node_info()) -> 'ok'.
 api_status_log_node({_Node, Hostname}) ->
     lager:debug("channel is on ~s", [Hostname]);
 api_status_log_node(Channel) ->
@@ -473,12 +477,12 @@ handle_query_endpoint_channels(JObj, _Props) ->
            ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
            | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
            ],
-    ServerId = kz_json:get_value(<<"Server-ID">>, JObj),
+    ServerId = kz_api:server_id(JObj),
     lager:debug("sending back endpoint query (~B) result to ~s", [length(UUIDs), ServerId]),
     kapi_call:publish_query_endpoint_channels_resp(ServerId, Resp).
 
-query_endpoint_channels_reply(true, UUIDs) -> {<<"Count">>, length(UUIDs)};
-query_endpoint_channels_reply(false, UUIDs) -> {<<"Channels">>, UUIDs}.
+query_endpoint_channels_reply('true', UUIDs) -> {<<"Count">>, length(UUIDs)};
+query_endpoint_channels_reply('false', UUIDs) -> {<<"Channels">>, UUIDs}.
 
 
 -spec count_endpoint_channels(kz_json:object()) -> integer().
@@ -502,14 +506,14 @@ query_endpoint_channels(JObj) ->
 
 -spec query_endpoint_channels(kz_term:ne_binary(), kz_term:ne_binary()) -> kz_term:ne_binaries().
 query_endpoint_channels(AccountId, EndpointId) ->
-    query_endpoint_channels(AccountId, EndpointId, undefined).
+    query_endpoint_channels(AccountId, EndpointId, 'undefined').
 
 -spec query_endpoint_channels(kz_term:ne_binary(), kz_term:ne_binary(), kz_term:api_ne_binary()) -> kz_term:ne_binaries().
 query_endpoint_channels(AccountId, EndpointId, Direction) ->
     MatchSpec = query_endpoint_channels_match_spec(AccountId, EndpointId, Direction),
     ets:select(?CHANNELS_TBL, MatchSpec).
 
-query_endpoint_channels_match_spec(AccountId, EndpointId, undefined) ->
+query_endpoint_channels_match_spec(AccountId, EndpointId, 'undefined') ->
     [{#channel{uuid = '$1', account_id = '$2', authorizing_id = '$3', owner_id = '$4', _ = '_'}
      ,[{'andalso',
         {'=:=', '$2', {'const', AccountId}},

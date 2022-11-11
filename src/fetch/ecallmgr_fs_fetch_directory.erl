@@ -300,7 +300,7 @@ reverse_auth(#{payload := JObj}=Context) ->
           ,{<<"Auth-Username">>, Username}
           ],
     case kz_directory:lookup_by_user_realm(Username, Realm) of
-        {ok, Endpoint} ->
+        {'ok', Endpoint} ->
             {'ok', Xml} = ecallmgr_fs_xml:reverse_authn_resp_xml(kz_json:set_values(KVs, kz_ccv:ccvs(Endpoint))),
             send_reply(Context#{reply => iolist_to_binary(Xml)});
         _Else ->

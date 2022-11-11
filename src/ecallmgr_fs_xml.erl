@@ -785,8 +785,7 @@ kazoo_var_to_fs_var(_, Vars) -> Vars.
 kazoo_merge_vars(Props) when is_list(Props) ->
     kz_json:to_proplist(kazoo_merge_vars(kz_json:from_list(Props)));
 kazoo_merge_vars(JObj) ->
-    Routines = [fun kazoo_merge_hold_media/1
-               ],
+    Routines = [fun kazoo_merge_hold_media/1],
     lists:foldl(fun kazoo_merge_vars_fold/2, JObj, Routines).
 
 kazoo_merge_vars_fold(Fun, JObj) -> Fun(JObj).
@@ -801,7 +800,7 @@ kazoo_merge_hold_media(JObj) ->
 
 kazoo_merge_hold_media_fold({Key, NewKey}, JObj) ->
     case kz_json:get_value(Key, JObj) of
-        undefined -> JObj;
+        'undefined' -> JObj;
         Value -> kz_json:set_value(NewKey, Value, kz_json:delete_key(Key, JObj))
     end.
 

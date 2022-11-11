@@ -183,7 +183,7 @@ collect(Master, ACLs, PidRefs, Timeout, Errors) ->
 
 process_collect_result(Master, ACLName, ACL, ACLs) ->
     case kz_json:get_value(ACLName, ACLs) of
-        undefined -> process_collect_result_add_acl(ACLName, ACL, ACLs);
+        'undefined' -> process_collect_result_add_acl(ACLName, ACL, ACLs);
         Existing -> process_collect_result_check_existing_acl(Master, ACLName, ACL, ACLs, Existing)
     end.
 
@@ -198,8 +198,8 @@ process_collect_result_check_existing_acl(Master, ACLName, ACL, ACLs, Existing) 
     case NewAccountId =:= Master
         orelse ExistingAccountId =/= Master
     of
-        true -> process_collect_result_add_acl(ACLName, ACL, ACLs);
-        false -> ACLs
+        'true' -> process_collect_result_add_acl(ACLName, ACL, ACLs);
+        'false' -> ACLs
     end.
 
 collect_continue(Master, ACLs, PidRefs, Ref, Pid, Reason, Timeout, Errors) ->

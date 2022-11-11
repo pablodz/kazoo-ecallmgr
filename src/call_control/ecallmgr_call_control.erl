@@ -651,15 +651,15 @@ is_play_app(AppName) -> lists:member(AppName, play_apps()).
 -spec handle_playback_complete(kz_term:ne_binary(), kz_json:object(), state()) -> state().
 handle_playback_complete(AppName, JObj, State) ->
     case is_play_app(AppName) of
-        true -> handle_playback_flush(AppName, JObj, State);
-        false -> State
+        'true' -> handle_playback_flush(AppName, JObj, State);
+        'false' -> State
     end.
 
 -spec handle_playback_flush(kz_term:ne_binary(), kz_json:object(), state()) -> state().
 handle_playback_flush(AppName, JObj, #state{command_q=CmdQ}=State) ->
     lager:debug("~s finished, checking for group-id/DTMF termination", [AppName]),
     case kz_json:get_ne_binary_value(<<"DTMF-Digit">>, JObj) of
-        undefined -> State;
+        'undefined' -> State;
         _DTMF ->
             GroupId = kz_json:get_ne_binary_value(<<"Group-ID">>, JObj),
             lager:debug("DTMF ~s terminated playback, flushing all with group id ~s"

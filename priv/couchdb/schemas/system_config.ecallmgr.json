@@ -353,6 +353,10 @@
             "description": "ecallmgr tcp packet type",
             "type": "integer"
         },
+        "trusted_authorizing_id": {
+            "description": "ecallmgr trusted_authorizing_id",
+            "type": "string"
+        },
         "use_bypass_media_after_bridge": {
             "default": false,
             "description": "ecallmgr use bypass media after bridge",

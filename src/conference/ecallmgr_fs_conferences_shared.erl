@@ -357,6 +357,6 @@ query_cluster_for_call(CallId) ->
 -spec choose_random_media_server() -> atom().
 choose_random_media_server() ->
     case ecallmgr_fs_nodes:connected() of
-        [] -> undefined;
+        [] -> 'undefined';
         Servers -> hd(kz_term:shuffle_list(Servers))
     end.

@@ -114,7 +114,7 @@ bind(Node, Type) -> ?FS_MODULE:bind(Node, Type).
 -spec bind(atom(), atom(), pos_integer()) -> fs_api_return().
 bind(Node, Type, Timeout) -> ?FS_MODULE:bind(Node, Type, Timeout).
 
--spec fetch_reply(map()) -> 'ok' | {'ok', any()} | {'error', any()}.
+-spec fetch_reply(map()) -> 'ok'.
 fetch_reply(#{node := Node} = Context) ->
     ?FS_MODULE:fetch_reply(Context).
 

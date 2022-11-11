@@ -53,7 +53,9 @@ channel_req(#{node := Node, fetch_id := FetchId, payload := JObj} = Context) ->
         andalso props:get_ne_binary_value(<<"switch_url">>, TargetChannel) =/= 'undefined'
     of
         'false' ->
-            lager:error_unsafe("fetch channel failed => ~p => ~p => ~p", [TargetChannel, FromChannel, ForChannel]),
+            lager:error_unsafe("fetch channel failed (target channel) => ~p", [TargetChannel]),
+            lager:error_unsafe("fetch channel failed (from channel) => ~p", [FromChannel]),
+            lager:error_unsafe("fetch channel failed (for channel) => ~p", [ForChannel]),
             channel_not_found(Context);
         'true' ->
             SwitchURL = props:get_ne_binary_value(<<"switch_url">>, TargetChannel),
@@ -134,15 +136,15 @@ channel_resp_dialprefix(SwitchURL, JObj, FromChannel, ForChannel) ->
               ,{<<"sip_route_uri">>, SwitchURL}
               ,{<<"sip_contact_user">>, kz_json:get_ne_binary_value(<<"refer-to-user">>, JObj)}
               ,{<<"sip_transport">>, switch_url_transport(SwitchURL)}
-              ,{<<"ecallmgr_", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, FromChannelCCVs)}
-              ,{<<?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, FromChannelCCVs)}
+              ,{<<"ecallmgr_", ?CALL_INTERACTION_ID>>, props:get_value(<<"interaction_id">>, FromChannel)}
+              ,{<<?CALL_INTERACTION_ID>>, props:get_value(<<"interaction_id">>, FromChannel)}
               ,{<<"ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, FromChannelCCVs)}
               ,{<<"ecallmgr_Realm">>, props:get_value(<<"Realm">>, FromChannelCCVs)}
               ,{<<"ecallmgr_Authorizing-Type">>, props:get_value(<<"Authorizing-Type">>, FromChannelCCVs)}
               ,{<<"ecallmgr_Authorizing-ID">>, props:get_value(<<"Authorizing-ID">>, FromChannelCCVs)}
               ,{<<"ecallmgr_Owner-ID">>, props:get_value(<<"Owner-ID">>, FromChannelCCVs)}
               ,{<<"presence_id">>, props:get_value(<<"Presence-ID">>, FromChannelCCVs)}
-              ,{<<"sip_h_X-FS-", ?CALL_INTERACTION_ID>>, props:get_value(<<"Call-Interaction-ID">>, FromChannelCCVs)}
+              ,{<<"sip_h_X-FS-", ?CALL_INTERACTION_ID>>, props:get_value(<<"interaction_id">>, FromChannel)}
               ,{<<"sip_h_X-ecallmgr_Account-ID">>, props:get_value(<<"Account-ID">>, FromChannelCCVs)}
               ,{<<"sip_h_X-FS-From-Core-UUID">>, kz_json:get_value(<<"Core-UUID">>, JObj)}
               ,{<<"sip_h_X-FS-Refer-Partner-UUID">>, props:get_value(<<"other_leg">>, FromChannel)}

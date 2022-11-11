@@ -292,6 +292,60 @@ to_api_props(?NE_BINARY=CallId) ->
     {'ok', #channel{}=Channel} = fetch(CallId, 'record'),
     to_api_props(Channel).
 
+
+-spec from_api_json(kz_json:object()) -> channel().
+from_api_json(JObj) ->
+    from_api_props(kz_json:to_proplist(<<"Channel-Record">>, JObj)).
+
+-spec from_api_props(kz_term:proplist()) -> channel().
+from_api_props(Props) ->
+    #channel{account_billing = props:get_value(<<"Account-Billing">>, Props)
+            ,account_id = props:get_value(<<"Account-ID">>, Props)
+            ,answered = props:get_value(<<"Answered">>, Props)
+            ,authorizing_id = props:get_value(<<"Authorizing-ID">>, Props)
+            ,authorizing_type = props:get_value(<<"Authorizing-Type">>, Props)
+            ,bridge_id = props:get_value(<<"Bridge-ID">>, Props)
+            ,direction = props:get_value(<<"Call-Direction">>, Props)
+            ,uuid = props:get_value(<<"Call-ID">>, Props)
+            ,callee_name = props:get_value(<<"Callee-ID-Name">>, Props)
+            ,callee_number = props:get_value(<<"Callee-ID-Number">>, Props)
+            ,caller_name = props:get_value(<<"Caller-ID-Name">>, Props)
+            ,caller_number = props:get_value(<<"Caller-ID-Number">>, Props)
+            ,callflow_id = props:get_value(<<"CallFlow-ID">>, Props)
+            ,is_authorized = props:get_value(<<"Channel-Authorized">>, Props)
+            ,context = props:get_value(<<"Context">>, Props)
+            ,cavs = props:get_value(<<"Custom-Application-Vars">>, Props)
+            ,ccvs = props:get_value(<<"Custom-Channel-Vars">>, Props)
+            ,cshs = props:get_value(<<"Custom-SIP-Headers">>, Props)
+            ,cahs = props:get_value(<<"Custom-AUTH-Headers">>, Props)
+            ,destination = props:get_value(<<"estination">>, Props)
+            ,request = props:get_value(<<"Request">>, Props)
+            ,dialplan = props:get_value(<<"Dialplan">>, Props)
+            ,fetch_id = props:get_value(<<"Fetch-ID">>, Props)
+            ,from = props:get_value(<<"From">>, Props)
+            ,from_tag = props:get_value(<<"From-Tag">>, Props)
+            ,is_loopback = props:get_value(<<"Is-Loopback">>, Props)
+            ,is_onhold = props:get_value(<<"Is-On-Hold">>, Props)
+            ,loopback_leg_name = props:get_value(<<"Loopback-Leg-Name">>, Props)
+            ,loopback_other_leg = props:get_value(<<"Loopback-Other-Leg">>, Props)
+            ,node = kz_term:to_atom(props:get_value(<<"Media-Node">>, Props), true)
+            ,other_leg = props:get_value(<<"Other-Leg-Call-ID">>, Props)
+            ,owner_id = props:get_value(<<"Owner-ID">>, Props)
+            ,precedence = props:get_value(<<"Precedence">>, Props)
+            ,presence_id = props:get_value(<<"Presence-ID">>, Props)
+            ,profile = props:get_value(<<"Profile">>, Props)
+            ,realm = props:get_value(<<"Realm">>, Props)
+            ,reseller_billing = props:get_value(<<"Reseller-Billing">>, Props)
+            ,reseller_id = props:get_value(<<"Reseller-ID">>, Props)
+            ,resource_id = props:get_value(<<"Resource-ID">>, Props)
+            ,switch_url = props:get_value(<<"Switch-URL">>, Props)
+            ,timestamp = props:get_value(<<"Timestamp">>, Props)
+            ,to = props:get_value(<<"To">>, Props)
+            ,to_tag = props:get_value(<<"To-Tag">>, Props)
+            ,username = props:get_value(<<"Username">>, Props)
+            ,interaction_id = props:get_value(<<?CALL_INTERACTION_ID>>, Props)
+            }.
+
 -spec channel_ccvs(channel() | kz_json:object() | kz_term:proplist()) -> kz_term:proplist().
 channel_ccvs(#channel{ccvs='undefined'}) -> [];
 channel_ccvs(#channel{ccvs=CCVs}) -> kz_json:to_proplist(CCVs);
@@ -341,25 +395,27 @@ channel_cahs(JObj) ->
 
 -spec fetch_channel(kz_term:ne_binary()) -> kz_term:proplist() | 'undefined'.
 fetch_channel(UUID) ->
-    case fetch(UUID, 'proplist') of
-        {'error', 'not_found'} -> fetch_remote(UUID);
-        {'ok', Channel} -> Channel
+    fetch_channel(UUID, 'proplist').
+
+-spec fetch_channel(kz_term:ne_binary(), channel_format()) -> fetch_resp() | 'undefined'.
+fetch_channel(UUID, Format) ->
+    case fetch(UUID, 'record') of
+        {'error', 'not_found'} -> fetch_remote(UUID, Format);
+        {'ok', Channel} -> format(Format, Channel)
     end.
 
--spec fetch_remote(kz_term:ne_binary()) -> kz_term:proplist() | 'undefined'.
-fetch_remote(UUID) ->
+-spec fetch_remote(kz_term:ne_binary(), channel_format()) -> fetch_resp() | 'undefined'.
+fetch_remote(UUID, Format) ->
     case get_active_channel_status(UUID) of
         {'error', _} -> 'undefined';
-        {'ok', JObj} ->
-            Props = kz_json:recursive_to_proplist(JObj),
-            CCVs = kz_json:get_value(<<"Custom-Channel-Vars">>, JObj, kz_json:new()),
-            Props ++ kz_json:to_proplist(kz_json:normalize(CCVs))
+        {'ok', JObj} -> format(Format, from_api_json(JObj))
     end.
 
 -spec get_active_channel_status(kz_term:ne_binary()) -> kz_amqp_worker:request_return().
 get_active_channel_status(UUID) ->
     Command = [{<<"Call-ID">>, UUID}
-              ,{<<"Active-Only">>, <<"true">>}
+              ,{<<"Active-Only">>, true}
+              ,{<<"Channel-Record">>, true}
               | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
               ],
     kz_amqp_worker:call(Command

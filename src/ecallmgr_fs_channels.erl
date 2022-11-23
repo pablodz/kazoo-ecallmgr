@@ -39,6 +39,9 @@
 
 -export([handle_query_auth_id/2]).
 -export([handle_query_user_channels/2]).
+-export([handle_query_endpoint_channels/2
+        ,query_endpoint_channels/1, query_endpoint_channels/2
+        ]).
 -export([handle_query_account_channels/2]).
 -export([handle_query_channels/2]).
 -export([handle_channel_status/2]).
@@ -79,6 +82,9 @@
                      }
                     ,{{?MODULE, 'handle_channel_status'}
                      ,[{<<"channel">>, <<"channel_status_req">>}]
+                     }
+                    ,{{?MODULE, 'handle_query_endpoint_channels'}
+                     ,[{<<"channel">>, <<"query_endpoint_channels_req">>}]
                      }
                     ]).
 -define(BINDINGS, [{'call', [{'restrict_to', ['status_req']}
@@ -456,6 +462,58 @@ send_empty_channel_resp(CallId, JObj) ->
            ],
     lager:debug("sending back empty channel data to ~s", [kz_api:server_id(JObj)]),
     kapi_call:publish_channel_status_resp(kz_api:server_id(JObj), Resp).
+
+-spec handle_query_endpoint_channels(kz_json:object(), kz_term:proplist()) -> 'ok'.
+handle_query_endpoint_channels(JObj, _Props) ->
+    'true' = kapi_call:query_endpoint_channels_req_v(JObj),
+    UUIDs = query_endpoint_channels(JObj),
+    CountOnly = kz_json:is_true(<<"Count-Only">>, JObj),
+    Resp = [query_endpoint_channels_reply(CountOnly, UUIDs)
+           ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
+           | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+           ],
+    ServerId = kz_json:get_value(<<"Server-ID">>, JObj),
+    lager:debug("sending back endpoint query (~B) result to ~s", [length(UUIDs), ServerId]),
+    kapi_call:publish_query_endpoint_channels_resp(ServerId, Resp).
+
+query_endpoint_channels_reply(true, UUIDs) -> {<<"Count">>, length(UUIDs)};
+query_endpoint_channels_reply(false, UUIDs) -> {<<"Channels">>, UUIDs}.
+
+-spec query_endpoint_channels(kz_json:object() | kz_term:ne_binary()) -> kz_term:ne_binaries().
+query_endpoint_channels(EndpointId)
+  when is_binary(EndpointId) ->
+    query_endpoint_channels(EndpointId, undefined);
+query_endpoint_channels(JObj) ->
+    EndpointId = kz_json:get_ne_binary_value(<<"Endpoint-ID">>, JObj),
+    Direction = kz_json:get_ne_binary_value(<<"Direction">>, JObj),
+    query_endpoint_channels(EndpointId, Direction).
+
+-spec query_endpoint_channels(kz_term:ne_binary(), kz_term:ne_binary()) -> kz_term:ne_binaries().
+query_endpoint_channels(EndpointId, Direction) ->
+    MatchSpec = query_endpoint_channels_match_spec(EndpointId, Direction),
+    ets:select(?CHANNELS_TBL, MatchSpec).
+
+query_endpoint_channels_match_spec(EndpointId, undefined) ->
+    [{#channel{uuid = '$1', authorizing_id = '$2', owner_id = '$3', _ = '_'}
+     ,[{'orelse',
+        {'=:=', '$2', {'const', EndpointId}}
+       ,{'=:=', '$3', {'const', EndpointId}}
+       }
+      ]
+     ,['$1']}
+    ];
+query_endpoint_channels_match_spec(EndpointId, Direction) ->
+    [{#channel{uuid = '$1', authorizing_id = '$2', owner_id = '$3', direction = '$4', _ = '_'}
+     ,[{'andalso',
+        {'orelse',
+         {'=:=', '$2', {'const', EndpointId}}
+        ,{'=:=', '$3', {'const', EndpointId}}
+        }
+       ,{'=:=', '$4', {'const', Direction}}
+       }
+      ]
+     ,['$1']}
+    ].
 
 %%%=============================================================================
 %%% gen_server callbacks

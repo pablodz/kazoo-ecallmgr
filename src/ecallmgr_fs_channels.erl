@@ -40,7 +40,8 @@
 -export([handle_query_auth_id/2]).
 -export([handle_query_user_channels/2]).
 -export([handle_query_endpoint_channels/2
-        ,query_endpoint_channels/1, query_endpoint_channels/2
+        ,query_endpoint_channels/1, query_endpoint_channels/2, query_endpoint_channels/3
+        ,count_endpoint_channels/1, count_endpoint_channels/2, count_endpoint_channels/3
         ]).
 -export([handle_query_account_channels/2]).
 -export([handle_query_channels/2]).
@@ -479,37 +480,58 @@ handle_query_endpoint_channels(JObj, _Props) ->
 query_endpoint_channels_reply(true, UUIDs) -> {<<"Count">>, length(UUIDs)};
 query_endpoint_channels_reply(false, UUIDs) -> {<<"Channels">>, UUIDs}.
 
--spec query_endpoint_channels(kz_json:object() | kz_term:ne_binary()) -> kz_term:ne_binaries().
-query_endpoint_channels(EndpointId)
-  when is_binary(EndpointId) ->
-    query_endpoint_channels(EndpointId, undefined);
+
+-spec count_endpoint_channels(kz_json:object()) -> integer().
+count_endpoint_channels(JObj) ->
+    length(query_endpoint_channels(JObj)).
+
+-spec count_endpoint_channels(kz_term:ne_binary(), kz_term:ne_binary()) -> integer().
+count_endpoint_channels(AccountId, EndpointId) ->
+    length(query_endpoint_channels(AccountId, EndpointId)).
+
+-spec count_endpoint_channels(kz_term:ne_binary(), kz_term:ne_binary(), kz_term:api_ne_binary()) -> integer().
+count_endpoint_channels(AccountId, EndpointId, Direction) ->
+    length(query_endpoint_channels(AccountId, EndpointId, Direction)).
+
+-spec query_endpoint_channels(kz_json:object()) -> kz_term:ne_binaries().
 query_endpoint_channels(JObj) ->
+    AccountId = kz_json:get_ne_binary_value(<<"Account-ID">>, JObj),
     EndpointId = kz_json:get_ne_binary_value(<<"Endpoint-ID">>, JObj),
     Direction = kz_json:get_ne_binary_value(<<"Direction">>, JObj),
-    query_endpoint_channels(EndpointId, Direction).
+    query_endpoint_channels(AccountId, EndpointId, Direction).
 
 -spec query_endpoint_channels(kz_term:ne_binary(), kz_term:ne_binary()) -> kz_term:ne_binaries().
-query_endpoint_channels(EndpointId, Direction) ->
-    MatchSpec = query_endpoint_channels_match_spec(EndpointId, Direction),
+query_endpoint_channels(AccountId, EndpointId) ->
+    query_endpoint_channels(AccountId, EndpointId, undefined).
+
+-spec query_endpoint_channels(kz_term:ne_binary(), kz_term:ne_binary(), kz_term:api_ne_binary()) -> kz_term:ne_binaries().
+query_endpoint_channels(AccountId, EndpointId, Direction) ->
+    MatchSpec = query_endpoint_channels_match_spec(AccountId, EndpointId, Direction),
     ets:select(?CHANNELS_TBL, MatchSpec).
 
-query_endpoint_channels_match_spec(EndpointId, undefined) ->
-    [{#channel{uuid = '$1', authorizing_id = '$2', owner_id = '$3', _ = '_'}
-     ,[{'orelse',
-        {'=:=', '$2', {'const', EndpointId}}
-       ,{'=:=', '$3', {'const', EndpointId}}
+query_endpoint_channels_match_spec(AccountId, EndpointId, undefined) ->
+    [{#channel{uuid = '$1', account_id = '$2', authorizing_id = '$3', owner_id = '$4', _ = '_'}
+     ,[{'andalso',
+        {'=:=', '$2', {'const', AccountId}},
+        {'orelse',
+         {'=:=', '$3', {'const', EndpointId}}
+        ,{'=:=', '$4', {'const', EndpointId}}
+        }
        }
       ]
      ,['$1']}
     ];
-query_endpoint_channels_match_spec(EndpointId, Direction) ->
-    [{#channel{uuid = '$1', authorizing_id = '$2', owner_id = '$3', direction = '$4', _ = '_'}
+query_endpoint_channels_match_spec(AccountId, EndpointId, Direction) ->
+    [{#channel{uuid = '$1', account_id = '$2', authorizing_id = '$3', owner_id = '$4', direction = '$5', _ = '_'}
      ,[{'andalso',
-        {'orelse',
-         {'=:=', '$2', {'const', EndpointId}}
-        ,{'=:=', '$3', {'const', EndpointId}}
+        {'andalso',
+         {'=:=', '$2', {'const', AccountId}},
+         {'orelse',
+          {'=:=', '$3', {'const', EndpointId}}
+         ,{'=:=', '$4', {'const', EndpointId}}
+         }
         }
-       ,{'=:=', '$4', {'const', Direction}}
+       ,{'=:=', '$5', {'const', Direction}}
        }
       ]
      ,['$1']}
@@ -535,6 +557,7 @@ init([]) ->
                                ,{'read_concurrency', 'true'}
                                ,{'write_concurrency', 'true'}
                                ]),
+    pg:join({kz_config:zone(), 'channel_cache'}, self()),
     {'ok', #state{max_channel_cleanup_ref=start_cleanup_ref()}}.
 
 -define(CLEANUP_TIMEOUT

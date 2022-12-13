@@ -892,7 +892,7 @@ media_control_fold(K, V, Acc) ->
 -spec kazoo_cavs_to_fs_vars_fold(kz_json:key(), kz_json:json_term(), iolist()) -> iolist().
 kazoo_cavs_to_fs_vars_fold(K, V, Acc) ->
     {Prefix, Val} = kazoo_cav_prefix_and_value(V),
-    Prefix1 = [Prefix, kz_term:to_list(K)],
+    Prefix1 = list_to_binary([Prefix, K]),
     [encode_fs_val(Prefix1, Val) | Acc].
 
 -spec kazoo_cav_prefix_and_value(kz_json:json_term()) -> {string(), string()}.
@@ -903,7 +903,7 @@ kazoo_cav_prefix_and_value(V) ->
                         end,
     %% Escape all embedded single quotes and commas so that FS can consume them
     Escaped = re:replace(Encoded, <<"([,'])">>, <<"\\\\\\g1">>, ['global', {'return', 'binary'}]),
-    {Prefix, kz_term:to_list(Escaped)}.
+    {Prefix, Escaped}.
 
 -spec codec_mappings(kz_term:ne_binary()) -> kz_term:ne_binary().
 codec_mappings(<<"G722_32">>) ->
@@ -1924,6 +1924,7 @@ kz_endpoint_separator() ->
 -define(EXCLUDE_VARIABLE_GROUPS, []).
 
 -define(DIRECTORY_VARIABLES_KEYS, [<<"Custom-Channel-Vars">>
+                                  ,<<"Custom-Application-Vars">>
                                   ,<<"Codecs">>
                                   ]).
 
@@ -1935,6 +1936,8 @@ get_directory_variables(JObj) ->
 -spec get_directory_variables(kz_term:ne_binary(), kz_json:object(), kz_types:xml_els()) -> kz_types:xml_els().
 get_directory_variables(<<"Codecs">>, Endpoint, Acc) ->
     codecs_els(Endpoint) ++ Acc;
+get_directory_variables(<<"Custom-Application-Vars">> = Key, Endpoint, Acc) ->
+    cavs_els(kz_json:get_json_value(Key, Endpoint)) ++ Acc;
 get_directory_variables(ObjectKey, JObj, Acc) ->
     Props = kz_json:to_proplist(ObjectKey, JObj),
     get_directory_variables(kazoo_merge_vars(Props), Acc).
@@ -1983,3 +1986,12 @@ codecs_els(Endpoint) ->
 codecs_el(Codecs) ->
     CodecsMap = [codec_mappings(Codec) || Codec <- Codecs, not kz_term:is_empty(Codec)],
     variable_el(<<"absolute_codec_string">> , kz_binary:join(CodecsMap, <<",">>)).
+
+cavs_els(undefined) -> [];
+cavs_els(CAVs) ->
+    kz_json:foldl(fun cav_el/3, [], CAVs).
+
+cav_el(Key, Value, Acc) ->
+    {Prefix, Val} = kazoo_cav_prefix_and_value(Value),
+    Name = list_to_binary([Prefix, Key]),
+    [get_directory_variable({Name, Val}) | Acc].

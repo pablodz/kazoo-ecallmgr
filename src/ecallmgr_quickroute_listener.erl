@@ -179,9 +179,12 @@ does_route_matches_account(AccountId, Route) ->
         _ -> 'false'
     end.
 
--spec quickroutes_resp(kapi_route:quickroute_query_req(), kz_json:objects()) -> 'ok'.
+-spec quickroutes_resp(kapi_route:quickroutes_query(), kz_json:objects()) -> 'ok'.
 quickroutes_resp(Req, QuickRoutes) ->
-    Resp = [{<<"Quickroutes">>, [export_quickroute(Number, QuickRoute) || {Number, QuickRoute} <- QuickRoutes]}
+    Resp = [{<<"Quickroutes">>, [export_quickroute(Number, QuickRoute)
+                                 || {Number, QuickRoute} <- QuickRoutes
+                                ]
+            }
            ,{<<"Msg-ID">>, kz_api:msg_id(Req)}
            | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
            ],

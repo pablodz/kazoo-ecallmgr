@@ -435,7 +435,7 @@ api_status_return(CallId, 'false', Channel) ->
             ),
     {'ok', Resp ++ kz_api:default_headers(?APP_NAME, ?APP_VERSION)}.
 
--spec api_status_node(kz_term:object()) -> api_status_node_info().
+-spec api_status_node(kz_json:object()) -> api_status_node_info().
 api_status_node(Channel) ->
     Node = kz_json:get_binary_value(<<"Media-Node">>, Channel),
     Hostname = case binary:split(Node, <<"@">>) of
@@ -444,7 +444,7 @@ api_status_node(Channel) ->
                end,
     {Node, Hostname}.
 
--spec api_status_log_node(kz_term:object() | api_status_node_info()) -> 'ok'.
+-spec api_status_log_node(kz_json:object() | api_status_node_info()) -> 'ok'.
 api_status_log_node({_Node, Hostname}) ->
     lager:debug("channel is on ~s", [Hostname]);
 api_status_log_node(Channel) ->

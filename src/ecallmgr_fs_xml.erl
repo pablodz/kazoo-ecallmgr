@@ -1987,7 +1987,7 @@ codecs_el(Codecs) ->
     CodecsMap = [codec_mappings(Codec) || Codec <- Codecs, not kz_term:is_empty(Codec)],
     variable_el(<<"absolute_codec_string">> , kz_binary:join(CodecsMap, <<",">>)).
 
-cavs_els(undefined) -> [];
+cavs_els('undefined') -> [];
 cavs_els(CAVs) ->
     kz_json:foldl(fun cav_el/3, [], CAVs).
 

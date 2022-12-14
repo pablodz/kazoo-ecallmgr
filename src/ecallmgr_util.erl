@@ -610,7 +610,7 @@ get_fs_key(<<?CHANNEL_LOOPBACK_HEADER_PREFIX, K/binary>>) ->
 get_fs_key(Key) ->
     case lists:keyfind(Key, 1, ?SPECIAL_CHANNEL_VARS) of
         'false' -> ?CCV(Key);
-        {_, Prefix} -> Prefix
+        {_, FSKey} -> FSKey
     end.
 
 -spec get_fs_key_and_value(kz_term:ne_binary()
@@ -703,7 +703,22 @@ maybe_sanitize_fs_value(Key, Val) when not is_binary(Key) ->
     maybe_sanitize_fs_value(kz_term:to_binary(Key), Val);
 maybe_sanitize_fs_value(Key, Val) when not is_binary(Val) ->
     maybe_sanitize_fs_value(Key, kz_term:to_binary(Val));
-maybe_sanitize_fs_value(_, Val) -> Val.
+maybe_sanitize_fs_value(Key, Val) ->
+    case get_fs_transform_value(Key) of
+        undefined -> Val;
+        Transform -> transform_fs_value(Transform, Val)
+    end.
+
+transform_fs_value({prepend, Prepend}, Val) ->
+    list_to_binary([Prepend, " ", Val]);
+transform_fs_value(media, Val) ->
+    media_path(Val, 'extant', get('callid'), kz_json:new()).
+
+get_fs_transform_value(Key) ->
+    case lists:keyfind(Key, 1, ?SPECIAL_CHANNEL_TRANSFORMS) of
+        {_, Transform} -> Transform;
+        _Else -> undefined
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc takes endpoints (/sofia/foo/bar), and optionally a caller id name/num

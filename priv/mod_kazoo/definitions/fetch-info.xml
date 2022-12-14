@@ -16,6 +16,8 @@
 	<field name="Fetch-Key-Value"/>
 	<field name="Fetch-Tag"/>
 
+	<field name="fetch-params" type="reference" />
+
 	<field name="Kazoo-Bundle" as="Fetch-Version" />
 	<!--
 	<field name="Kazoo-Version"/>

@@ -43,6 +43,9 @@
         ,query_endpoint_channels/1, query_endpoint_channels/2, query_endpoint_channels/3
         ,count_endpoint_channels/1, count_endpoint_channels/2, count_endpoint_channels/3
         ]).
+-export([handle_count/2
+        ,count/1, count/2, count/3, count/4
+        ]).
 -export([handle_query_account_channels/2]).
 -export([handle_query_channels/2]).
 -export([handle_channel_status/2]).
@@ -86,6 +89,9 @@
                      }
                     ,{{?MODULE, 'handle_query_endpoint_channels'}
                      ,[{<<"channel">>, <<"query_endpoint_channels_req">>}]
+                     }
+                    ,{{?MODULE, 'handle_count'}
+                     ,[{<<"channel">>, <<"count_req">>}]
                      }
                     ]).
 -define(BINDINGS, [{'call', [{'restrict_to', ['status_req']}
@@ -589,6 +595,12 @@ handle_call({'new_channel', #channel{uuid=UUID}=Channel}, _, State) ->
 handle_call({'new_or_update', #channel{}=Channel}, _, State) ->
     Result = ets:insert(?CHANNELS_TBL, Channel),
     {'reply', Result, State};
+handle_call({count, {AccountId, OwnerId, DeviceId, Direction}}, From, State) ->
+    _ = kz_process:spawn(fun() -> gen_server:reply(From, count(AccountId, OwnerId, DeviceId, Direction)) end),
+    {noreply, State};
+handle_call({count, Args}, From, State) when is_map(Args) ->
+    _ = kz_process:spawn(fun() -> gen_server:reply(From, count(Args)) end),
+    {noreply, State};
 handle_call(_, _, State) ->
     {'reply', {'error', 'not_implemented'}, State}.
 
@@ -1143,3 +1155,147 @@ channel_match_for_delete(UUID, Node) ->
       ],
       ['true']
      }].
+
+-spec handle_count(kz_json:object(), kz_term:proplist()) -> 'ok'.
+handle_count(JObj, _Props) ->
+    'true' = kapi_call:count_req_v(JObj),
+    Count = count(JObj),
+    Resp = [{<<"Count">>, kz_json:from_map(Count)}
+           ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
+           | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+           ],
+    ServerId = kz_api:server_id(JObj),
+    lager:debug("sending back count result to ~s", [ServerId]),
+    kapi_call:publish_count_resp(ServerId, Resp).
+
+
+-spec count(kz_json:object() | map()) -> map().
+count(Map) when is_map(Map) ->
+    AccountId = maps:get(account, Map),
+    Direction = maps:get(direction, Map, undefined),
+    DeviceId = maps:get(device, Map,  undefined),
+    EndpointId = maps:get(endpoint, Map,  undefined),
+    OwnerId = maps:get(owner, Map,  undefined),
+    UserId = maps:get(user, Map,  undefined),
+    Routines = [{account, AccountId, Direction, fun count_by_account_match_spec/2}
+               ,{device, {AccountId, DeviceId}, Direction, fun count_by_device_match_spec/2}
+               ,{endpoint, {AccountId, EndpointId}, Direction, fun count_by_endpoint_match_spec/2}
+               ,{owner, {AccountId, OwnerId}, Direction, fun count_by_owner_match_spec/2}
+               ,{user, {AccountId, UserId}, Direction, fun count_by_owner_match_spec/2}
+               ],
+    maps:from_list(lists:filtermap(fun count_fun/1, Routines));
+count(JObj) ->
+    Props = [{account, kz_json:get_ne_binary_value(<<"Account-ID">>, JObj)}
+            ,{device, kz_json:get_ne_binary_value(<<"Device-ID">>, JObj)}
+            ,{endpoint, kz_json:get_ne_binary_value(<<"Endpoint-ID">>, JObj)}
+            ,{owner, kz_json:get_ne_binary_value(<<"Owner-ID">>, JObj)}
+            ,{user, kz_json:get_ne_binary_value(<<"User-ID">>, JObj)}
+            ,{direction, kz_json:get_ne_binary_value(<<"Direction">>, JObj)}
+            ],
+    count(maps:from_list(lists:filter(fun({_, V}) -> V =/= undefined end, Props))).
+
+-spec count(kz_term:ne_binary(), kz_term:ne_binary()) -> map().
+count(AccountId, EndpointId) ->
+    count(#{account => AccountId, endpoint => EndpointId}).
+
+-spec count(kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binary()) -> map().
+count(AccountId, OwnerId, DeviceId) ->
+    count(#{account => AccountId, owner => OwnerId, device => DeviceId}).
+
+-spec count(kz_term:ne_binary(), kz_term:api_ne_binary(), kz_term:api_ne_binary(), kz_term:api_ne_binary()) -> map().
+count(AccountId, OwnerId, DeviceId, Direction) ->
+    count(#{account => AccountId, owner => OwnerId, device => DeviceId, direction => Direction}).
+
+count_fun({_, undefined, _, _}) -> false;
+count_fun({_, {_, undefined}, _, _}) -> false;
+count_fun({Header, Id, Direction, Fun}) ->
+    MatchSpec = Fun(Id, Direction),
+    {true, {Header, length(ets:select(?CHANNELS_TBL, MatchSpec))}}.
+
+
+count_by_account_match_spec(AccountId, 'undefined') ->
+    [{#channel{uuid = '$1', account_id = '$2', _ = '_'}
+     ,[{'=:=', '$2', {'const', AccountId}}]
+     ,['$1']}
+    ];
+count_by_account_match_spec(AccountId, Direction) ->
+    [{#channel{uuid = '$1', account_id = '$2', direction = '$3', _ = '_'}
+     ,[{'andalso',
+        {'=:=', '$2', {'const', AccountId}},
+        {'=:=', '$3', {'const', Direction}}
+       }
+      ]
+     ,['$1']}
+    ].
+
+count_by_owner_match_spec({AccountId, OwnerId}, 'undefined') ->
+    [{#channel{uuid = '$1', account_id = '$2', owner_id = '$3', _ = '_'}
+     ,[{'andalso',
+        {'=:=', '$2', {'const', AccountId}},
+        {'=:=', '$3', {'const', OwnerId}}
+       }
+      ]
+     ,['$1']}
+    ];
+count_by_owner_match_spec({AccountId, OwnerId}, Direction) ->
+    [{#channel{uuid = '$1', account_id = '$2', owner_id = '$3', direction = '$4', _ = '_'}
+     ,[{'andalso',
+        {'andalso',
+         {'=:=', '$2', {'const', AccountId}},
+         {'=:=', '$3', {'const', OwnerId}}
+        }
+       ,{'=:=', '$4', {'const', Direction}}
+       }
+      ]
+     ,['$1']}
+    ].
+
+count_by_device_match_spec({AccountId, DeviceId}, 'undefined') ->
+    [{#channel{uuid = '$1', account_id = '$2', authorizing_id = '$3', _ = '_'}
+     ,[{'andalso',
+        {'=:=', '$2', {'const', AccountId}},
+        {'=:=', '$3', {'const', DeviceId}}
+       }
+      ]
+     ,['$1']}
+    ];
+count_by_device_match_spec({AccountId, DeviceId}, Direction) ->
+    [{#channel{uuid = '$1', account_id = '$2', authorizing_id = '$3', direction = '$4', _ = '_'}
+     ,[{'andalso',
+        {'andalso',
+         {'=:=', '$2', {'const', AccountId}},
+         {'=:=', '$3', {'const', DeviceId}}
+        }
+       ,{'=:=', '$4', {'const', Direction}}
+       }
+      ]
+     ,['$1']}
+    ].
+
+count_by_endpoint_match_spec({AccountId, EndpointId}, 'undefined') ->
+    [{#channel{uuid = '$1', account_id = '$2', authorizing_id = '$3', owner_id = '$4', _ = '_'}
+     ,[{'andalso',
+        {'=:=', '$2', {'const', AccountId}},
+        {'orelse',
+         {'=:=', '$3', {'const', EndpointId}}
+        ,{'=:=', '$4', {'const', EndpointId}}
+        }
+       }
+      ]
+     ,['$1']}
+    ];
+count_by_endpoint_match_spec({AccountId, EndpointId}, Direction) ->
+    [{#channel{uuid = '$1', account_id = '$2', authorizing_id = '$3', owner_id = '$4', direction = '$5', _ = '_'}
+     ,[{'andalso',
+        {'andalso',
+         {'=:=', '$2', {'const', AccountId}},
+         {'orelse',
+          {'=:=', '$3', {'const', EndpointId}}
+         ,{'=:=', '$4', {'const', EndpointId}}
+         }
+        }
+       ,{'=:=', '$5', {'const', Direction}}
+       }
+      ]
+     ,['$1']}
+    ].

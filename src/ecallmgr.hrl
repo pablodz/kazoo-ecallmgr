@@ -487,6 +487,7 @@
                              ,'ecallmgr_fs_fetch_channels'
                              ,'ecallmgr_fs_fetch_directory'
                              ,'ecallmgr_fs_fetch_location'
+                             ,'ecallmgr_fs_fetch_limit'
                              ]).
 
 -define(DEFAULT_RESPONSE_CODE, <<"488">>).

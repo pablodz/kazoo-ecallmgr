@@ -1,0 +1,14 @@
+<definition name="fetch-params">
+
+    <field name="Fetch-Params" type="static" serialize-as="object">
+		<filters>
+			<filter name="fetch-params" type="include" compare="prefix" value="Fetch-Param-" exclude-prefix="true" />
+        </filters>
+
+		<fields>
+			<field name="Fetch-Param-" type="prefix" exclude-prefix="true" />
+            <field name="Fetch-Param-Endpoint-Call-Limits" as="Endpoint-Call-Limits" serialize-as="raw" />
+        </fields>
+    </field>
+
+</definition>

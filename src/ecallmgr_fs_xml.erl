@@ -889,7 +889,7 @@ media_control_fold(K, V, Acc) ->
 -spec kazoo_cavs_to_fs_vars_fold(kz_json:key(), kz_json:json_term(), iolist()) -> iolist().
 kazoo_cavs_to_fs_vars_fold(K, V, Acc) ->
     {Prefix, Val} = kazoo_cav_prefix_and_value(V),
-    Prefix1 = list_to_binary([Prefix, K]),
+    Prefix1 = [Prefix, kz_term:to_list(K)],
     [encode_fs_val(Prefix1, Val) | Acc].
 
 -spec kazoo_cav_prefix_and_value(kz_json:json_term()) -> {string(), string()}.
@@ -900,7 +900,14 @@ kazoo_cav_prefix_and_value(V) ->
                         end,
     %% Escape all embedded single quotes and commas so that FS can consume them
     Escaped = re:replace(Encoded, <<"([,'])">>, <<"\\\\\\g1">>, ['global', {'return', 'binary'}]),
-    {Prefix, Escaped}.
+    {Prefix, kz_term:to_list(Escaped)}.
+
+-spec kazoo_cav_prefix(kz_json:json_term()) -> kz_term:ne_binary().
+kazoo_cav_prefix(V) ->
+    case kz_json:is_json_object(V) of
+        'true' -> <<?JSON_APPLICATION_VAR_PREFIX>>;
+        'false' -> <<?APPLICATION_VAR_PREFIX>>
+    end.
 
 -spec codec_mappings(kz_term:ne_binary()) -> kz_term:ne_binary().
 codec_mappings(<<"G722_32">>) ->
@@ -1988,6 +1995,5 @@ cavs_els(CAVs) ->
     kz_json:foldl(fun cav_el/3, [], CAVs).
 
 cav_el(Key, Value, Acc) ->
-    {Prefix, Val} = kazoo_cav_prefix_and_value(Value),
-    Name = list_to_binary([Prefix, Key]),
-    [get_directory_variable({Name, Val}) | Acc].
+    Name = list_to_binary([kazoo_cav_prefix(Value), Key]),
+    [get_directory_variable({Name, ecallmgr_util:maybe_sanitize_fs_value(Key, Value)}) | Acc].

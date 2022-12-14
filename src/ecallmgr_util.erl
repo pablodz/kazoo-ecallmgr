@@ -924,8 +924,7 @@ build_simple_channels(Endpoints) ->
 
 -spec build_bridge_channels(kz_json:objects()) -> bridge_channels().
 build_bridge_channels(Endpoints) ->
-    CWEP = maybe_apply_call_waiting(Endpoints),
-    EPs = endpoint_jobjs_to_records(CWEP),
+    EPs = endpoint_jobjs_to_records(Endpoints),
     FilteredEPs = maybe_filter_failover_channels(EPs, ?FAILOVER_IF_ALL_UNREGED),
     build_bridge_channels(FilteredEPs, []).
 
@@ -941,30 +940,6 @@ maybe_filter_failover_channels(Channels, 'true') ->
     %% it is important to pass bridge strings in intial order to {@link failover_if_all_unregistered/1}
     %% function so only the first duplicated endpoint will ne used.
     failover_if_all_unregistered(lists:reverse(Channels)).
-
--spec maybe_apply_call_waiting(kz_json:objects()) -> kz_json:objects().
-maybe_apply_call_waiting(Endpoints) ->
-    [call_waiting_map(E) || E <- Endpoints].
-
--spec call_waiting_map(kz_json:object()) -> kz_json:object().
-call_waiting_map(Endpoint) ->
-    CCVs = kz_json:get_json_value(<<"Custom-Channel-Vars">>, Endpoint, kz_json:new()),
-    case kz_json:is_true(<<"Call-Waiting-Disabled">>, CCVs) of
-        'false' -> Endpoint;
-        'true' ->
-            OwnerId = kz_json:get_value(<<"Owner-ID">>, CCVs),
-            maybe_add_respond_header(Endpoint, OwnerId)
-    end.
-
--spec maybe_add_respond_header(kz_json:object(), kz_term:ne_binary()) -> kz_json:object().
-maybe_add_respond_header(Endpoint, OwnerId) ->
-    case ecallmgr_fs_channels:has_channels_for_owner(OwnerId) of
-        'true' ->
-            lager:debug("channel must be busy!"),
-            kz_json:set_value([<<"Custom-SIP-Headers">>, <<"X-KAZOO-Respond-With">>], <<"486 User Busy">>, Endpoint);
-        'false' ->
-            Endpoint
-    end.
 
 -spec build_bridge_channels(bridge_endpoints(), build_returns()) -> bridge_channels().
 %% If the Invite-Format is "route" then we have been handed a sip route, do that now

@@ -595,12 +595,12 @@ handle_call({'new_channel', #channel{uuid=UUID}=Channel}, _, State) ->
 handle_call({'new_or_update', #channel{}=Channel}, _, State) ->
     Result = ets:insert(?CHANNELS_TBL, Channel),
     {'reply', Result, State};
-handle_call({count, {AccountId, OwnerId, DeviceId, Direction}}, From, State) ->
+handle_call({'count', {AccountId, OwnerId, DeviceId, Direction}}, From, State) ->
     _ = kz_process:spawn(fun() -> gen_server:reply(From, count(AccountId, OwnerId, DeviceId, Direction)) end),
-    {noreply, State};
-handle_call({count, Args}, From, State) when is_map(Args) ->
+    {'noreply', State};
+handle_call({'count', Args}, From, State) when is_map(Args) ->
     _ = kz_process:spawn(fun() -> gen_server:reply(From, count(Args)) end),
-    {noreply, State};
+    {'noreply', State};
 handle_call(_, _, State) ->
     {'reply', {'error', 'not_implemented'}, State}.
 
@@ -1171,28 +1171,28 @@ handle_count(JObj, _Props) ->
 
 -spec count(kz_json:object() | map()) -> map().
 count(Map) when is_map(Map) ->
-    AccountId = maps:get(account, Map),
-    Direction = maps:get(direction, Map, undefined),
-    DeviceId = maps:get(device, Map,  undefined),
-    EndpointId = maps:get(endpoint, Map,  undefined),
-    OwnerId = maps:get(owner, Map,  undefined),
-    UserId = maps:get(user, Map,  undefined),
-    Routines = [{account, AccountId, Direction, fun count_by_account_match_spec/2}
-               ,{device, {AccountId, DeviceId}, Direction, fun count_by_device_match_spec/2}
-               ,{endpoint, {AccountId, EndpointId}, Direction, fun count_by_endpoint_match_spec/2}
-               ,{owner, {AccountId, OwnerId}, Direction, fun count_by_owner_match_spec/2}
-               ,{user, {AccountId, UserId}, Direction, fun count_by_owner_match_spec/2}
+    AccountId = maps:get('account', Map),
+    Direction = maps:get('direction', Map, 'undefined'),
+    DeviceId = maps:get('device', Map, 'undefined'),
+    EndpointId = maps:get('endpoint', Map,  'undefined'),
+    OwnerId = maps:get('owner', Map,  'undefined'),
+    UserId = maps:get('user', Map,  'undefined'),
+    Routines = [{'account', AccountId, Direction, fun count_by_account_match_spec/2}
+               ,{'device', {AccountId, DeviceId}, Direction, fun count_by_device_match_spec/2}
+               ,{'endpoint', {AccountId, EndpointId}, Direction, fun count_by_endpoint_match_spec/2}
+               ,{'owner', {AccountId, OwnerId}, Direction, fun count_by_owner_match_spec/2}
+               ,{'user', {AccountId, UserId}, Direction, fun count_by_owner_match_spec/2}
                ],
     maps:from_list(lists:filtermap(fun count_fun/1, Routines));
 count(JObj) ->
-    Props = [{account, kz_json:get_ne_binary_value(<<"Account-ID">>, JObj)}
-            ,{device, kz_json:get_ne_binary_value(<<"Device-ID">>, JObj)}
-            ,{endpoint, kz_json:get_ne_binary_value(<<"Endpoint-ID">>, JObj)}
-            ,{owner, kz_json:get_ne_binary_value(<<"Owner-ID">>, JObj)}
-            ,{user, kz_json:get_ne_binary_value(<<"User-ID">>, JObj)}
-            ,{direction, kz_json:get_ne_binary_value(<<"Direction">>, JObj)}
+    Props = [{'account', kz_json:get_ne_binary_value(<<"Account-ID">>, JObj)}
+            ,{'device', kz_json:get_ne_binary_value(<<"Device-ID">>, JObj)}
+            ,{'endpoint', kz_json:get_ne_binary_value(<<"Endpoint-ID">>, JObj)}
+            ,{'owner', kz_json:get_ne_binary_value(<<"Owner-ID">>, JObj)}
+            ,{'user', kz_json:get_ne_binary_value(<<"User-ID">>, JObj)}
+            ,{'direction', kz_json:get_ne_binary_value(<<"Direction">>, JObj)}
             ],
-    count(maps:from_list(lists:filter(fun({_, V}) -> V =/= undefined end, Props))).
+    count(maps:from_list(lists:filter(fun({_, V}) -> V =/= 'undefined' end, Props))).
 
 -spec count(kz_term:ne_binary(), kz_term:ne_binary()) -> map().
 count(AccountId, EndpointId) ->
@@ -1206,12 +1206,11 @@ count(AccountId, OwnerId, DeviceId) ->
 count(AccountId, OwnerId, DeviceId, Direction) ->
     count(#{account => AccountId, owner => OwnerId, device => DeviceId, direction => Direction}).
 
-count_fun({_, undefined, _, _}) -> false;
-count_fun({_, {_, undefined}, _, _}) -> false;
+count_fun({_, 'undefined', _, _}) -> 'false';
+count_fun({_, {_, 'undefined'}, _, _}) -> 'false';
 count_fun({Header, Id, Direction, Fun}) ->
     MatchSpec = Fun(Id, Direction),
-    {true, {Header, length(ets:select(?CHANNELS_TBL, MatchSpec))}}.
-
+    {'true', {Header, length(ets:select(?CHANNELS_TBL, MatchSpec))}}.
 
 count_by_account_match_spec(AccountId, 'undefined') ->
     [{#channel{uuid = '$1', account_id = '$2', _ = '_'}

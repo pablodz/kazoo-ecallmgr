@@ -67,13 +67,13 @@ fetch_limit(#{fetch_id := FetchId, node := Node, payload := JObj}=Context, _) ->
 -spec check_limit(map()) -> fs_handlecall_ret().
 check_limit(#{payload := JObj} = Context) ->
     case kz_json:get_integer_value([<<"Fetch-Params">>, <<"Channel-Limit">>], JObj) of
-        undefined -> check_endpoint_limits(Context);
+        'undefined' -> check_endpoint_limits(Context);
         Value -> check_endpoint_limit(Context, Value)
     end.
 
 check_endpoint_limits(#{payload := JObj} = Context) ->
     case kz_json:get_json_value([<<"Fetch-Params">>, <<"Endpoint-Call-Limits">>], JObj) of
-        undefined -> limit_not_found(Context);
+        'undefined' -> limit_not_found(Context);
         Value -> check_endpoint_limits(Context, kz_maps:keys_to_atoms(kz_json:to_map(Value)))
     end.
 
@@ -90,7 +90,7 @@ log_limits(Limits) ->
     Iterator = maps:iterator(Limits),
     iterate_log_limits(maps:next(Iterator)).
 
-iterate_log_limits(none) -> ok;
+iterate_log_limits('none') -> 'ok';
 iterate_log_limits({K, V, Iterator}) ->
     log_limit(K, V),
     iterate_log_limits(maps:next(Iterator)).
@@ -108,7 +108,9 @@ reply_limit(#{fetch_id := FetchId
              ,payload := JObj
              ,endpoint_id := EndpointId
              ,account_id := AccountId
-             } = Context, Success) ->
+             } = Context
+           ,Success
+           ) ->
     {'ok', Xml} = limit_resp_xml(Success, JObj),
     lager:debug("sending limit ~s (~s/~s) XML to ~w for request ~s"
                ,[Success, EndpointId, AccountId, Node, FetchId]
@@ -144,18 +146,18 @@ create_query(Context) ->
                ,fun add_type/1
                ,fun add_user/1
                ],
-    maps:get(query, kz_maps:exec(Routines, maps:put(query, #{}, Context))).
+    maps:get('query', kz_maps:exec(Routines, maps:put('query', #{}, Context))).
 
 add_account(#{account_id := AccountId, query := Query} = Context) ->
-    maps:put(query, maps:put(account, AccountId, Query), Context).
+    maps:put('query', maps:put('account', AccountId, Query), Context).
 
 add_type(#{payload := JObj, endpoint_id := EndpointId, query := Query} = Context) ->
     Type = kz_json:get_atom_value([<<"Fetch-Params">>, <<"Endpoint-Type">>], JObj),
-    maps:put(query, maps:put(Type, EndpointId, Query), Context).
+    maps:put('query', maps:put(Type, EndpointId, Query), Context).
 
-add_user(#{query := #{user := _}} = Context) -> Context;
+add_user(#{query := #{'user' := _}} = Context) -> Context;
 add_user(#{payload := JObj, query := Query} = Context) ->
     case kz_json:get_ne_binary_value([<<"Fetch-Params">>, <<"Endpoint-Owner-ID">>], JObj) of
-        undefined -> Context;
-        OwnerId -> maps:put(query, maps:put(user, OwnerId, Query), Context)
+        'undefined' -> Context;
+        OwnerId -> maps:put('query', maps:put('user', OwnerId, Query), Context)
     end.

@@ -64,7 +64,7 @@
 -record(channel, {uuid :: kz_term:api_ne_binary() | '$1' | '$2' | '_'
                  ,destination :: kz_term:api_ne_binary() | '_'
                  ,request :: kz_term:api_ne_binary() | '_'
-                 ,direction :: kz_term:api_ne_binary() | '$1' | '$4' | '$5' | '_'
+                 ,direction :: kz_term:api_ne_binary() | '$1' | '$3' | '$4' | '$5' | '_'
                  ,account_id :: kz_term:api_ne_binary() | '$1' | '$2' | '_'
                  ,account_billing :: kz_term:api_ne_binary() | '$7' | '_'
                  ,authorizing_id :: kz_term:api_ne_binary() | '$1' | '$2' | '$3' | '_'

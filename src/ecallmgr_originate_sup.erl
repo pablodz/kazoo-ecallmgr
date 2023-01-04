@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2022, 2600Hz
+%%% @copyright (C) 2011-2023, 2600Hz
 %%% @doc Simple-One-For-One strategy for restarting call event processes
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public

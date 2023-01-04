@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2022, 2600Hz
+%%% @copyright (C) 2011-2023, 2600Hz
 %%% @doc Generate the XML for various FS responses
 %%% @author James Aimonetti
 %%% @author Karl Anderson

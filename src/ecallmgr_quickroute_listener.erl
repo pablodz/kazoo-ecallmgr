@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2022, 2600Hz
+%%% @copyright (C) 2010-2023, 2600Hz
 %%% @doc Associates endpoint ID(s) with destinations for fast routing
 %%% (bypassing authz_req and route_req)
 %%%

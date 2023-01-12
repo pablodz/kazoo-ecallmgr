@@ -318,7 +318,7 @@ get_sip_interface_from_db([FsPath]) ->
     NetworkMap = kapps_config:get_json(?APP_NAME, <<"network_map">>, kz_json:new()),
     case map_fs_path_to_sip_profile(FsPath, NetworkMap) of
         'undefined' ->
-            lager:debug("unable to find network map for ~s, using default interface '~s'"
+            lager:debug("unable to find the network map for ~s, using default interface '~s'"
                        ,[FsPath, ?SIP_INTERFACE]),
             ?SIP_INTERFACE;
         Else ->

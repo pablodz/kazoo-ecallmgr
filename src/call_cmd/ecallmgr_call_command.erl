@@ -1157,7 +1157,8 @@ record_call(_UUID, <<"resume">>, JObj) ->
                     end,
     {<<"record_session_resume">>, RecordingName};
 record_call(UUID, <<"start">>, JObj) ->
-    ScopeVariables = record_call_vars(UUID, JObj),
+    ScopeVariables = record_scoped_vars(UUID, JObj),
+    Variables = record_call_vars(UUID, JObj),
     TimeLimit = record_call_limit(JObj),
 
     MediaName = kz_json:get_ne_binary_value(<<"Media-Name">>, JObj),
@@ -1176,6 +1177,7 @@ record_call(UUID, <<"start">>, JObj) ->
 
     [{<<"unshift">>, <<"Media-Recordings=", RecordingId/binary>>}
     ,{<<"unshift">>, <<"Media-Recordings-Name=", RecordingName/binary>>}
+    ,{<<"kz_multiset_encoded">>, Variables}
     ,{<<"record_session">>, list_to_binary(RecordArgs)}
     ];
 record_call(_UUID, <<"stop">>, JObj) ->
@@ -1194,12 +1196,11 @@ record_call_limit(JObj) ->
         Limit -> Limit
     end.
 
--spec record_call_vars(kz_term:ne_binary(), kz_json:object()) -> binary().
-record_call_vars(UUID, JObj) ->
+-spec record_scoped_vars(kz_term:ne_binary(), kz_json:object()) -> binary().
+record_scoped_vars(UUID, JObj) ->
     Routines = [fun maybe_waste_resources/1
                ,fun(Acc) -> maybe_get_terminators(Acc, JObj) end
                ],
-    FollowTransfer = kz_json:get_binary_boolean(<<"Follow-Transfer">>, JObj, <<"true">>),
     RecordMinSec = kz_json:get_binary_value(<<"Record-Min-Sec">>, JObj),
     SampleRate = get_sample_rate(JObj),
 
@@ -1207,8 +1208,6 @@ record_call_vars(UUID, JObj) ->
                       ,[{<<"RECORD_APPEND">>, <<"true">>}
                        ,{<<"RECORD_STEREO">>, should_record_stereo(JObj)}
                        ,{<<"RECORD_SOFTWARE">>, ecallmgr_util:fs_arg_encode(?RECORD_SOFTWARE)}
-                       ,{<<"recording_follow_transfer">>, FollowTransfer}
-                       ,{<<"recording_follow_attxfer">>, FollowTransfer}
                        ,{<<"enable_file_write_buffering">>, <<"false">>}
                        ,{<<"record_min_sec">>, RecordMinSec}
                        ,{<<"record_sample_rate">>, kz_term:to_binary(SampleRate)}
@@ -1216,6 +1215,15 @@ record_call_vars(UUID, JObj) ->
                       ,Routines
                       ),
     scope_variables(UUID, Vars).
+
+-spec record_call_vars(kz_term:ne_binary(), kz_json:object()) -> binary().
+record_call_vars(UUID, JObj) ->
+    FollowTransfer = kz_json:get_binary_boolean(<<"Follow-Transfer">>, JObj, <<"true">>),
+    Vars = [{<<"recording_follow_transfer">>, FollowTransfer}
+           ,{<<"recording_follow_attxfer">>, FollowTransfer}
+           ],
+    Args = ecallmgr_util:process_fs_kv(UUID, Vars, 'set'),
+    ecallmgr_util:fs_args_to_binary(Args).
 
 -spec record_call_args(kz_json:object()) -> binary().
 record_call_args(JObj) ->

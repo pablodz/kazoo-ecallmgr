@@ -22,7 +22,7 @@
         ,sip_channel_xml/1
         ,conference_resp_xml/1
         ,event_filters_resp_xml/1
-        ,directory_resp_location_xml/3
+        ,directory_resp_location_xml/2, directory_resp_location_xml/3
         ,prompt_resp_xml/2
         ]).
 
@@ -1898,13 +1898,24 @@ location_el(Id, Value) ->
 directory_resp_location_xml(ProxyPath, Props, JObj) ->
     %% TODO
     %% sipinterface_1 => compute from Proxy-IP / Proxy-Port & networks
-    SIPInterface = ?DEFAULT_FS_PROFILE,
     Id = kzd_fetch:fetch_key_value(JObj),
-    Vars = [list_to_binary([K, "=", V]) || {K, V} <- [{<<"sip_route_uri">>, ProxyPath} | get_channel_params(Props)]],
-    Location = list_to_binary(["[^^!", kz_binary:join(Vars, <<"!">>), "]", "sofia", "/", SIPInterface, "/", Id]),
+    Location = directory_resp_location(Id, ProxyPath, Props),
     LocationEl = location_el(Id, Location),
     SectionEl = section_el(<<"directory">>,  LocationEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
+
+-spec directory_resp_location_xml([{kz_term:ne_binary(), kz_term:proplist()}], kz_json:object()) -> {'ok', iolist()}.
+directory_resp_location_xml(Metas, JObj) ->
+    Id = kzd_fetch:fetch_key_value(JObj),
+    Location = kz_binary:join([directory_resp_location(Id, ProxyPath, Props) || {ProxyPath, Props} <- Metas], <<",">>),
+    LocationEl = location_el(Id, Location),
+    SectionEl = section_el(<<"directory">>,  LocationEl),
+    {'ok', xmerl:export([SectionEl], 'fs_xml')}.
+
+directory_resp_location(Id, ProxyPath, Props) ->
+    SIPInterface = ?DEFAULT_FS_PROFILE,
+    Vars = [list_to_binary([K, "=", V]) || {K, V} <- [{<<"sip_route_uri">>, ProxyPath} | get_channel_params(Props)]],
+    list_to_binary(["[^^!", kz_binary:join(Vars, <<"!">>), "]", "sofia", "/", SIPInterface, "/", Id]).
 
 -spec prompt_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value()) -> kz_types:xml_el().
 prompt_el(Id, Value) ->

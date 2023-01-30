@@ -92,6 +92,12 @@ fetch_from_registrar(#{fetch_id := FetchId, node := Node, payload := JObj}=Conte
             lager:debug("sending directory location (~s/~s) XML to ~w for request ~s"
                        ,[EndpointId, AccountId, Node, FetchId]
                        ),
+            freeswitch:fetch_reply(Context#{reply => iolist_to_binary(Xml)});
+        {'ok', Metas} ->
+            {'ok', Xml} = ecallmgr_fs_xml:directory_resp_location_xml(Metas, JObj),
+            lager:debug("sending ~B directory locations (~s/~s) XML to ~w for request ~s"
+                       ,[length(Metas), EndpointId, AccountId, Node, FetchId]
+                       ),
             freeswitch:fetch_reply(Context#{reply => iolist_to_binary(Xml)})
     end.
 

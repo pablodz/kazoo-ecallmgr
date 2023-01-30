@@ -121,6 +121,7 @@
                       ,user_agent :: kz_term:api_ne_binary() | '_'
                       ,username :: kz_term:api_ne_binary() | '_'
                       ,endpoint_token :: kz_term:api_ne_binary() | '_'
+                      ,meta_id :: kz_term:api_ne_binary() | '_'
                       }).
 
 -type registration() :: #registration{}.
@@ -221,6 +222,7 @@ lookup_endpoint(<<EndpointId/binary>>, <<AccountId/binary>>) ->
 
 -spec lookup_proxy_path(kz_term:ne_binary(), kz_term:ne_binary()) ->
           {'ok', kz_term:api_ne_binary(), kz_term:proplist()} |
+          {'ok', [{kz_term:api_ne_binary(), kz_term:proplist()}]} |
           {'error', 'not_found'}.
 lookup_proxy_path(<<>>, _Username) -> {'error', 'not_found'};
 lookup_proxy_path(_Realm, <<>>) -> {'error', 'not_found'};
@@ -229,12 +231,22 @@ lookup_proxy_path(<<Realm/binary>>, <<Username/binary>>) ->
                              ,authorizing_id = Username
                              ,_ = '_'
                              },
-
     case ets:match_object(?MODULE, MatchSpec) of
-        [] ->
-            {'ok', 'undefined', []};
-        [#registration{proxy = Proxy}=Reg] ->
-            {'ok', Proxy, proxy_vars(Reg)}
+        [] -> lookup_meta_path(Realm, Username);
+        [#registration{proxy = Proxy}=Reg] -> {'ok', Proxy, proxy_vars(Reg)}
+    end.
+
+-spec lookup_meta_path(kz_term:ne_binary(), kz_term:ne_binary()) ->
+          {'ok', [{kz_term:api_ne_binary(), kz_term:proplist()}]} |
+          {'error', 'not_found'}.
+lookup_meta_path(<<Realm/binary>>, <<Username/binary>>) ->
+    MatchSpec = #registration{account_id = Realm
+                             ,meta_id = Username
+                             ,_ = '_'
+                             },
+    case ets:match_object(?MODULE, MatchSpec) of
+        [] -> {'error', 'not_found'};
+        Regs -> {ok, [{Proxy, proxy_vars(Reg)} || #registration{proxy = Proxy}=Reg <- Regs]}
     end.
 
 -spec proxy_vars_options(registration()) -> map().
@@ -968,6 +980,7 @@ endpoint_from_token_ccvs({'ok', Endpoint}) ->
             ,{<<"Account-Realm">>, kzd_endpoint:account_realm(Endpoint)}
             ,{<<"Account-Name">>, kzd_endpoint:account_name(Endpoint)}
             ,{<<"Presence-ID">>, kzd_endpoint:presence_id(Endpoint)}
+            ,{<<"Meta-ID">>, kzd_endpoint:meta_id(Endpoint)}
             ],
     kz_json:from_list(Props).
 
@@ -1006,6 +1019,7 @@ augment_registration(Reg, JObj) ->
                     ,register_overwrite_notify=OverwriteNotify
                     ,suppress_unregister=SuppressUnregister
                     ,endpoint_token=EndpointToken
+                    ,meta_id=FindFun(<<"Meta-ID">>, Reg#registration.meta_id)
                     }.
 
 -spec fix_contact(kz_term:api_binary()) -> kz_term:api_binary().

@@ -36,7 +36,7 @@ init() ->
     'ok'.
 
 -spec sofia(map()) -> fs_sendmsg_ret().
-sofia(#{node := Node, fetch_id := Id}=Ctx) ->
+sofia(#{fetch_id := Id} = Ctx) ->
     kz_log:put_callid(Id),
     case kapps_config:is_true(?APP_NAME, <<"sofia_conf">>, 'false') of
         'false' ->
@@ -44,43 +44,45 @@ sofia(#{node := Node, fetch_id := Id}=Ctx) ->
             {'ok', Resp} = ecallmgr_fs_xml:not_found(<<"sofia conf disabled">>),
             freeswitch:fetch_reply(Ctx#{reply => iolist_to_binary(Resp)});
         'true' ->
-            Profiles = kapps_config:get_json(?APP_NAME, <<"fs_profiles">>, kz_json:new()),
-            DefaultProfiles = default_sip_profiles(Node),
-            try ecallmgr_fs_xml:sip_profiles_xml(kz_json:merge(DefaultProfiles, Profiles)) of
-                {'ok', ConfigXml} ->
-                    lager:debug("sending sofia XML to ~s: ~s", [Node, ConfigXml]),
-                    freeswitch:fetch_reply(Ctx#{reply => erlang:iolist_to_binary(ConfigXml)})
-            catch
-                _E:_R ->
-                    lager:info("sofia profile resp failed to convert to XML (~s): ~p", [_E, _R]),
-                    {'ok', Resp} = ecallmgr_fs_xml:not_found(<<"sofia conf error">>),
-                    freeswitch:fetch_reply(Ctx#{reply => iolist_to_binary(Resp)})
-            end
+            sofia_conf(Ctx)
     end.
 
+sofia_conf(Ctx) ->
+    Routines = [fun sofia_settings/1
+               ,fun sofia_profiles/1
+               ,fun sofia_reply/1
+               ],
+    kz_maps:exec(Routines, Ctx#{conf => kz_json:new()}).
 
--spec default_sip_profiles(atom()) -> kz_json:object().
-default_sip_profiles(Node) ->
-    Gateways = case kapps_config:is_true(?APP_NAME, <<"process_gateways">>, 'false') of
-                   'false' -> kz_json:new();
-                   'true' ->
-                       SysconfResp = kapps_config:get_json(?APP_NAME, <<"gateways">>, kz_json:new()),
-                       _ = maybe_kill_node_gateways(SysconfResp, Node),
-                       SysconfResp
-               end,
-    JObj = kz_json:from_list([{kz_term:to_binary(?DEFAULT_FS_PROFILE)
-                              ,kz_json:from_list(default_sip_profile())}
-                             ]),
-    kz_json:set_value([kz_term:to_binary(?DEFAULT_FS_PROFILE), <<"Gateways">>]
-                     ,Gateways
-                     ,JObj
-                     ).
+sofia_settings(#{conf := Conf} = Ctx) ->
+    Settings = kapps_config:get_json(?APP_NAME, [<<"sofia">>, <<"settings">>], kz_json:new()),
+    Ctx#{conf => kz_json:set_value(<<"settings">>, Settings, Conf)}.
 
--spec default_sip_profile() -> kz_term:proplist().
+sofia_profiles(#{conf := Conf} = Ctx) ->
+    Profiles = kapps_config:get_json(?APP_NAME, [<<"sofia">>, <<"profiles">>], kz_json:new()),
+    Ctx#{conf => kz_json:set_value(<<"profiles">>, kz_json:map(sofia_profiles_map_fun(), Profiles), Conf)}.
+
+sofia_profiles_map_fun() ->
+    Default = default_sip_profile(),
+    fun(K, V) ->
+            {K, kz_json:merge(Default, V)}
+    end.
+
+sofia_reply(#{node := Node, conf := Conf} = Ctx) ->
+    try ecallmgr_fs_xml:sofia_conf_xml(Conf) of
+        {'ok', ConfigXml} ->
+            lager:debug("sending sofia XML to ~s: ~s", [Node, ConfigXml]),
+            freeswitch:fetch_reply(Ctx#{reply => erlang:iolist_to_binary(ConfigXml)})
+    catch
+        _E:_R ->
+            lager:info("sofia profile resp failed to convert to XML (~s): ~p", [_E, _R]),
+            {'ok', Resp} = ecallmgr_fs_xml:not_found(<<"sofia conf error">>),
+            freeswitch:fetch_reply(Ctx#{reply => iolist_to_binary(Resp)})
+    end.
+
+-spec default_sip_profile() -> kz_json:object().
 default_sip_profile() ->
-    [{<<"Settings">>, kz_json:from_list(default_sip_settings())}
-    ,{<<"Gateways">>, kz_json:from_list(default_sip_gateways())}
-    ].
+    kz_json:from_list([{<<"Settings">>, kz_json:from_list(default_sip_settings())}]).
 
 -spec default_sip_settings() -> kz_term:proplist().
 default_sip_settings() ->
@@ -146,60 +148,24 @@ default_sip_settings() ->
     ,{<<"auto-restart">>, <<"false">>}
     ,{<<"rtp-enable-zrtp">>, <<"true">>}
     ,{<<"liberal-dtmf">>, <<"true">>}
+    ,{<<"apply-candidate-acl">>, <<"0.0.0.0/0">>}
+    ,{<<"apply-inbound-acl-x-token">>, <<"X-FS-Auth-Token">>}
+    ,{<<"apply-proxy-acl-x-token">>, <<"X-AUTH-Token">>}
+    ,{<<"user-x-token-jwt-header">>, <<"X-AUTH-JWT-Token">>}
+    ,{<<"enable-uuid-acl-check">>, <<"true">>}
+    ,{<<"apply-proxy-acl-uuid-x-header">>, <<"X-Proxy-Core-UUID">>}
+    ,{<<"apply-inbound-acl-uuid-x-header">>, <<"X-FS-Core-UUID">>}
+    ,{<<"enable-core-uuid-header">>, <<"true">>}
+    ,{<<"auth-calls">>, <<"true">>}
+    ,{<<"auth-calls-acl-only">>, <<"true">>}
+    ,{<<"auth-require-user">>, <<"true">>}
+    ,{<<"disable-register">>, <<"true">>}
+    ,{<<"accept-blind-auth">>, <<"false">>}
+    ,{<<"accept-blind-reg">>, <<"false">>}
+    ,{<<"manage-presence">>, <<"false">>}
+    ,{<<"manage-shared-appearance">>, <<"false">>}
+    ,{<<"channel-xml-fetch-on-nightmare-transfer">>, <<"true">>}
+    ,{<<"fire-transfer-events">>, <<"true">>}
+    ,{<<"keep-auth-caller-id">>, <<"true">>}
+    ,{<<"enable-dynamic-outbound-proxy">>, <<"true">>}
     ].
-
-default_sip_gateways() -> [].
-
-maybe_kill_node_gateways(JObj, Node) ->
-    try get_node_gateways(Node) of
-        Gateways ->
-            NewNames = kz_json:get_keys(JObj),
-            _ = maybe_kill_changed_gateways(NewNames, Gateways, JObj, Node),
-            RunningNames = kz_json:get_keys(Gateways),
-            _ = maybe_kill_removed_gateways(RunningNames, JObj, Node)
-    catch
-        _:_:_ -> 'ok'
-    end.
-
-maybe_kill_removed_gateways([], _, _) -> 'ok';
-maybe_kill_removed_gateways([GatewayName|Names], JObj, Node) ->
-    _ = case kz_json:get_value(GatewayName, JObj) of
-            'undefined' -> kill_gateway(GatewayName, Node);
-            _Else -> 'ok'
-        end,
-    maybe_kill_removed_gateways(Names, JObj, Node).
-
-maybe_kill_changed_gateways([], _, _, _) -> 'ok';
-maybe_kill_changed_gateways([GatewayName|Names], Gateways, JObj, Node) ->
-    Running =  kz_json:get_value(GatewayName, Gateways),
-    New = kz_json:get_value(GatewayName, JObj),
-    _ = maybe_kill_changed_gateway(GatewayName, Running, New, Node),
-    maybe_kill_changed_gateways(Names, Gateways, JObj, Node).
-
-maybe_kill_changed_gateway(_, 'undefined', _, _) -> 'ok';
-maybe_kill_changed_gateway(GatewayName, Running, New, Node) ->
-    case compare_node_gateways(Running, New) of
-        'false' -> kill_gateway(GatewayName, Node);
-        'true' -> 'ok'
-    end.
-
-compare_node_gateways(Running, New) ->
-    NewVersion = kz_json:get_value([<<"Variables">>, <<"Gateway-Version">>], New),
-    case kz_json:get_value([<<"Inbound-Variables">>, <<"Gateway-Version">>], Running) of
-        'undefined' -> 'true';
-        NewVersion -> 'true';
-        _Else -> 'false'
-    end.
-
-kill_gateway(GatewayName, Node) ->
-    Args = ["profile "
-           ,?DEFAULT_FS_PROFILE
-           ," killgw "
-           ,kz_term:to_list(GatewayName)
-           ],
-    freeswitch:api(Node, 'sofia', lists:flatten(Args)).
-
-get_node_gateways(Node) ->
-    {'ok', Response} = freeswitch:api(Node, 'sofia', "xmlstatus gateway"),
-    {Xml, _} = xmerl_scan:string(kz_term:to_list(Response)),
-    ecallmgr_fs_xml:sofia_gateways_xml_to_json(Xml).

@@ -18,7 +18,7 @@
         ,directory_resp_group_xml/3
         ,acl_xml/1, empty_response/0
         ,not_found/0, not_found/1
-        ,sip_profiles_xml/1, sofia_gateways_xml_to_json/1
+        ,sofia_conf_xml/1
         ,sip_channel_xml/1
         ,conference_resp_xml/1
         ,event_filters_resp_xml/1
@@ -55,16 +55,6 @@ acl_xml(AclsJObj) ->
     NetworkListEl = network_list_el([V || {_, V} <- orddict:to_list(AclsFold)]),
 
     ConfigEl = config_el(<<"acl.conf">>, <<"kazoo generated ACL lists">>, NetworkListEl),
-
-    SectionEl = section_el(<<"configuration">>, ConfigEl),
-
-    {'ok', xmerl:export([SectionEl], 'fs_xml')}.
-
--spec sip_profiles_xml(kz_json:object()) -> {'ok', iolist()}.
-sip_profiles_xml(JObj) ->
-    ProfilesEl = sofia_profiles_el(JObj),
-
-    ConfigEl = config_el(<<"sofia.conf">>, ProfilesEl),
 
     SectionEl = section_el(<<"configuration">>, ConfigEl),
 
@@ -1442,41 +1432,81 @@ prepend_child(#xmlElement{content=Contents}=El, Child) ->
 xml_attrib(Name, Value) when is_atom(Name) ->
     #xmlAttribute{name=Name, value=kz_term:to_list(Value)}.
 
+-spec sofia_conf_xml(kz_json:object()) -> {'ok', iolist()}.
+sofia_conf_xml(JObj) ->
+    SettingsEl = sofia_global_settings_el(kz_json:get_json_value(<<"settings">>, JObj)),
+    ProfilesEl = sofia_profiles_el(kz_json:get_json_value(<<"profiles">>, JObj)),
+
+    ConfigEl = config_el(<<"sofia.conf">>, [SettingsEl, ProfilesEl]),
+
+    SectionEl = section_el(<<"configuration">>, ConfigEl),
+
+    {'ok', xmerl:export([SectionEl], 'fs_xml')}.
+
+sofia_global_settings_el(undefined) ->
+    #xmlElement{name='global_settings'};
+sofia_global_settings_el(Settings) ->
+    #xmlElement{name='global_settings', content=sofia_settings_el(Settings)}.
+
+sofia_profiles_el(undefined) ->
+    #xmlElement{name='profiles'};
 sofia_profiles_el(JObj) ->
-    Content = lists:foldl(fun(Key, Xml) ->
-                                  Profile = kz_json:get_value(Key, JObj),
-                                  [#xmlElement{name='profile'
-                                              ,attributes=[xml_attrib('name', Key)]
-                                              ,content=sofia_profile_el(Profile)
-                                              }
-                                  | Xml
-                                  ]
-                          end, [], kz_json:get_keys(JObj)),
+    Content = lists:foldl(sofia_profiles_fold_fun(JObj), [], kz_json:get_keys(JObj)),
     #xmlElement{name='profiles', content=Content}.
 
+sofia_profiles_fold_fun(JObj) ->
+    fun(Key, Xml) ->
+            Profile = kz_json:get_json_value(Key, JObj),
+            [#xmlElement{name='profile'
+                        ,attributes=[xml_attrib('name', Key)]
+                        ,content=sofia_profile_el(Profile)
+                        }
+            | Xml
+            ]
+    end.
+
 sofia_profile_el(JObj) ->
-    Settings = kz_json:get_value(<<"Settings">>, JObj, kz_json:new()),
-    Gateways = kz_json:get_value(<<"Gateways">>, JObj, kz_json:new()),
-    [#xmlElement{name='settings'
-                ,content=sofia_settings_el(Settings)
-                }
-    ,#xmlElement{name='gateways'
-                ,content=sofia_gateways_el(Gateways)
-                }
-    ].
+    Routines = [{<<"Settings">>, fun sofia_profile_settings/1}
+               ,{<<"Gateways">>, fun sofia_profile_gateways/1}
+               ],
+    lists:foldr(sofia_profile_fold_fun(JObj), [], Routines).
+
+sofia_profile_fold_fun(JObj) ->
+    fun({Key, Fun}, Acc) ->
+            case kz_json:get_json_value(Key, JObj) of
+                undefined -> Acc;
+                Value -> [Fun(Value) | Acc]
+            end
+    end.
+
+sofia_profile_settings(Settings) ->
+    #xmlElement{name='settings', content=sofia_settings_el(Settings)}.
+
+sofia_profile_gateways(Gateways) ->
+    #xmlElement{name='gateways', content=sofia_gateways_el(Gateways)}.
 
 sofia_settings_el(JObj) ->
-    lists:foldl(fun(Key, Xml) ->
-                        Value = kz_json:get_value(Key, JObj),
-                        Name = kz_term:to_lower_binary(Key),
-                        [#xmlElement{name='param'
-                                    ,attributes=[xml_attrib('name', Name)
-                                                ,xml_attrib('value', Value)
-                                                ]
-                                    }
-                        | Xml
-                        ]
-                end, [], kz_json:get_keys(JObj)).
+    lists:foldl(sofia_settings_el_fun(JObj), [], kz_json:get_keys(JObj)).
+
+sofia_settings_el_fun(JObj) ->
+    fun(Key, Xml) ->
+            Name = kz_term:to_lower_binary(Key),
+            case kz_json:get_value(Key, JObj) of
+                undefined -> Xml;
+                Values when is_list(Values) ->
+                    lists:foldl(sofia_setting_el_fun(Name), Xml, Values);
+                Value ->
+                    sofia_setting_el(Name, Value, Xml)
+            end
+    end.
+
+sofia_setting_el_fun(Name) ->
+    fun(Value, Acc) ->
+            sofia_setting_el(Name, Value, Acc)
+    end.
+
+sofia_setting_el(Name, Value, Xml) ->
+    [param_el(Name, kz_term:to_binary(Value)) | Xml].
 
 sofia_gateways_el(JObj) ->
     lists:foldl(fun(Key, Xml) ->
@@ -1521,44 +1551,6 @@ sofia_gateway_vars_el(JObj) ->
                         | Xml
                         ]
                 end, [], kz_json:get_keys(JObj)).
-
--spec sofia_gateways_xml_to_json(kz_types:xml_el() | kz_types:xml_els()) -> kz_json:object().
-sofia_gateways_xml_to_json(Xml) ->
-    lists:foldl(fun sofia_gateway_xml_to_json/2
-               ,kz_json:new()
-               ,get_sofia_gateways_el(Xml)
-               ).
-
-get_sofia_gateways_el(Xml) ->
-    case xmerl_xpath:string("/gateways/gateway", Xml) of
-        #xmlElement{}=Gateways -> [Gateways];
-        Else -> Else
-    end.
-
-sofia_gateway_xml_to_json(Xml, JObj) ->
-    Id = kz_xml:get_value("/gateway/name/text()", Xml),
-    InboundVars = xmerl_xpath:string("/gateway/inbound-variables/*", Xml),
-    OutboundVars = xmerl_xpath:string("/gateway/outbound-variables/*", Xml),
-    Props = [{<<"Username">>, kz_xml:get_value("/gateway/username/text()", Xml)}
-            ,{<<"Password">>, kz_xml:get_value("/gateway/password/text()", Xml)}
-            ,{<<"Realm">>, kz_xml:get_value("/gateway/realm/text()", Xml)}
-            ,{<<"Proxy">>, kz_xml:get_value("/gateway/proxy/text()", Xml)}
-            ,{<<"From-Domain">>, kz_xml:get_value("/gateway/from/text()", Xml)}
-            ,{<<"Expire-Seconds">>, kz_xml:get_value("/gateway/expires/text()", Xml)}
-            ,{<<"Inbound-Variables">>, sofia_gateway_vars_xml_to_json(InboundVars, kz_json:new())}
-            ,{<<"Outbound-Variables">>, sofia_gateway_vars_xml_to_json(OutboundVars, kz_json:new())}
-            ],
-    kz_json:set_value(Id, kz_json:from_list(Props), JObj).
-
--spec sofia_gateway_vars_xml_to_json(kz_types:xml_el() | kz_types:xml_els(), kz_json:object()) -> kz_json:object().
-sofia_gateway_vars_xml_to_json(#xmlElement{}=Xml, JObj) ->
-    sofia_gateway_vars_xml_to_json([Xml], JObj);
-sofia_gateway_vars_xml_to_json([], JObj) ->
-    JObj;
-sofia_gateway_vars_xml_to_json([Var|Vars], JObj) ->
-    Key = kz_xml:get_value("/variable/@name", Var),
-    Value = kz_xml:get_value("/variable/@value", Var),
-    sofia_gateway_vars_xml_to_json(Vars, kz_json:set_value(Key, Value, JObj)).
 
 -spec event_filters_resp_xml(kz_term:ne_binaries()) -> {'ok', iolist()}.
 event_filters_resp_xml(Headers) ->

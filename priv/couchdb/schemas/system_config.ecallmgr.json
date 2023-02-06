@@ -343,6 +343,20 @@
             "description": "Should KAZOO send SIP NOTIFY packets to conference participants with custom conference variables",
             "type": "boolean"
         },
+        "sofia": {
+            "properties": {
+                "profiles": {
+                    "default": {},
+                    "description": "ecallmgr sofia profiles",
+                    "type": "object"
+                },
+                "settings": {
+                    "default": {},
+                    "description": "ecallmgr sofia settings",
+                    "type": "object"
+                }
+            }
+        },
         "sofia_conf": {
             "default": false,
             "description": "ecallmgr sofia conf",

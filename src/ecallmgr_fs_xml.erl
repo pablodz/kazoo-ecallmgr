@@ -1642,15 +1642,8 @@ directory_resp_group_id(Endpoint, JObj) ->
         GroupID -> GroupID
     end.
 
-dial_string(Node, Endpoint, Id) ->
-    Uri = kz_json:get_ne_binary_value(<<"SIP-Invite-Route-URI">>, Endpoint),
-    SIPInterface = kz_json:get_ne_binary_value(<<"SIP-Interface">>, Endpoint, ?DEFAULT_FS_PROFILE),
-    dial_string(Uri, Node, Id, SIPInterface).
-
-dial_string('undefined', Node, Id, _SIPInterface) ->
-    list_to_binary(["${", freeswitch:contact_api(Node), "(", Id, ")}"]);
-dial_string(Uri, _Node, _Id, SIPInterface) ->
-    list_to_binary(["sofia/", SIPInterface, "/", Uri]).
+dial_string(Endpoint) ->
+    kz_json:get_ne_binary_value(<<"Endpoint-Dial-String">>, Endpoint).
 
 route_uri(Endpoint) ->
     kz_json:get_ne_binary_value(<<"SIP-Proxy-Route-URI">>, Endpoint).
@@ -1703,10 +1696,9 @@ directory_resp_resource_xml(_Node, Endpoint, JObj) ->
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
 
 -spec directory_resp_device_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
-directory_resp_device_xml(Node, Endpoint, JObj) ->
+directory_resp_device_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
-    Id = <<UserId/binary, "@", DomainName/binary>>,
 
     ProfileParams = get_profile_params(Endpoint),
     VariableEls = get_directory_variables(Endpoint),
@@ -1725,7 +1717,7 @@ directory_resp_device_xml(Node, Endpoint, JObj) ->
     CRVsEl = [param_el(<<"dial-var-", K/binary>>, V) || {K, V} <- CRVs],
     SIPHeaders = get_custom_sip_headers(Endpoint),
     SIPHeadersEl = [param_el(<<"dial-var-sip_h_", K/binary>>, V) || {K, V} <- SIPHeaders],
-    Params = [{<<"endpoint-dial-string">>, dial_string(Node, Endpoint, Id)}
+    Params = [{<<"endpoint-dial-string">>, dial_string(Endpoint)}
              ,{<<"endpoint-separator">>, kz_endpoint_separator()}
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}
@@ -1738,18 +1730,10 @@ directory_resp_device_xml(Node, Endpoint, JObj) ->
     SectionEl = section_el(<<"directory">>, DomainEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
 
--spec user_dial_string(kz_term:ne_binaries(), kz_term:ne_binary()) -> kz_term:ne_binary().
-user_dial_string([], _AccountId) ->
-    <<"error/no_endpoints">>;
-user_dial_string(Ids, AccountId) ->
-    kz_binary:join([list_to_binary(["kz/", M, "@", AccountId]) || M <- Ids], kz_endpoint_separator()).
-
-
 -spec directory_resp_user_xml(atom(), kz_json:object(), kz_json:object()) -> {'ok', iolist()}.
 directory_resp_user_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
-    Id = <<UserId/binary, "@", DomainName/binary>>,
 
     ProfileParams = get_profile_params(Endpoint),
     VariableEls = get_directory_variables(Endpoint),
@@ -1757,11 +1741,8 @@ directory_resp_user_xml(_Node, Endpoint, JObj) ->
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
     UserProps = props:filter_undefined(user_el_props('undefined', UserId)),
-    Members = kz_json:get_list_value(<<"Members">>, Endpoint, []),
-    DialEndpoints = user_dial_string(Members, DomainName),
 
-    Params = [{<<"group-dial-string">>, <<"kz/", Id/binary>>}
-             ,{<<"endpoint-dial-string">>,  DialEndpoints}
+    Params = [{<<"endpoint-dial-string">>,  dial_string(Endpoint)}
              ,{<<"endpoint-separator">>, kz_endpoint_separator()}
              ,{<<"jsonrpc-allowed-methods">>, <<"verto">>}
              ,{<<"jsonrpc-allowed-event-channels">>, <<"conference">>}

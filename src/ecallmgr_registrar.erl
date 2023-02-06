@@ -980,7 +980,7 @@ endpoint_from_token_ccvs({'ok', Endpoint}) ->
             ,{<<"Account-Realm">>, kzd_endpoint:account_realm(Endpoint)}
             ,{<<"Account-Name">>, kzd_endpoint:account_name(Endpoint)}
             ,{<<"Presence-ID">>, kzd_endpoint:presence_id(Endpoint)}
-            ,{<<"Meta-ID">>, kzd_endpoint:meta_id(Endpoint)}
+            ,{<<"Endpoint-Meta-ID">>, kzd_endpoint:meta_id(Endpoint)}
             ],
     kz_json:from_list(Props).
 
@@ -1019,7 +1019,7 @@ augment_registration(Reg, JObj) ->
                     ,register_overwrite_notify=OverwriteNotify
                     ,suppress_unregister=SuppressUnregister
                     ,endpoint_token=EndpointToken
-                    ,meta_id=FindFun(<<"Meta-ID">>, Reg#registration.meta_id)
+                    ,meta_id=FindFun(<<"Endpoint-Meta-ID">>, Reg#registration.meta_id)
                     }.
 
 -spec fix_contact(kz_term:api_binary()) -> kz_term:api_binary().
@@ -1322,6 +1322,7 @@ to_props(Reg) ->
       ,{<<"User-Agent">>, Reg#registration.user_agent}
       ,{<<"Username">>, Reg#registration.username}
       ,{<<"Endpoint-Token">>, Reg#registration.endpoint_token}
+      ,{<<"Endpoint-Meta-ID">>, Reg#registration.meta_id}
       ,{<<"AOR">>, list_to_binary(["sip:", Reg#registration.username, "@", Reg#registration.realm])}
       ]
      ).

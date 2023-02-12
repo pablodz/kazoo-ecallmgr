@@ -341,8 +341,14 @@ get_originate_action(<<"bridge">>, JObj, _Node) ->
 get_originate_action(<<"eavesdrop">>, JObj, _Node) ->
     lager:debug("got originate with action eavesdrop"),
     get_eavesdrop_action(JObj);
-get_originate_action(_, _, _) ->
+get_originate_action(<<"extension">>, JObj, _) ->
+    lager:debug("got originate with action extension"),
+    get_extension_action(JObj);
+get_originate_action(<<"park">>, _, _) ->
     lager:debug("got originate with action park"),
+    ?ORIGINATE_PARK;
+get_originate_action(_ , _, _) ->
+    lager:debug("setting default originate action to park"),
     ?ORIGINATE_PARK.
 
 -spec get_transfer_action(kz_json:object(), kz_term:api_binary()) -> kz_term:ne_binary().
@@ -356,6 +362,14 @@ get_transfer_action(JObj, Route) ->
       ," XML ", Context, "' inline"
       ]
      ).
+
+-spec get_extension_action(kz_json:object()) -> kz_term:ne_binary().
+get_extension_action(JObj) ->
+    Data = kz_json:get_json_value(<<"Application-Data">>, JObj),
+    Extension = kz_json:get_ne_binary_value(<<"Extension">>, Data, <<"error">>),
+    Dialplan = kz_json:get_ne_binary_value(<<"Dialplan">>, Data, ?DEFAULT_FS_DIALPLAN),
+    Context = kz_json:get_ne_binary_value(<<"Context">>, Data, ?DEFAULT_FREESWITCH_CONTEXT),
+    list_to_binary([Extension, " ", Dialplan, " ", Context]).
 
 -spec intercept_unbridged_only(kz_term:ne_binary() | 'undefined', kz_json:object()) -> kz_term:ne_binary().
 intercept_unbridged_only('undefined', JObj) ->

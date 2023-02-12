@@ -1,4 +1,6 @@
 <definition name="fax_data">
+	<field name="variable_fax_result_text" as="Fax-Result-Text" />
+	<field name="variable_fax_result_code" as="Fax-Result-Code" serialize-as="number" />
 	<field name="variable_fax_success" as="Fax-Success" serialize-as="boolean" />
 	<field name="variable_has_t38" as="Fax-T38-Used" serialize-as="boolean" />
 	<field name="variable_fax_t38_status" as="Fax-T38-Status" />

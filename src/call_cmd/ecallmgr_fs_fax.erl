@@ -14,43 +14,28 @@
 
 -export([receive_fax/3]).
 
--include_lib("kazoo_stdlib/include/kz_types.hrl").
-
 -spec receive_fax(atom(), kz_term:ne_binary(), kz_json:object()) -> kz_term:proplist().
-receive_fax(Node, UUID, JObj) ->
-    Sets = props:filter_undefined(
-             lists:foldl(fun(Header, Acc) ->
-                                 case kz_json:get_value(Header, JObj) of
-                                     'undefined' -> Acc;
-                                     Value -> [header_to_fs_var(Header, Value) | Acc]
-                                 end
-                         end
-                        ,[]
-                        ,[<<"Enable-T38-Fax">>
-                         ,<<"Enable-T38-Fax-Request">>
-                         ,<<"Enable-T38-Passthrough">>
-                         ,<<"Enable-T38-Gateway">>
-                         ])),
-    _ = ecallmgr_fs_command:set(Node, UUID, Sets),
-    Filename = kz_term:to_list(kz_json:get_value(<<"Fax-Local-Filename">>, JObj, ecallmgr_util:fax_filename(UUID))),
-    [{<<"playback">>, <<"silence_stream://2000">>}
-    ,{<<"rxfax">>, Filename}
+receive_fax(_Node, UUID, JObj) ->
+    [{<<"kz_multiset_encoded">>, t38_variables(UUID, JObj)}
+    ,{<<"answer">>, <<>>}
+    ,{<<"playback">>, <<"silence_stream://2000">>}
+    ,{<<"rxfax">>, fax_filename(UUID, JObj)}
     ].
 
-header_to_fs_var(<<"Enable-T38-Fax">>, Value ) ->
-    case kz_term:is_true(Value) of
-        'true' -> {<<"fax_enable_t38">>, <<"true">> };
-        'false' -> {<<"fax_enable_t38">>, 'undefined'}
-    end;
-header_to_fs_var(<<"Enable-T38-Fax-Request">>, Value ) ->
-    case kz_term:is_true(Value) of
-        'true' -> {<<"fax_enable_t38_request">>, <<"true">> };
-        'false' -> {<<"fax_enable_t38_request">>, 'undefined'}
-    end;
-header_to_fs_var(<<"Enable-T38-Passthrough">>, Value ) ->
-    case kz_term:is_true(Value) of
-        'true' -> {<<"t38_passthru">>, <<"true">> };
-        'false' -> {<<"t38_passthru">>, 'undefined'}
-    end;
-header_to_fs_var(<<"Enable-T38-Gateway">>, Direction) ->
-    {<<"execute_on_answer">>, <<"t38_gateway ", Direction/binary>>}.
+fax_filename(UUID, JObj) ->
+    Default = ecallmgr_util:fax_filename(UUID),
+    kz_json:get_ne_binary_value(<<"Fax-Local-Filename">>, JObj, Default).
+
+t38_variables(UUID, JObj) ->
+    Vars = kz_json:filter(fun filter_t38/1, JObj),
+    ecallmgr_util:multi_set_args(UUID, kz_json:to_proplist(Vars)).
+
+filter_t38({K, _V}) ->
+    lists:member(K, t38_headers()).
+
+t38_headers() ->
+    [<<"Enable-T38-Fax">>
+    ,<<"Enable-T38-Fax-Request">>
+    ,<<"Enable-T38-Passthrough">>
+    ,<<"Enable-T38-Gateway">>
+    ].

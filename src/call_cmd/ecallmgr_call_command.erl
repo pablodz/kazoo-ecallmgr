@@ -1126,12 +1126,13 @@ deflect(JObj) ->
     Target = kz_json:get_ne_binary_value(<<"Target-URI">>, JObj),
     {<<"deflect">>, Target}.
 
--spec record_call(kz_term:ne_binary(), kz_json:object()) -> fs_app().
+-spec record_call(kz_term:ne_binary(), kz_json:object()) -> fs_app() | fs_apps().
 record_call(UUID, JObj) ->
     Action = kz_json:get_ne_binary_value(<<"Record-Action">>, JObj),
     record_call(UUID, Action, JObj).
 
--spec record_call(kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object()) -> fs_app().
+-spec record_call(kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object()) ->
+          fs_app() | fs_apps().
 record_call(_UUID, <<"mask">>, JObj) ->
     RecordingName = case kz_json:get_ne_binary_value(<<"Media-Name">>, JObj) of
                         'undefined' -> <<"${Media-Recordings-Name[0]}">>;

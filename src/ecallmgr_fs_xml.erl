@@ -762,6 +762,9 @@ kazoo_var_to_fs_var({<<"Call-Context">>, JObj}, Vars) ->
     Val = kz_json:encode(JObj),
     [encode_fs_val("kz-endpoint-runtime-context", Val) | Vars];
 
+kazoo_var_to_fs_var({<<"SIP-Diversions">>, V}, Vars) ->
+    [encode_fs_val("sip_h_Diversion",  encode_sip_diversions(V)) | Vars];
+
 kazoo_var_to_fs_var({AMQPHeader, V}, Vars) ->
     case lists:keyfind(AMQPHeader, 1, ?SPECIAL_CHANNEL_VARS) of
         'false' -> Vars;
@@ -1981,3 +1984,10 @@ cavs_els(CAVs) ->
 cav_el(Key, Value, Acc) ->
     Name = list_to_binary([kazoo_cav_prefix(Value), Key]),
     [get_directory_variable({Name, ecallmgr_util:maybe_sanitize_fs_value(Key, Value)}) | Acc].
+
+-spec encode_sip_diversions(kz_term:ne_binaries()) -> kz_term:ne_binary().
+encode_sip_diversions(Diversions) ->
+    case kz_app_config:is_true(?APP, <<"send_multiple_diversion_headers">>) of
+        true -> list_to_binary([<<"ARRAY::">>, kz_binary:join(Diversions, <<"|:">>)]);
+        false -> kz_binary:join(Diversions, <<",">>)
+    end.

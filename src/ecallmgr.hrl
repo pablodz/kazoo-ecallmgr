@@ -377,6 +377,7 @@
                               ,{<<"Application-UUID-Name">>, <<"app_uuid_name">>}
                               ,{<<"Account-Cross-Boundary">>, <<"loopback_cross_boundary">>}
                               ,{<<"RTP-Disable-Hold">>, <<"rtp_disable_hold">>}
+                              ,{<<"Call-Forward-Diversions">>, <<"sip_diversions">>}
                               ]).
 
 %% Call and Channel Vars that have a special transform value instead of the

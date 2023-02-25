@@ -8,6 +8,7 @@
 				<prefix-exception value="variable_sip_h_X-FS-"/>
 				<prefix-exception value="variable_sip_h_Referred-By"/>
 				<prefix-exception value="variable_sip_h_Refer-To"/>
+				<prefix-exception value="variable_sip_h_Diversion"/>
 			</filter>
 		</filters>
 		<fields>
@@ -18,6 +19,7 @@
 				<prefix-exception value="variable_sip_h_X-FS-"/>
 				<prefix-exception value="variable_sip_h_Referred-By"/>
 				<prefix-exception value="variable_sip_h_Refer-To"/>
+				<prefix-exception value="variable_sip_h_Diversion"/>
 			</field>
 		</fields>
 	</field>

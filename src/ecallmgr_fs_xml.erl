@@ -1890,8 +1890,12 @@ directory_resp_location_xml(Metas, JObj) ->
 
 directory_resp_location(Id, ProxyPath, Props) ->
     SIPInterface = ?DEFAULT_FS_PROFILE,
-    Vars = [list_to_binary([K, "=", V]) || {K, V} <- [{<<"sip_proxy_uri">>, ProxyPath} | get_channel_params(Props)]],
+    Params = get_channel_params(props:set_value(<<"Proxy-URI">>, ProxyPath, Props)),
+    Vars = directory_resp_location_vars(Params),
     list_to_binary(["[^^!", kz_binary:join(Vars, <<"!">>), "]", "sofia", "/", SIPInterface, "/", Id]).
+
+directory_resp_location_vars(Props) ->
+    [encode_fs_val(K, V) || {K, V} <-  Props].
 
 -spec prompt_el(kz_types:xml_attrib_value(), kz_types:xml_attrib_value()) -> kz_types:xml_el().
 prompt_el(Id, Value) ->

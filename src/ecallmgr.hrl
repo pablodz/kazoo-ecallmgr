@@ -323,6 +323,9 @@
                               ,{<<"Secure-ZRTP">>, <<"zrtp_secure_media">>}
                               ,{<<"Simplify-Loopback">>, <<"loopback_bowout_on_execute">>}
                               ,{<<"Proxy-Path">>, <<"sip_route_uri">>}
+                              ,{<<"Proxy-URI">>, <<"sip_proxy_uri">>}
+                              ,{<<"Proxy-Route">>, <<"sip_route_uri">>}
+                              ,{<<"Proxy-Bypass-Dynamic-Proxy">>, <<"bypass_proxy">>}
                               ,{<<"To-URI">>, <<"sip_to_uri">>}
                               ,{<<"To-User">>, <<"sip_to_user">>}
                               ,{<<"To-Realm">>, <<"sip_to_realm">>}

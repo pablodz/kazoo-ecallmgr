@@ -81,6 +81,8 @@
               ,connect_strategy = 'ping' :: connect_strategy()
               }).
 -type fs_node() :: #node{}.
+-type fs_node_kv() :: {atom(), fs_node()}.
+-type fs_node_kvs() :: [fs_node_kv()].
 
 -record(capability, {node :: atom() | '$1' | '_'
                     ,name :: kz_term:ne_binary() | '$1' | '$2' | '_'
@@ -173,17 +175,24 @@ flush(Key) ->
 
 -spec do_flush(binary()) -> 'ok'.
 do_flush(Args) ->
-    lager:debug("flushing xml cache ~s from all FreeSWITCH servers", [Args]),
-    _ = [freeswitch:api(Node, 'xml_flush_cache', Args)
-         || Node <- connected(), filter_release(Node)
-        ],
-    'ok'.
+    do_flush(nodes_to_flush(), Args).
 
--spec filter_release(atom()) -> boolean().
-filter_release(Node) ->
-    case freeswitch:release(Node) of
-        {_, _, <<"community">>} -> 'true';
-        _ -> 'false'
+-spec do_flush([atom()], binary()) -> 'ok'.
+do_flush([], _Args) -> ok;
+do_flush(Nodes, Args) ->
+    lager:debug("flushing xml cache ~s from ~B erlang connected FreeSWITCH servers", [Args, length(Nodes)]),
+    lists:foreach(fun(N) -> freeswitch:api(N, 'xml_flush_cache', Args) end, Nodes).
+
+-spec nodes_to_flush() -> [atom()].
+nodes_to_flush() ->
+    [K || {K, Node} <- fs_nodes(), filter_release(Node)].
+
+-spec filter_release(fs_node()) -> boolean().
+filter_release(#node{connected = false}) -> false;
+filter_release(#node{connected = true, client_version = ClientVersion}) ->
+    case freeswitch:release(ClientVersion) of
+        {_, _, <<"community">>} -> true;
+        _ -> false
     end.
 
 -spec is_node_up(atom()) -> boolean().
@@ -988,3 +997,7 @@ instance_uuid(Node) ->
         Pid when is_pid(Pid) -> ecallmgr_fs_node:instance_uuid(Pid);
         _Else -> 'undefined'
     end.
+
+-spec fs_nodes() -> fs_node_kvs().
+fs_nodes() ->
+    gen_server:call(?SERVER, 'nodes').

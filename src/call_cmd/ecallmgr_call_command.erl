@@ -1158,14 +1158,14 @@ record_call(_UUID, <<"resume">>, JObj) ->
                     end,
     {<<"record_session_resume">>, RecordingName};
 record_call(UUID, <<"start">>, JObj) ->
-    ScopeVariables = record_scoped_vars(UUID, JObj),
+    AppVariables = record_app_vars(UUID, JObj),
     TimeLimit = record_call_limit(JObj),
 
     MediaName = kz_json:get_ne_binary_value(<<"Media-Name">>, JObj),
     RecordingName = ecallmgr_util:recording_filename(MediaName),
     RecordingId = kz_json:get_ne_binary_value(<<"Media-Recording-ID">>, JObj),
 
-    RecordArgs = [ScopeVariables
+    RecordArgs = [AppVariables
                  ,"^^", ?RECORD_CALL_PARAM_SEPARATOR
                  ,RecordingName
                  ,?RECORD_CALL_PARAM_SEPARATOR, "+"
@@ -1175,16 +1175,24 @@ record_call(UUID, <<"start">>, JObj) ->
                  ,"}"
                  ],
 
-    [{<<"unshift">>, <<"Media-Recordings=", RecordingId/binary>>}
-    ,{<<"unshift">>, <<"Media-Recordings-Name=", RecordingName/binary>>}
-    ,{<<"record_session">>, list_to_binary(RecordArgs)}
-    ];
+    case record_call_track_media_recording(JObj) of
+        true ->
+            [{<<"unshift">>, <<"Media-Recordings=", RecordingId/binary>>}
+            ,{<<"unshift">>, <<"Media-Recordings-Name=", RecordingName/binary>>}
+            ,{<<"record_session">>, list_to_binary(RecordArgs)}
+            ];
+        false ->
+            {<<"record_session">>, list_to_binary(RecordArgs)}
+    end;
 record_call(_UUID, <<"stop">>, JObj) ->
     RecordingName = case kz_json:get_ne_binary_value(<<"Media-Name">>, JObj) of
                         'undefined' -> <<"${Media-Recordings-Name[0]}">>;
                         MediaName -> ecallmgr_util:recording_filename(MediaName)
                     end,
     {<<"stop_record_session">>, RecordingName}.
+
+record_call_track_media_recording(JObj) ->
+    kz_json:is_true(<<"Track-Media-Recording">>, JObj, true).
 
 -spec record_call_limit(kz_json:object()) -> integer().
 record_call_limit(JObj) ->
@@ -1195,8 +1203,8 @@ record_call_limit(JObj) ->
         Limit -> Limit
     end.
 
--spec record_scoped_vars(kz_term:ne_binary(), kz_json:object()) -> binary().
-record_scoped_vars(UUID, JObj) ->
+-spec record_app_vars(kz_term:ne_binary(), kz_json:object()) -> binary().
+record_app_vars(UUID, JObj) ->
     Routines = [fun maybe_waste_resources/1
                ,fun(Acc) -> maybe_get_terminators(Acc, JObj) end
                ],
@@ -1211,10 +1219,11 @@ record_scoped_vars(UUID, JObj) ->
                        ,{<<"record_min_sec">>, RecordMinSec}
                        ,{<<"record_sample_rate">>, kz_term:to_binary(SampleRate)}
                        ,{<<"Recording-Follow-Transfer">>, record_follow_transfer(JObj)}
+                       ,{<<"Controller-App-Name">>, kz_api:app_name(JObj)}
                        ]
                       ,Routines
                       ),
-    scope_variables(UUID, Vars).
+    app_variables(UUID, Vars).
 
 -spec record_follow_transfer(kz_json:object()) -> boolean().
 record_follow_transfer(JObj) ->
@@ -1563,6 +1572,17 @@ scope_variables(UUID, Vars) ->
 -spec scope_variables(kz_term:binaries()) -> binary().
 scope_variables(Vars) ->
     list_to_binary(["%^[", kz_binary:join(Vars, <<"^">>), "]"]).
+
+-spec app_variables(kz_term:ne_binary(), kz_term:proplist()) -> binary().
+app_variables(UUID, Vars) ->
+    case ecallmgr_util:process_fs_kv(UUID, Vars, 'set') of
+        [] -> <<>>;
+        Args -> app_variables(Args)
+    end.
+
+-spec app_variables(kz_term:binaries()) -> binary().
+app_variables(Vars) ->
+    list_to_binary(["/^[", kz_binary:join(Vars, <<"^">>), "]"]).
 
 -spec redirect_app(kz_term:ne_binary(), kz_json:object()) -> fs_apps().
 redirect_app(UUID, JObj) ->

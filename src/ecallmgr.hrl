@@ -189,11 +189,14 @@
 -define(CREDS_KEY(Realm, Username), {'authn', Username, Realm}).
 
 -define(DP_EVENT_VARS, [{<<"Execute-On-Answer">>, <<"execute_on_answer">>}
+                       ,{<<"Execute-On-Pre-Answer">>, <<"execute_on_pre_answer">>}
                        ,{<<"Execute-On-Bridge">>, <<"execute_on_pre_bridge">>}
                        ,{<<"Execute-On-Before-Bridge">>, <<"execute_on_pre_bridge">>}
                        ,{<<"Execute-On-After-Bridge">>, <<"execute_on_after_bridge">>}
                        ,{<<"Execute-On-Tone-Detect">>, <<"execute_on_tone_detect">>}
                        ,{<<"Execute-On-Record-Post-Process">>, <<"record_post_process_exec_app">>}
+                       ,{<<"Execute-On-Media">>, <<"execute_on_media">>}
+                       ,{<<"Execute-On-Ring">>, <<"execute_on_ring">>}
                        ]).
 -define(BRIDGE_CHANNEL_VAR_SEPARATOR, "!").
 -define(RECORD_CALL_PARAM_SEPARATOR, "#").
@@ -216,6 +219,8 @@
                               ,{<<"Bridge-Generate-Comfort-Noise">>,<<"bridge_generate_comfort_noise">>}
                               ,{<<"Bypass-Media">>, <<"bypass_media_after_bridge">>}
                               ,{<<"Bypass-Proxy">>, <<"bypass_proxy">>}
+
+                              ,{<<"Controller-App-Name">>, <<"controller_app_name">>}
 
                               ,{<<"Callee-ID-Name">>, <<"callee_id_name">>}
                               ,{<<"Callee-ID-Number">>, <<"callee_id_number">>}

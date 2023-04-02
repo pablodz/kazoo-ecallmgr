@@ -38,6 +38,15 @@ exec_cmd(<<"send_http">>, Args, JObj, Node, Options) ->
     APIMethod = kz_term:to_atom(<<"kz_http_", Method/binary>>, 'true'),
     send_http(Node, File, Url, APIMethod, JObj);
 
+exec_cmd(<<"call_command">>, 'undefined', JObj, _Node, _Options) ->
+    lager:debug("received call_command command with empty arguments"),
+    reply_error(<<"no arguments">>, JObj);
+exec_cmd(<<"call_command">>, Cmd, JObj, Node, _Options) ->
+    case call_command_allowed(kz_api:app_name(JObj), kapi_dialplan:application_name(Cmd)) of
+        true -> call_command(Node, Cmd, JObj);
+        false -> reply_error(<<"not allowed">>, JObj)
+    end;
+
 exec_cmd(Cmd, _Args, JObj, _Node, _Options) ->
     reply_error(<<Cmd/binary, " not_implemented">>, JObj).
 
@@ -49,8 +58,7 @@ reply_error(Error, JObj) ->
              | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
              ],
     API = kz_json:set_values(Values, kz_api:remove_defaults(JObj)),
-    Queue = kz_api:server_id(JObj),
-    kz_amqp_worker:cast(API, fun(P) -> kapi_switch:publish_fs_reply(Queue, P) end).
+    send_reply(kz_api:server_id(JObj), API).
 
 -spec reply_error(kz_term:ne_binary(), kz_json:object(), kz_json:object()) -> 'ok'.
 reply_error(Error, EventData, JObj) ->
@@ -61,8 +69,7 @@ reply_error(Error, EventData, JObj) ->
              | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
              ],
     API = kz_json:set_values(Values, kz_api:remove_defaults(JObj)),
-    Queue = kz_api:server_id(JObj),
-    kz_amqp_worker:cast(API, fun(P) -> kapi_switch:publish_fs_reply(Queue, P) end).
+    send_reply(kz_api:server_id(JObj), API).
 
 -spec reply_success(kz_json:object(), kz_term:proplist()) -> 'ok'.
 reply_success(JObj, Response) ->
@@ -72,8 +79,11 @@ reply_success(JObj, Response) ->
              | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
              ],
     API = kz_json:set_values(Values, kz_api:remove_defaults(JObj)),
-    Queue = kz_api:server_id(JObj),
-    kapi_switch:publish_fs_reply(Queue, API).
+    send_reply(kz_api:server_id(JObj), API).
+
+send_reply(undefined, _Payload) -> ok;
+send_reply(Queue, Payload) ->
+    kapi_switch:publish_fs_reply(Queue, Payload).
 
 -spec send_http(atom(), binary(), binary(), atom(), kz_json:object()) -> 'ok'.
 send_http(_Node, 'undefined', _Url, _Method, JObj) ->
@@ -101,3 +111,16 @@ send_http_cb('error', Reply, FSProps, [JobId, JObj, _File, _Node, Channel]) ->
     _ = kz_amqp_channel:consumer_channel(Channel),
     Props = ecallmgr_util:unserialize_fs_props(FSProps),
     reply_error(Reply, kz_json:from_list(Props), JObj).
+
+-spec call_command_allowed(kz_term:ne_binary(), kz_term:ne_binary()) -> boolean().
+call_command_allowed(SenderApplication, CommandApplication) ->
+    kz_app_config:is_true(?APP, [<<"node_call_command_allowed_applications">>, SenderApplication, CommandApplication]).
+
+call_command(Node, Cmd, JObj) ->
+    freeswitch:call_cmd_sync(true),
+    case ecallmgr_call_command:exec_cmd(Node, kz_api:call_id(JObj), Cmd) of
+        ok -> reply_success(JObj, [{<<"Call-Command-Result">>, <<"ok">>}]);
+        {ok, Result} -> reply_success(JObj, [{<<"Call-Command-Result">>, Result}]);
+        {error, Error} -> reply_error(Error, JObj);
+        Other -> reply_error(term_to_binary(Other), JObj)
+    end.

@@ -18,7 +18,7 @@
 receive_fax(_Node, UUID, JObj) ->
     [{<<"kz_multiset_encoded">>, t38_variables(UUID, JObj)}
     ,{<<"answer">>, <<>>}
-    ,{<<"playback">>, <<"silence_stream://2000">>}
+    ,{<<"playback">>, <<"silence_stream://2000">>, [{<<"event-lock">>, <<"true">>}]}
     ,{<<"rxfax">>, fax_filename(UUID, JObj)}
     ].
 

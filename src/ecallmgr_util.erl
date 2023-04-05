@@ -699,6 +699,8 @@ maybe_sanitize_fs_value(<<"Failover-Reasons">>, <<Val/binary>>) ->
     Val;
 maybe_sanitize_fs_value(<<"Failover-Reasons">>, Val) when is_list(Val) ->
     kz_binary:join(Val, <<",">>);
+maybe_sanitize_fs_value(_Key, [First | _] = Val) when is_binary(First) ->
+    kz_binary:join(Val, <<",">>);
 maybe_sanitize_fs_value(Key, Val) when not is_binary(Key) ->
     maybe_sanitize_fs_value(kz_term:to_binary(Key), Val);
 maybe_sanitize_fs_value(Key, Val) when not is_binary(Val) ->

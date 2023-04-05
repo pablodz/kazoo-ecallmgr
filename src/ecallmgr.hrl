@@ -260,6 +260,7 @@
                               ,{<<"Enable-T38-Passthrough">>, <<"t38_passthru">>}
                               ,{<<"Enable-T38-Gateway">>, <<"execute_on_answer_fax_t38_gateway">>}
                               ,{<<"Endpoint-Delay">>, <<"leg_delay_start">>}
+                              ,{<<"Endpoint-Mark-Ring-Ready">>, <<"kz-endpoint-mark-ring-ready">>}
                               ,{<<"Endpoint-Progress-Timeout">>, <<"leg_progress_timeout">>}
                               ,{<<"Endpoint-Timeout">>, <<"leg_timeout">>}
                               ,{<<"Export-Variables">>, <<"export_vars">>}

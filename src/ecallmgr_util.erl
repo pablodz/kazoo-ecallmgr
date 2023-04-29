@@ -173,7 +173,8 @@ send_cmd(Node, UUID, App, "playseek", Cmd) ->
 send_cmd(Node, UUID, App, "unbridge", _) ->
     lager:debug("execute on node ~s: ~s uuid_park(~s)", [Node, App, UUID]),
     freeswitch:api(Node, 'uuid_park', UUID);
-send_cmd(Node, _UUID, App, "broadcast", Args) ->
+send_cmd(Node, UUID, App, "broadcast", BroadcastArgs) ->
+    Args = iolist_to_binary([UUID, " ", BroadcastArgs]),
     lager:debug("execute on node ~s: ~s uuid_broadcast(~s)", [Node, App, Args]),
     Resp = freeswitch:api(Node, 'uuid_broadcast', iolist_to_binary(Args)),
     lager:debug("broadcast resulted in: ~p", [Resp]),

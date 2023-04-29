@@ -1143,10 +1143,16 @@ get_sip_contact(#bridge_endpoint{ip_address='undefined'
                                 ,channel_vars=CVs
                                 }=EP) ->
     {'ok', Contact, Props} = ecallmgr_registrar:lookup_contact(Realm, Username),
-    Vars = ecallmgr_fs_xml:build_leg_vars(Props),
+    Vars = ecallmgr_fs_xml:build_leg_vars(contact_vars(Props)),
     NewEP = EP#bridge_endpoint{channel_vars=Vars ++ CVs},
     {binary:replace(Contact, <<">">>, <<>>), NewEP};
 get_sip_contact(#bridge_endpoint{ip_address=IPAddress}) -> IPAddress.
+
+contact_vars(Props) ->
+    lists:map(fun contact_var/1, Props).
+
+contact_var({<<"Proxy-Path">>, V}) -> {<<"Proxy-URI">>, V};
+contact_var(KV) -> KV.
 -endif.
 
 -spec maybe_clean_contact(kz_term:ne_binary(), bridge_endpoint()) -> kz_term:ne_binary().

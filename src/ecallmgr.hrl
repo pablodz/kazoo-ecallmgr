@@ -389,6 +389,7 @@
                               ,{<<"Account-Cross-Boundary">>, <<"loopback_cross_boundary">>}
                               ,{<<"RTP-Disable-Hold">>, <<"rtp_disable_hold">>}
                               ,{<<"Call-Forward-Diversions">>, <<"sip_diversions">>}
+                              ,{<<"Presence-Aliases">>, <<"presence_aliases">>}
                               ]).
 
 %% Call and Channel Vars that have a special transform value instead of the

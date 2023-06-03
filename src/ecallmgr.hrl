@@ -261,6 +261,7 @@
                               ,{<<"Enable-T38-Gateway">>, <<"execute_on_answer_fax_t38_gateway">>}
                               ,{<<"Endpoint-Delay">>, <<"leg_delay_start">>}
                               ,{<<"Endpoint-Mark-Ring-Ready">>, <<"kz-endpoint-mark-ring-ready">>}
+                              ,{<<"Endpoint-Ignore-Mark-Ring-Ready">>, <<"kz-endpoint-ignore-mark-ring-ready">>}
                               ,{<<"Endpoint-Progress-Timeout">>, <<"leg_progress_timeout">>}
                               ,{<<"Endpoint-Timeout">>, <<"leg_timeout">>}
                               ,{<<"Export-Variables">>, <<"export_vars">>}
@@ -282,6 +283,7 @@
                               ,{<<"Ignore-Display-Updates">>, <<"ignore_display_updates">>}
                               ,{<<"Ignore-Early-Media">>, <<"ignore_early_media">>}
                               ,{<<"Ignore-Ring-Ready">>, <<"ignore_ring_ready">>}
+                              ,{<<"Ignore-Mark-Ring-Ready">>, <<"ignore_mark_ring_ready">>}
                               ,{<<"Ignore-Forward">>, <<"outbound_redirect_fatal">>}
                               ,{<<"Inherit-Codec">>, <<"inherit_codec">>}
                               ,{<<"Loopback-Bowout">>, <<"loopback_bowout">>}

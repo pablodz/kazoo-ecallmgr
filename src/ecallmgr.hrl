@@ -319,6 +319,7 @@
                               ,{<<"Record-Sample-Rate">>, <<"record_sample_rate">>}
                               ,{<<"Request-URI">>, <<"sip_req_uri">>}
                               ,{<<"Signal-Bridge-To">>, <<"signal_bridge_to">>}
+                              ,{<<"SIP-Asserted-Identity-Send-Tel-URI">>, <<"sip_send_tel_paid">>}
                               ,{<<"SIP-Identity-Passthru">>, <<"sip_identity_passthru">>}
                               ,{<<"SIP-Invite-Parameters">>, <<"sip_invite_params">>}
                               ,{<<"SIP-Invite-Contact-User">>, <<"sip_contact_user">>}

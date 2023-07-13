@@ -6,13 +6,26 @@
 	-->
 	<!--<field name="Hangup-Cause" type="first-of" value="variable_last_bridge_hangup_cause|Hangup-Cause|variable_originate_failed_cause|variable_hangup_cause|variable_bridge_hangup_cause">-->
 
-	<field name="Hangup-Cause" type="first-of"
-		value="variable_originate_failed_cause|variable_bridge_hangup_cause|Hangup-Cause|variable_hangup_cause">
+	<field name="Hangup-Cause" type="first-of" value="Hangup-Cause|variable_hangup_cause">
 		<filters>
 			<filter name="Application" type="include" compare="contains" value="bridge" />
 		</filters>
 	</field>
 
+	<field name="variable_bridge_hangup_cause" as="Hangup-Cause">
+		<filters>
+			<filter name="Application" type="include" compare="contains" value="bridge" />
+			<filter name="variable_bridge_hangup_cause" type="exclude" value="BOWOUT" />
+			<filter name="variable_last_bridge_hangup_cause" type="exclude" value="BOWOUT" />
+		</filters>
+	</field>
+
+	<field name="variable_originate_failed_cause" as="Hangup-Cause">
+		<filters>
+			<filter name="Application" type="include" compare="contains" value="bridge" />
+		</filters>
+	</field>
+	
 	<!--
 		this doesn't work well because voicemail is not bridge
 		and we can't use 
@@ -61,6 +74,8 @@
 			<filter name="Call-Direction" type="include" compare="value" value="outbound" />
 			<filter name="Caller-Logical-Direction" type="exclude" compare="value" value="inbound" />
 			<filter name="last_app" type="exclude" compare="contains" value="intercept" />
+			<filter name="variable_bridge_hangup_cause" type="exclude" value="BOWOUT" />
+			<filter name="variable_last_bridge_hangup_cause" type="exclude" value="BOWOUT" />
 		</filters>
 	</field>
 

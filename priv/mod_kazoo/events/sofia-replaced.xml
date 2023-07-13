@@ -2,7 +2,7 @@
 	<fields>
 		<field name="call_event" type="reference" />
 		<field name="Event-Name" type="static" value="CHANNEL_REPLACED" />
-		<field name="att_xfer_replaced_by" type="first-of" as="Replaced-By"
-			value="variable_att_xfer_replaced_by|att_xfer_replaced_by" />
+		<field name="att_xfer_replaced_by" type="first-of" as="Replaced-By" value="variable_att_xfer_replaced_by|att_xfer_replaced_by" />
+		<field name="att_xfer_originating_session" as="Transfer-Is-Semi-Attended" serialize-as="boolean"/>
 	</fields>
 </event>

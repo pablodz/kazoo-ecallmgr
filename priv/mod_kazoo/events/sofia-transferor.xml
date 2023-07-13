@@ -7,5 +7,8 @@
 		<field name="Transfer-Leg" type="expand" value="${regex(${variable_transfer_to}|([^:]*):(.*)|%2)}"/>
 		<field name="Transfer-Destination" type="expand" value="${regex(${variable_transfer_destination}|([^:]*):(.*)|%2)}"/>
 		<field name="att_xfer_destination_call_id" as="Transfer-Destination"/>
+		<field name="att_xfer_original_call_id" as="Transfer-Original-Call-ID"/>
+		<field name="att_xfer_destination_peer_uuid" as="Transfer-Destination-Peer-UUID"/>
+		<field name="att_xfer_originating_session" as="Transfer-Is-Semi-Attended" serialize-as="boolean"/>
 	</fields>
 </event>

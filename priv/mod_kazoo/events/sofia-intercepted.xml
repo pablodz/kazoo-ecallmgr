@@ -2,7 +2,6 @@
 	<fields>
 		<field name="call_event" type="reference" />
 		<field name="Event-Name" type="static" value="CHANNEL_INTERCEPTED" />
-		<field name="Intercepted-By" type="first-of"
-			value="variable_intercepted_by|intercepted_by" />
+		<field name="Intercepted-By" type="first-of" value="variable_intercepted_by|intercepted_by" />
 	</fields>
 </event>

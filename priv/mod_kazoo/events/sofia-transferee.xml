@@ -2,5 +2,7 @@
 	<fields>
 		<field name="call_event" type="reference" />
 		<field name="Event-Name" type="static" value="CHANNEL_TRANSFEREE" />
+		<field name="att_xfer_replaced_call_id" as="Replaced-Call-ID" />
+		<field name="att_xfer_originating_session" as="Transfer-Is-Semi-Attended" serialize-as="boolean"/>
 	</fields>
 </event>

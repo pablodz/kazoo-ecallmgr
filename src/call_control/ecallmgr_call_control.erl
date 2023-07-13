@@ -1130,7 +1130,13 @@ handle_replaced(JObj, #state{fetch_id=FetchId
             ReplacedBy = kz_json:get_ne_binary_value(<<"Replaced-By">>, JObj),
             case ecallmgr_fs_channel:fetch(ReplacedBy) of
                 {'ok', _Channel} ->
-                    {'noreply', handle_sofia_replaced(ReplacedBy, State)};
+                    case kz_term:is_true(kz_call_event:transfer_is_semi_attended(JObj)) of
+                        true ->
+                            lager:debug("channel replaced but transfer was from originating leg, ignoring"),
+                            {'noreply', State};
+                        false ->
+                            {'noreply', handle_sofia_replaced(ReplacedBy, State)}
+                    end;
                 _Else ->
                     lager:debug("channel replaced was not handled : ~p", [_Else]),
                     {'noreply', State}
@@ -1159,9 +1165,15 @@ handle_transferee(JObj, #state{fetch_id=FetchId
                               }=State) ->
     case kz_call_event:custom_channel_var(JObj, <<"Fetch-ID">>) of
         FetchId ->
-            lager:info("we have been transferred, terminate immediately"),
-            _ = ecallmgr_fs_command:set(Node, UUID, [{<<"Hangup-After-Bridge">>, <<"true">>}]),
-            {'stop', 'normal', State};
+            case kz_term:is_true(kz_call_event:transfer_is_semi_attended(JObj)) of
+                true ->
+                    lager:debug("channel transferee but transfer was from originating leg, ignoring"),
+                    {'noreply', State};
+                false ->
+                    lager:info("we have been transferred, terminate immediately"),
+                    _ = ecallmgr_fs_command:set(Node, UUID, [{<<"Hangup-After-Bridge">>, <<"true">>}]),
+                    {'stop', 'normal', State}
+            end;
         _Else ->
             lager:info("we were a different instance of this transferred call ~s : ~s", [FetchId, _Else]),
             {'noreply', State}

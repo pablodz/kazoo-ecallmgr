@@ -51,6 +51,9 @@
 -export([handle_channel_status/2]).
 -export([api_status/1]).
 
+-export([channels/1, channels/2, channels/3, channels/4]).
+-export([handle_channels/2]).
+
 -export([has_channels_for_owner/1]).
 
 -export([set_channels_update_default_strategy/0
@@ -93,8 +96,11 @@
                     ,{{?MODULE, 'handle_count'}
                      ,[{<<"channel">>, <<"count_req">>}]
                      }
+                    ,{{?MODULE, 'handle_channels'}
+                     ,[{<<"channel">>, <<"channels_req">>}]
+                     }
                     ]).
--define(BINDINGS, [{'call', [{'restrict_to', ['status_req']}
+-define(BINDINGS, [{'call', [{'restrict_to', ['status_req', 'channels_req']}
                             ,'federate'
                             ]}
                   ]).
@@ -605,7 +611,14 @@ handle_call({'count', {AccountId, OwnerId, DeviceId, Direction}}, From, State) -
 handle_call({'count', Args}, From, State) when is_map(Args) ->
     _ = kz_process:spawn(fun() -> gen_server:reply(From, count(Args)) end),
     {'noreply', State};
-handle_call(_, _, State) ->
+handle_call({'channels', {AccountId, OwnerId, DeviceId, Direction}}, From, State) ->
+    _ = kz_process:spawn(fun() -> gen_server:reply(From, channels(AccountId, OwnerId, DeviceId, Direction)) end),
+    {'noreply', State};
+handle_call({'channels', Args}, From, State) when is_map(Args) ->
+    _ = kz_process:spawn(fun() -> gen_server:reply(From, channels(Args)) end),
+    {'noreply', State};
+handle_call(_Args, _From, State) ->
+    lager:error("unhandled call => ~p => ~p", [_Args, _From]),
     {'reply', {'error', 'not_implemented'}, State}.
 
 %%------------------------------------------------------------------------------
@@ -797,6 +810,7 @@ find_by_user_realm('undefined', Realm) ->
              || Channel <- Channels
             ]
     end;
+%% this only works for direct park, valet usage on parking will not work for this and kamailio query for shortcut will fail
 find_by_user_realm(<<?CALL_PARK_FEATURE, _/binary>>=Username, Realm) ->
     lager:debug("search channels for call park feature in realm ~s", [Realm]),
     Pattern = #channel{destination=Username
@@ -1326,4 +1340,178 @@ count_by_endpoint_match_spec({AccountId, EndpointId}, Direction) ->
        }
       ]
      ,['$1']}
+    ].
+
+
+-spec handle_channels(kz_json:object(), kz_term:proplist()) -> 'ok'.
+handle_channels(JObj, _Props) ->
+    'true' = kapi_call:channels_req_v(JObj),
+    Channels = channels(JObj),
+    Resp = [{<<"Channels">>, kz_json:from_map(Channels)}
+           ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
+           | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+           ],
+    ServerId = kz_api:server_id(JObj),
+    lager:debug("sending back channels result to ~s", [ServerId]),
+    kapi_call:publish_channels_resp(ServerId, Resp).
+
+field_mapper(Map) ->
+    field_mapper_fun(fields(Map)).
+
+fields(Map) ->
+    case maps:get(fields, Map, undefined) of
+        List when is_list(List) -> [kz_term:to_atom(Item) || Item <- List];
+        _Other -> default_fields()
+    end.
+
+default_fields() ->
+    [switch_url
+    ,is_onhold
+    ,destination
+    ,other_leg
+    ].
+
+field_mapper_fun(RequestedFields) ->
+    Fields = lists:zip(lists:seq(2, record_info(size, channel)), record_info(fields, channel)),
+    FilteredFields = lists:filter(fun({_, Name}) -> lists:member(Name, RequestedFields) end, Fields),
+    fun(Record) ->
+            lists:foldl(fun({I, E}, Acc) -> Acc#{E => element(I, Record) } end, #{}, FilteredFields)
+    end.
+
+channels_query_arg(Arg, Map) ->
+    case maps:get(Arg, Map,  undefined) of
+        EndpointId when is_binary(EndpointId) -> list_to_tuple(binary:split(EndpointId, <<"@">>));
+        Endpoint when is_tuple(Endpoint) -> Endpoint;
+        _Other -> undefined
+    end.
+
+-spec channels(kz_json:object() | map()) -> map().
+channels(Map) when is_map(Map) ->
+    Account = maps:get('account', Map, 'undefined'),
+    Direction = maps:get('direction', Map, 'undefined'),
+    Mapper = field_mapper(Map),
+    Routines = [{'account', Account, Direction, fun account_match_spec/2, Mapper}
+               ,{'device', channels_query_arg(device, Map), Direction, fun device_match_spec/2, Mapper}
+               ,{'endpoint', channels_query_arg(endpoint, Map), Direction, fun endpoint_match_spec/2,Mapper}
+               ,{'owner', channels_query_arg(owner, Map), Direction, fun owner_match_spec/2, Mapper}
+               ,{'user', channels_query_arg(user, Map), Direction, fun owner_match_spec/2, Mapper}
+               ],
+    maps:from_list(lists:filtermap(fun channels_fun/1, Routines));
+channels(JObj) ->
+    Props = [{'account', kz_json:get_ne_binary_value(<<"Account-ID">>, JObj)}
+            ,{'device', kz_json:get_ne_binary_value(<<"Device-ID">>, JObj)}
+            ,{'endpoint', kz_json:get_ne_binary_value(<<"Endpoint-ID">>, JObj)}
+            ,{'owner', kz_json:get_ne_binary_value(<<"Owner-ID">>, JObj)}
+            ,{'user', kz_json:get_ne_binary_value(<<"User-ID">>, JObj)}
+            ,{'direction', kz_json:get_ne_binary_value(<<"Direction">>, JObj)}
+            ,{'fields', kz_json:get_ne_binaries(<<"Fields">>, JObj)}
+            ],
+    channels(maps:from_list(lists:filter(fun({_, V}) -> V =/= 'undefined' end, Props))).
+
+-spec channels(kz_term:ne_binary(), kz_term:ne_binary()) -> map().
+channels(AccountId, EndpointId) ->
+    channels(#{account => AccountId, endpoint => EndpointId}).
+
+-spec channels(kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binary()) -> map().
+channels(AccountId, OwnerId, DeviceId) ->
+    channels(#{account => AccountId, owner => OwnerId, device => DeviceId}).
+
+-spec channels(kz_term:ne_binary(), kz_term:api_ne_binary(), kz_term:api_ne_binary(), kz_term:api_ne_binary()) -> map().
+channels(AccountId, OwnerId, DeviceId, Direction) ->
+    channels(#{account => AccountId, owner => OwnerId, device => DeviceId, direction => Direction}).
+
+channels_fun({_, undefined, _, _, _}) -> false;
+channels_fun({_, {_, undefined}, _, _, _}) -> false;
+channels_fun({Header, Id, Direction, Fun, Mapper}) ->
+    MatchSpec = Fun(Id, Direction),
+    {true, {Header, channels_map(ets:select(?CHANNELS_TBL, MatchSpec), Mapper)}}.
+
+channels_map(Channels, Mapper) ->
+    lists:foldl(fun(#channel{uuid = UUID} = Record, Acc) -> Acc#{UUID => Mapper(Record)} end, #{}, Channels).
+
+account_match_spec(AccountId, 'undefined') ->
+    [{#channel{account_id = '$2', _ = '_'}
+     ,[{'=:=', '$2', {'const', AccountId}}]
+     ,['$_']}
+    ];
+account_match_spec(AccountId, Direction) ->
+    [{#channel{account_id = '$2', direction = '$3', _ = '_'}
+     ,[{'andalso',
+        {'=:=', '$2', {'const', AccountId}},
+        {'=:=', '$3', {'const', Direction}}
+       }
+      ]
+     ,['$_']}
+    ].
+
+owner_match_spec({OwnerId, AccountId}, 'undefined') ->
+    [{#channel{account_id = '$2', owner_id = '$3', _ = '_'}
+     ,[{'andalso',
+        {'=:=', '$2', {'const', AccountId}},
+        {'=:=', '$3', {'const', OwnerId}}
+       }
+      ]
+     ,['$_']}
+    ];
+owner_match_spec({OwnerId, AccountId}, Direction) ->
+    [{#channel{account_id = '$2', owner_id = '$3', direction = '$4', _ = '_'}
+     ,[{'andalso',
+        {'andalso',
+         {'=:=', '$2', {'const', AccountId}},
+         {'=:=', '$3', {'const', OwnerId}}
+        }
+       ,{'=:=', '$4', {'const', Direction}}
+       }
+      ]
+     ,['$_']}
+    ].
+
+device_match_spec({DeviceId, AccountId}, 'undefined') ->
+    [{#channel{account_id = '$2', authorizing_id = '$3', _ = '_'}
+     ,[{'andalso',
+        {'=:=', '$2', {'const', AccountId}},
+        {'=:=', '$3', {'const', DeviceId}}
+       }
+      ]
+     ,['$_']}
+    ];
+device_match_spec({DeviceId, AccountId}, Direction) ->
+    [{#channel{account_id = '$2', authorizing_id = '$3', direction = '$4', _ = '_'}
+     ,[{'andalso',
+        {'andalso',
+         {'=:=', '$2', {'const', AccountId}},
+         {'=:=', '$3', {'const', DeviceId}}
+        }
+       ,{'=:=', '$4', {'const', Direction}}
+       }
+      ]
+     ,['$_']}
+    ].
+
+endpoint_match_spec({EndpointId, AccountId}, 'undefined') ->
+    [{#channel{account_id = '$2', authorizing_id = '$3', owner_id = '$4', _ = '_'}
+     ,[{'andalso',
+        {'=:=', '$2', {'const', AccountId}},
+        {'orelse',
+         {'=:=', '$3', {'const', EndpointId}}
+        ,{'=:=', '$4', {'const', EndpointId}}
+        }
+       }
+      ]
+     ,['$_']}
+    ];
+endpoint_match_spec({EndpointId, AccountId}, Direction) ->
+    [{#channel{account_id = '$2', authorizing_id = '$3', owner_id = '$4', direction = '$5', _ = '_'}
+     ,[{'andalso',
+        {'andalso',
+         {'=:=', '$2', {'const', AccountId}},
+         {'orelse',
+          {'=:=', '$3', {'const', EndpointId}}
+         ,{'=:=', '$4', {'const', EndpointId}}
+         }
+        }
+       ,{'=:=', '$5', {'const', Direction}}
+       }
+      ]
+     ,['$_']}
     ].

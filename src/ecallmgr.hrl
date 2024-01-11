@@ -338,6 +338,7 @@
                               ,{<<"Proxy-Bypass-Dynamic-Proxy">>, <<"bypass_proxy">>}
                               ,{<<"Proxy-Tag">>, <<"sip_outbound_proxy_tag">>}
                               ,{<<"Proxy-Zone">>, <<"sip_outbound_proxy_zone">>}
+                              ,{<<"Proxy-Route-Thru-Originating">>, <<"route_thru_originating_proxy">>}
                               ,{<<"To-URI">>, <<"sip_to_uri">>}
                               ,{<<"To-User">>, <<"sip_to_user">>}
                               ,{<<"To-Realm">>, <<"sip_to_realm">>}

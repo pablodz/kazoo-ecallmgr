@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2023, 2600Hz
+%%% @copyright (C) 2010-2024, 2600Hz
 %%% @doc Created when a call hits a fetch_handler in ecallmgr_route.
 %%% A Control Queue is created by the lookup_route function in the
 %%% fetch_handler. On initialization, besides adding itself as the
@@ -1130,13 +1130,7 @@ handle_replaced(JObj, #state{fetch_id=FetchId
             ReplacedBy = kz_json:get_ne_binary_value(<<"Replaced-By">>, JObj),
             case ecallmgr_fs_channel:fetch(ReplacedBy) of
                 {'ok', _Channel} ->
-                    case kz_term:is_true(kz_call_event:transfer_is_semi_attended(JObj)) of
-                        true ->
-                            lager:debug("channel replaced but transfer was from originating leg, ignoring"),
-                            {'noreply', State};
-                        false ->
-                            {'noreply', handle_sofia_replaced(ReplacedBy, State)}
-                    end;
+                    {'noreply', handle_sofia_replaced(ReplacedBy, State)};
                 _Else ->
                     lager:debug("channel replaced was not handled : ~p", [_Else]),
                     {'noreply', State}
@@ -1165,15 +1159,9 @@ handle_transferee(JObj, #state{fetch_id=FetchId
                               }=State) ->
     case kz_call_event:custom_channel_var(JObj, <<"Fetch-ID">>) of
         FetchId ->
-            case kz_term:is_true(kz_call_event:transfer_is_semi_attended(JObj)) of
-                true ->
-                    lager:debug("channel transferee but transfer was from originating leg, ignoring"),
-                    {'noreply', State};
-                false ->
-                    lager:info("we have been transferred, terminate immediately"),
-                    _ = ecallmgr_fs_command:set(Node, UUID, [{<<"Hangup-After-Bridge">>, <<"true">>}]),
-                    {'stop', 'normal', State}
-            end;
+            lager:info("we have been transferred, terminate immediately"),
+            _ = ecallmgr_fs_command:set(Node, UUID, [{<<"Hangup-After-Bridge">>, <<"true">>}]),
+            {'stop', 'normal', State};
         _Else ->
             lager:info("we were a different instance of this transferred call ~s : ~s", [FetchId, _Else]),
             {'noreply', State}

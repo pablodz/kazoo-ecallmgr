@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2023, 2600Hz
+%%% @copyright (C) 2010-2024, 2600Hz
 %%% @doc Execute call commands
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -1015,9 +1015,12 @@ play_app(UUID, JObj) ->
 play_app(MediaPath, 'true', _Loop) ->
     {<<"endless_playback">>, MediaPath};
 play_app(MediaPath, 'false', LoopCount) when is_integer(LoopCount), LoopCount > 0 ->
-    {<<"loop_playback +", (kz_term:to_binary(LoopCount))/binary>>, MediaPath};
+    {<<"loop_playback">>, make_loop_playback_args(LoopCount, MediaPath)};
 play_app(MediaPath, _Endless, _Loop) ->
     {<<"playback">>, MediaPath}.
+
+make_loop_playback_args(LoopCount, MediaPath) ->
+    <<"+", (kz_term:to_binary(LoopCount))/binary, " ", MediaPath/binary>>.
 
 -spec play_bridged(kz_json:object(), kz_term:ne_binary()) -> fs_app().
 play_bridged(JObj, F) ->

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2024, 2600Hz
+%%% @copyright (C) 2011-2025, 2600Hz
 %%% @doc Generate the XML for various FS responses
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -67,6 +67,11 @@ sip_channel_xml(Props) ->
     SectionEl = section_el(<<"channels">>, ChannelEl),
     {'ok', xmerl:export([SectionEl], 'fs_xml')}.
 
+-spec authn_expires(kz_json:object()) -> kz_term:api_integer().
+authn_expires(JObj) ->
+    Expires = kz_json:get_value(<<"Expires">>, JObj),
+    ecallmgr_util:maybe_add_expires_deviation_ms(Expires).
+
 -spec authn_resp_xml(kz_term:api_terms()) -> {'ok', iolist()}.
 authn_resp_xml([_|_]=RespProp) ->
     authn_resp_xml(props:get_value(<<"Auth-Method">>, RespProp)
@@ -80,9 +85,7 @@ authn_resp_xml(JObj) ->
         {'ok', []}=OK -> OK;
         {'ok', Elements} ->
             Number = kz_json:get_value([<<"Custom-SIP-Headers">>,<<"P-Kazoo-Primary-Number">>],JObj),
-            Expires = ecallmgr_util:maybe_add_expires_deviation_ms(
-                        kz_json:get_value(<<"Expires">>,JObj)
-                       ),
+            Expires = authn_expires(JObj),
             Username = kz_json:get_value(<<"Auth-Username">>, JObj, UserId),
             UserEl = user_el(user_el_props(Number, Username, Expires), Elements),
             DomainEl = domain_el(kz_json:get_value(<<"Auth-Realm">>, JObj, DomainName), UserEl),
@@ -1187,23 +1190,16 @@ user_el(Props, Children) ->
                ,content=[C || C <- Children, C =/= 'undefined']
                }.
 
--spec user_el_props(kz_term:api_ne_binary(), kz_term:ne_binary()) -> kz_term:proplist().
-user_el_props(Number, Username) ->
-    user_el_props(Number, Username, 'undefined').
-
 -spec user_el_props(kz_term:api_ne_binary(), kz_term:ne_binary(), kz_term:api_integer()) -> kz_term:proplist().
-user_el_props(Number, Username, 'undefined') ->
-    [{'number-alias', Number}
-    | user_el_default_props(Username)
-    ];
-user_el_props(Number, Username, Expires) when Expires < 1 ->
-    [{'number-alias', Number}
-    | user_el_default_props(Username)
-    ];
 user_el_props(Number, Username, Expires) ->
-    [{'number-alias', Number}
+    user_el_props(Number, Username, Expires, 'undefined').
+
+-spec user_el_props(kz_term:api_ne_binary(), kz_term:ne_binary(), kz_term:api_integer(), kz_term:api_ne_binary()) -> kz_term:proplist().
+user_el_props(Number, Username, Expires, Revision) ->
+    [{'id', Username}
+    ,{'revision', Revision}
+    ,{'number-alias', Number}
     ,{'cacheable', Expires}
-    | user_el_default_props(Username)
     ].
 
 -spec user_el_default_props(kz_types:xml_attrib_value()) -> kz_term:proplist().
@@ -1689,15 +1685,19 @@ directory_resp_endpoint_xml(<<"sys_info">>, Node, Endpoint, JObj) ->
 directory_resp_resource_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
+    Revision = kz_json:get_ne_binary_value(<<"Revision">>, Endpoint),
 
     ProfileParams = get_profile_params(Endpoint),
     SIPHeaders = get_custom_sip_headers(Endpoint),
-    VariableEls =get_directory_variables(Endpoint),
+    VariableEls = get_directory_variables(Endpoint),
     HeaderEls = [variable_el(K, V) || {K, V} <- SIPHeaders],
     VariablesEl = variables_el(VariableEls ++ HeaderEls),
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
-    UserProps = user_el_default_props(UserId),
+
+    Expires = kz_json:get_integer_value(<<"Expires">>, Endpoint),
+    UserProps = user_el_props(undefined, UserId, Expires, Revision),
+
     UserEl = user_el(UserProps, [VariablesEl, ProfileVariablesEl]),
     DomainEl = domain_el(DomainName, UserEl),
     SectionEl = section_el(<<"directory">>, DomainEl),
@@ -1707,6 +1707,7 @@ directory_resp_resource_xml(_Node, Endpoint, JObj) ->
 directory_resp_device_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
+    Revision = kz_json:get_ne_binary_value(<<"Revision">>, Endpoint),
 
     ProfileParams = get_profile_params(Endpoint),
     VariableEls = get_directory_variables(Endpoint),
@@ -1716,7 +1717,7 @@ directory_resp_device_xml(_Node, Endpoint, JObj) ->
 
     Number = kz_json:get_value([<<"Custom-SIP-Headers">>,<<"P-Kazoo-Primary-Number">>], Endpoint),
     Expires = kz_json:get_integer_value(<<"Expires">>, Endpoint),
-    UserProps = user_el_props(Number, UserId, Expires),
+    UserProps = user_el_props(Number, UserId, Expires, Revision),
 
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
@@ -1742,13 +1743,16 @@ directory_resp_device_xml(_Node, Endpoint, JObj) ->
 directory_resp_user_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     UserId = directory_resp_user_id(Endpoint, JObj),
+    Revision = kz_json:get_ne_binary_value(<<"Revision">>, Endpoint),
 
     ProfileParams = get_profile_params(Endpoint),
     VariableEls = get_directory_variables(Endpoint),
     VariablesEl = variables_el(VariableEls),
     ProfileEls = [variable_el(K, V) || {K, V} <- ProfileParams],
     ProfileVariablesEl = variables_el('profile-variables', ProfileEls),
-    UserProps = props:filter_undefined(user_el_props('undefined', UserId)),
+
+    Expires = kz_json:get_integer_value(<<"Expires">>, Endpoint),
+    UserProps = user_el_props(undefined, UserId, Expires, Revision),
 
     Params = [{<<"endpoint-dial-string">>,  dial_string(Endpoint)}
              ,{<<"endpoint-separator">>, kz_endpoint_separator()}
@@ -1772,7 +1776,11 @@ directory_resp_user_xml(_Node, Endpoint, JObj) ->
 directory_resp_group_ep_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     GroupId = directory_resp_user_id(Endpoint, JObj),
-    GroupProps = user_el_default_props(GroupId),
+    Revision = kz_json:get_ne_binary_value(<<"Revision">>, Endpoint),
+
+    Expires = kz_json:get_integer_value(<<"Expires">>, Endpoint),
+    GroupProps = user_el_props(undefined, GroupId, Expires, Revision),
+
     VariableEls = get_directory_variables(Endpoint),
     Members = kz_json:get_list_value(<<"Members">>, Endpoint, []),
     Dial = lists:foldr(fun(EP, Acc) ->
@@ -1797,7 +1805,13 @@ directory_resp_group_ep_xml(_Node, Endpoint, JObj) ->
 directory_resp_group_xml(_Node, Endpoint, JObj) ->
     DomainName = directory_resp_domain(Endpoint, JObj),
     GroupId = directory_resp_group_id(Endpoint, JObj),
-    GroupProps = [{<<"name">>, GroupId}],
+    Revision = kz_json:get_ne_binary_value(<<"Revision">>, Endpoint),
+
+    Expires = kz_json:get_integer_value(<<"Expires">>, Endpoint),
+    GroupProps = [{<<"name">>, GroupId}
+                 | user_el_props(undefined, GroupId, Expires, Revision)
+                 ],
+
     Members = kz_json:get_json_value(<<"Members">>, Endpoint, kz_json:new()),
     MembersEl = kz_json:foldr(fun fold_user_el/3, [], Members),
     VariableEls = get_directory_variables(Endpoint),

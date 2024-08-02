@@ -1214,10 +1214,17 @@ record_app_vars(UUID, JObj) ->
     RecordMinSec = kz_json:get_binary_value(<<"Record-Min-Sec">>, JObj),
     SampleRate = get_sample_rate(JObj),
 
+    Threshold =  kz_json:get_integer_value([<<"Record-Silence-Detection">>, <<"Threshold">>], JObj),
+    InitialTimeout = kz_json:get_integer_value([<<"Record-Silence-Detection">>, <<"Initial-Timeout">>], JObj),
+    FinalTimeout = kz_json:get_integer_value([<<"Record-Silence-Detection">>, <<"Final-Timeout">>], JObj),
+
     Vars = lists:foldl(fun(F, V) -> F(V) end
                       ,[{<<"RECORD_APPEND">>, <<"true">>}
                        ,{<<"RECORD_STEREO">>, should_record_stereo(JObj)}
                        ,{<<"RECORD_SOFTWARE">>, ecallmgr_util:fs_arg_encode(?RECORD_SOFTWARE)}
+                       ,{<<"RECORD_SILENCE_THRESHOLD">>, Threshold}
+                       ,{<<"RECORD_INITIAL_TIMEOUT_MS">>, InitialTimeout}
+                       ,{<<"RECORD_FINAL_TIMEOUT_MS">>, FinalTimeout}
                        ,{<<"enable_file_write_buffering">>, <<"false">>}
                        ,{<<"record_min_sec">>, RecordMinSec}
                        ,{<<"record_sample_rate">>, kz_term:to_binary(SampleRate)}

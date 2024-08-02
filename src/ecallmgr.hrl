@@ -309,6 +309,9 @@
                               ,{<<"RECORD_APPEND">>, <<"RECORD_APPEND">>}
                               ,{<<"RECORD_SOFTWARE">>, <<"RECORD_SOFTWARE">>}
                               ,{<<"RECORD_STEREO">>, <<"RECORD_STEREO">>}
+                              ,{<<"RECORD_SILENCE_THRESHOLD">>, <<"RECORD_SILENCE_THRESHOLD">>}
+                              ,{<<"RECORD_INITIAL_TIMEOUT_MS">>, <<"RECORD_INITIAL_TIMEOUT_MS">>}
+                              ,{<<"RECORD_FINAL_TIMEOUT_MS">>, <<"RECORD_FINAL_TIMEOUT_MS">>}
                               ,{<<"RTCP-MUX">>, <<"rtcp_mux">>}
                               ,{<<"RTP-Secure-Audio-Confirmed">>, <<"rtp_secure_media_confirmed_audio">>}
                               ,{<<"RTP-Secure-Media">>, <<"rtp_secure_media">>}

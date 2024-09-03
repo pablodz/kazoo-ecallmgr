@@ -372,6 +372,8 @@
                               ,{<<"park_after_bridge">>, <<"park_after_bridge">>}
                               ,{<<"park_after_pickup">>, <<"park_after_bridge">>}
                               ,{<<"playback_terminators">>, <<"playback_terminators">>}
+                              ,{<<"playback_timeout_sec">>, <<"playback_timeout_sec">>}
+                              ,{<<"playback_timeout_as_success">>, <<"playback_timeout_as_success">>}
                               ,{<<"record_min_sec">>, <<"record_min_sec">>}
                               ,{<<"record_sample_rate">>, <<"record_sample_rate">>}
                               ,{<<"record_waste_resources">>, <<"record_waste_resources">>}

@@ -1037,6 +1037,7 @@ play_bridged(JObj, F) ->
 play_vars(UUID, JObj) ->
     Routines = [fun maybe_add_group_id/2
                ,fun maybe_add_terminators/2
+               ,fun maybe_add_timeout_sec/2
                ],
     case lists:foldl(fun(F, V) -> F(V, JObj) end, [], Routines) of
         [] -> 'undefined';
@@ -1057,6 +1058,15 @@ maybe_add_terminators(Acc, JObj) ->
     case get_terminators(JObj) of
         'undefined' -> Acc;
         Terminators -> [Terminators|Acc]
+    end.
+
+-spec maybe_add_timeout_sec(kz_term:proplist(), kz_json:object()) -> kz_term:proplist().
+maybe_add_timeout_sec(Acc, JObj) ->
+    case kz_json:get_integer_value(<<"Playback-Timeout">>, JObj) of
+        'undefined' -> Acc;
+        Timeout -> [{<<"playback_timeout_sec">>, Timeout}
+                   ,{<<"playback_timeout_as_success">>, 'true'}
+                   | Acc]
     end.
 
 %%------------------------------------------------------------------------------

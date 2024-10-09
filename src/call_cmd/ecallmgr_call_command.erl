@@ -899,7 +899,7 @@ get_conference_flags(JObj) ->
             Flags = lists:foldl(fun maybe_add_conference_flag/2, [<<>>], L),
             All = case maybe_add_conference_flag(KV, []) of
                       [] -> tl(Flags);
-                      [<<",">> | T] -> [T | Flags];
+                      [<<"|">> | T] -> [T | Flags];
                       Fs -> [Fs | Flags]
                   end,
             iolist_to_binary(["+flags{", All, "}"])
@@ -908,7 +908,7 @@ get_conference_flags(JObj) ->
 maybe_add_conference_flag({K, V}, Acc) ->
     case lists:keyfind(K, 2, ?CONFERENCE_FLAGS) of
         'false' -> Acc;
-        {FSFlag, _} when V =:= 'true' -> [<<",">>, FSFlag | Acc];
+        {FSFlag, _} when V =:= 'true' -> [<<"|">>, FSFlag | Acc];
         _ -> Acc
     end.
 

@@ -20,13 +20,13 @@ all_conference_flags_test() ->
                              ,{<<"Moderator">>, 'true'}
                              ,{<<"End-Conference">>, 'true'}
                              ]),
-    ?assertEqual(<<"+flags{mute,moderator,deaf}">>, ecallmgr_call_command:get_conference_flags(JObj)).
+    ?assertEqual(<<"+flags{mute|moderator|deaf}">>, ecallmgr_call_command:get_conference_flags(JObj)).
 
 two_conference_flags_test() ->
     JObj = conf_join_options([{<<"Mute">>, 'true'}
                              ,{<<"Moderator">>, 'true'}
                              ]),
-    ?assertEqual(<<"+flags{mute,moderator}">>, ecallmgr_call_command:get_conference_flags(JObj)).
+    ?assertEqual(<<"+flags{mute|moderator}">>, ecallmgr_call_command:get_conference_flags(JObj)).
 
 one_conference_flag_test() ->
     JObj = conf_join_options([{<<"Mute">>, 'true'}]),

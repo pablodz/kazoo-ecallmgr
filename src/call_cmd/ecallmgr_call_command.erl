@@ -533,6 +533,12 @@ get_fs_app(_Node, _UUID, JObj, <<"detect_speech">>) ->
         'true' -> detect_speech_app(JObj)
     end;
 
+get_fs_app(_Node, UUID, JObj, <<"stream">>) ->
+    case kapi_dialplan:stream_v(JObj) of
+        'false' -> {'error', <<"stream failed to execute as JObj did not validate">>};
+        'true' -> stream(UUID, JObj)
+    end;
+
 get_fs_app(_Node, _UUID, _JObj, _App) ->
     lager:debug("unknown application ~s", [_App]),
     {'error', <<"application unknown">>}.
@@ -1666,3 +1672,31 @@ redirect_app_fixup_node(Node) ->
 
 redirect_app_fixup_url(SipUrl) ->
     binary:replace(SipUrl, <<"mod_sofia@">>, <<>>).
+
+-spec stream(kz_term:ne_binary(), kz_json:object()) -> fs_app().
+stream(UUID, JObj) ->
+    Action = kz_json:get_ne_binary_value(<<"Action">>, JObj),
+    stream(UUID, Action, JObj).
+
+-spec stream(kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object()) -> fs_app().
+stream(_UUID, <<"start">>, JObj) ->
+    StreamURL = kz_json:get_ne_binary_value(<<"Stream-URL">>, JObj),
+    AudioTracks = kz_json:get_ne_binary_value(<<"Audio-Tracks">>, JObj, <<"inbound">>),
+    AudioMix = kz_json:get_ne_binary_value(<<"Audio-Mix">>, JObj, <<"mono">>),
+    SampleRate = kz_json:get_ne_binary_value(<<"Sample-Rate">>, JObj, <<"8k">>),
+    Metadata = stream_metadata(JObj),
+
+    StreamArgs = [StreamURL, AudioTracks, AudioMix, SampleRate, Metadata],
+
+    {<<"kz_audio_fork_start">>, kz_binary:join(StreamArgs, <<" ">>)};
+stream(_UUID, Action, JObj) ->
+    %% Action: pause, resume, stop
+    StreamId = kz_json:get_ne_binary_value(<<"Stream-ID">>, JObj, <<"all">>),
+    {<<"kz_audio_fork_", Action/binary>>, StreamId}.
+
+-spec stream_metadata(kz_json:object()) -> binary().
+stream_metadata(JObj) ->
+    case kz_json:get_ne_json_value(<<"Connect-Payload">>, JObj) of
+        'undefined' -> <<>>;
+        PayloadJObj -> kz_json:encode(PayloadJObj)
+    end.

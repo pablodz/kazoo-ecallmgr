@@ -1,0 +1,10 @@
+<definition name="conference-recording-vars">
+	<field name="Recording" type="static" serialize-as="object">
+		<fields>
+            <field name="Milliseconds-Elapsed" as="File-MilliSeconds" serialize-as="number" />
+            <field name="Path" as="File-Path" />
+            <field name="Record-File-Size" as="File-Size" serialize-as="number" />
+            <field name="Recording-Data" as="Data" />
+		</fields>
+	</field>
+</definition>

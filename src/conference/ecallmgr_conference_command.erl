@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2023, 2600Hz
+%%% @copyright (C) 2011-2024, 2600Hz
 %%% @doc Execute conference commands
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -269,6 +269,16 @@ get_conf_command(<<"vars">>, ConferenceId, JObj) ->
         'true' ->
             _ = update_conference_vars(ConferenceId, JObj),
             {<<"vars">>, 'noop'}
+    end;
+
+get_conf_command(<<"setvar">>, _ConferenceId, JObj) ->
+    case kapi_conference:fs_conference_setvar_v(JObj) of
+        'false' ->
+            {'error', <<"conference setvar failed to execute as JObj did not validate.">>};
+        'true' ->
+            Parameter = kz_json:get_binary_value(<<"Parameter">>, JObj),
+            Value = kz_json:get_binary_value(<<"Value">>, JObj),
+            {<<"setvar">>, [Parameter, " ", Value]}
     end;
 
 get_conf_command(Cmd, _ConferenceId, _JObj) ->

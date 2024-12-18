@@ -35,4 +35,7 @@
 			<filter name="Action" type="include" compare="value" value="conference-create" />
 		</filters>
 	</field>
+
+	<field name="conference-recording-vars" type="reference" />
+
 </definition>

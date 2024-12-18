@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2023, 2600Hz
+%%% @copyright (C) 2011-2024, 2600Hz
 %%% @doc Execute conference commands
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -64,6 +64,22 @@ process_event(<<"conference-destroy">>, JObj, Node) ->
     InstanceId = kz_conference_event:instance_id(JObj),
     _ = ecallmgr_fs_conferences:destroy(InstanceId),
     _ = ecallmgr_conference_control_sup:stop_conference_control(Node, ConferenceId, InstanceId);
+
+process_event(<<"start-recording">>, JObj, _Node) ->
+    lager:info("conference recording started"),
+    AccountId = kz_json:get_binary_value(<<"Account-ID">>, JObj),
+    ConferenceName = kz_json:get_binary_value(<<"Conference-ID">>, JObj),
+    Data = recording_data(AccountId, ConferenceName),
+    CommandReq =
+        [{<<"Conference-ID">>, ConferenceName}
+        ,{<<"Parameter">>, <<"Recording-Data">>}
+        ,{<<"Value">>, Data}
+        ,{<<"Application-Name">>, <<"setvar">>}
+        | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
+        ],
+    kapi_conference:publish_fs_conference_setvar(ConferenceName, CommandReq);
+process_event(<<"stop-recording">>, _JObj, _Node) ->
+    lager:info("conference recording stopped");
 
 process_event(<<"add-member">>, JObj, Node) ->
     _ = set_participant_interaction_id(Node, JObj),
@@ -136,3 +152,13 @@ conference_interaction_id(JObj) ->
         'undefined' -> 'undefined';
         Vars -> kz_json:get_ne_binary_value(<<"Interaction-ID">>, Vars)
     end.
+
+-spec recording_data(kz_term:ne_binary(),  kz_json:object()) -> kz_term:ne_binary().
+recording_data(AccountId, _ConfId) ->
+    {Year, Month, _} = erlang:date(),
+    MediaDocId = ?MATCH_MODB_PREFIX(kz_term:to_binary(Year), kz_date:pad_month(Month), kz_binary:rand_hex(16)),
+    Recorder = kapps_call_recording:media_recorder(kz_json:new(), AccountId),
+    Prop = [{<<"Recorder">>, Recorder}
+           ,{<<"ID">>, MediaDocId}
+           ],
+    base64:encode(term_to_binary(kz_json:from_list(Prop))).

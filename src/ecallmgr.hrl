@@ -102,6 +102,7 @@
                  ,loopback_other_leg :: kz_term:api_ne_binary() | '_'
                  ,callflow_id :: kz_term:api_ne_binary() | '_'
                  ,is_onhold = 'false' :: boolean() | '_'
+                 ,recording_status = 'undefined' :: kz_term:api_object() | '_'
                  ,cavs :: kz_term:api_object() | '_'
                  ,ccvs :: kz_term:api_object() | '_'
                  ,cshs :: kz_term:api_object() | '_'

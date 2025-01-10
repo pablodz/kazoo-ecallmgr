@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2023, 2600Hz
+%%% @copyright (C) 2013-2025, 2600Hz
 %%% @doc Track the FreeSWITCH channel information, and provide accessors
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -29,7 +29,7 @@
         ,new_or_update/1
         ]).
 -export([destroy/2]).
--export([update/3, updates/2]).
+-export([update/3, updates/2, update_recording_status/3]).
 -export([cleanup_old_channels/0, cleanup_old_channels/1
         ,max_channel_uptime/0
         ,set_max_channel_uptime/1, set_max_channel_uptime/2
@@ -229,6 +229,10 @@ new_or_update(#channel{uuid=UUID}=Channel) ->
 -spec destroy(kz_term:ne_binary(), atom()) -> 'ok'.
 destroy(UUID, Node) ->
     do_channel_destroy(UUID, Node).
+
+-spec update_recording_status(kz_term:ne_binary(), kz_term:ne_binary(), any()) -> 'ok'.
+update_recording_status(UUID, MediaID, Status) ->
+    do_update_recording_status(UUID, MediaID, Status).
 
 -spec update(kz_term:ne_binary(), pos_integer(), any()) -> 'ok'.
 update(UUID, Key, Value) ->
@@ -617,6 +621,9 @@ maybe_log_updates('true', UUID, Updates) ->
 handle_cast({'channel_updates', UUID, Updates}, State) ->
     WasUpdated = ets:update_element(?CHANNELS_TBL, UUID, Updates),
     maybe_log_updates(WasUpdated, UUID, Updates),
+    {'noreply', State};
+handle_cast({'channel_recording_update', UUID, RecordingID, RecordingEvent}, State) ->
+    set_channel_recording_status(UUID, RecordingID, RecordingEvent),
     {'noreply', State};
 handle_cast({'destroy_channel', UUID, Node}, State) ->
     MatchSpec = channel_match_for_delete(UUID, Node),
@@ -1106,6 +1113,28 @@ do_update('server', UUID, Updates) ->
     gen_server:cast(?SERVER, {'channel_updates', UUID, Updates});
 do_update(_Other, UUID, Updates) ->
     gen_server:cast(?SERVER, {'channel_updates', UUID, Updates}).
+
+do_update_recording_status(UUID, RecordingID, RecordingState) ->
+    Strategy = persistent_term:get('channels_update_strategy', 'server'),
+    do_update_recording_status(Strategy, UUID, RecordingID, RecordingState).
+
+do_update_recording_status('concurrency', UUID, RecordingID, RecordingEvent) ->
+    set_channel_recording_status(UUID, RecordingID, RecordingEvent);
+do_update_recording_status('server', UUID, RecordingID, RecordingEvent) ->
+    gen_server:cast(?SERVER, {'channel_recording_update', UUID, RecordingID, RecordingEvent});
+do_update_recording_status(_Other, UUID, RecordingID, RecordingEvent) ->
+    gen_server:cast(?SERVER, {'channel_recording_update', UUID, RecordingID, RecordingEvent}).
+
+set_channel_recording_status(UUID, RecordingID, RecordingEvent) ->
+    case ecallmgr_fs_channel:fetch(UUID, 'record') of
+        {'ok', #channel{recording_status=CurrentStatus}} ->
+            CurrentReccordingState = kz_json:get_value(RecordingID, CurrentStatus),
+            NewRecordingState = ecallmgr_fs_recordings:update_state(CurrentReccordingState, RecordingEvent),
+            NewStatus = kz_json:set_value(RecordingID, NewRecordingState, CurrentStatus),
+            WasUpdated = ets:update_element(?CHANNELS_TBL, UUID, {#channel.recording_status, NewStatus}),
+            maybe_log_updates(WasUpdated, UUID, [{#channel.recording_status, NewStatus}]);
+        _ -> lager:error("could no update recording status of channel ~s", [UUID])
+    end.
 
 do_channel_insert(Action, Channel) ->
     Strategy = persistent_term:get('channels_update_strategy', 'server'),

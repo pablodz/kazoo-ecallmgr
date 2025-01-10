@@ -1,6 +1,7 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2023, 2600Hz
-%%% @doc Receives STOP RECORD event
+%%% @copyright (C) 2011-2025, 2600Hz
+%%% @doc Receives RECORD_START, RECORD_STOP, RECORD_MASK, RECORD_UNMASK,
+%%% RECORD_PAUSE and RECORD_RESUME events
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,13 +12,24 @@
 -module(ecallmgr_fs_recordings).
 
 -export([init/0]).
--export([handle_record_stop/1]).
+-export([handle_record_stop/1
+        ,handle_recording_event/1
+        ,update_state/2
+        ]).
 
 -include("ecallmgr.hrl").
 
 -spec init() -> 'ok'.
 init() ->
     _ = kazoo_bindings:bind(<<"event_stream.event.call_event.RECORD_STOP">>, ?MODULE, 'handle_record_stop'),
+    _ = kazoo_bindings:bind([
+                             <<"event_stream.event.call_event.RECORD_START">>,
+                             <<"event_stream.event.call_event.RECORD_STOP">>,
+                             <<"event_stream.event.call_event.RECORD_MASK">>,
+                             <<"event_stream.event.call_event.RECORD_UNMASK">>,
+                             <<"event_stream.event.call_event.RECORD_PAUSE">>,
+                             <<"event_stream.event.call_event.RECORD_RESUME">>
+                            ], ?MODULE, 'handle_recording_event'),
     'ok'.
 
 -spec handle_record_stop(map()) -> any().
@@ -26,6 +38,25 @@ handle_record_stop(#{node := Node, call_id := UUID, payload := JObj}) ->
     IsLocal = handling_locally(JObj),
     MediaRecorder = kz_recording:recorder(JObj),
     maybe_store_recording(IsLocal, MediaRecorder, JObj, UUID, Node).
+
+-spec handle_recording_event(map()) -> any().
+handle_recording_event(#{node := _Node, call_id := UUID, payload := JObj}) ->
+    kz_log:put_callid(UUID),
+    RecordingID = filename:rootname(kz_recording:name(JObj)),
+    ecallmgr_fs_channels:update_recording_status(UUID, RecordingID, kz_call_event:event_name(JObj)).
+
+-spec update_state(any(), kz_term:ne_binary()) -> any().
+update_state(_, <<"RECORD_START">>) -> 'recording';
+update_state(_, <<"RECORD_STOP">>) -> 'stopped';
+update_state('recording', <<"RECORD_MASK">>) -> 'masked';
+update_state('paused', <<"RECORD_MASK">>) -> 'paused_and_masked';
+update_state('masked', <<"RECORD_UNMASK">>) -> 'recording';
+update_state('paused_and_masked', <<"RECORD_UNMASK">>) -> 'paused';
+update_state('recording', <<"RECORD_PAUSE">>) -> 'paused';
+update_state('masked', <<"RECORD_PAUSE">>) -> 'paused_and_masked';
+update_state('paused', <<"RECORD_RESUME">>) -> 'recording';
+update_state('paused_and_masked', <<"RECORD_RESUME">>) -> 'masked';
+update_state(State, _) -> State.
 
 -spec maybe_store_recording(boolean(), kz_term:api_binary(), kz_json:object(), kz_term:ne_binary(), atom()) ->
           'ok' |

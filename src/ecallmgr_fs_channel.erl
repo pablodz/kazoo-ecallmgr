@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2023, 2600Hz
+%%% @copyright (C) 2013-2025, 2600Hz
 %%% @doc Track the FreeSWITCH channel information, and provide accessors
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -214,6 +214,7 @@ to_props(Channel) ->
       ,{<<"interaction_id">>, Channel#channel.interaction_id}
       ,{<<"is_loopback">>, Channel#channel.is_loopback}
       ,{<<"is_onhold">>, Channel#channel.is_onhold}
+      ,{<<"recording_status">>, Channel#channel.recording_status}
       ,{<<"loopback_leg_name">>, Channel#channel.loopback_leg_name}
       ,{<<"loopback_other_leg">>, Channel#channel.loopback_other_leg}
       ,{<<"node">>, Channel#channel.node}
@@ -269,6 +270,7 @@ to_api_props(#channel{}=Channel) ->
       ,{<<"From-Tag">>, Channel#channel.from_tag}
       ,{<<"Is-Loopback">>, Channel#channel.is_loopback}
       ,{<<"Is-On-Hold">>, Channel#channel.is_onhold}
+      ,{<<"Recording-Status">>, Channel#channel.recording_status}
       ,{<<"Loopback-Leg-Name">>, Channel#channel.loopback_leg_name}
       ,{<<"Loopback-Other-Leg">>, Channel#channel.loopback_other_leg}
       ,{<<"Media-Node">>, kz_term:to_binary(Channel#channel.node)}
@@ -326,6 +328,7 @@ from_api_props(Props) ->
             ,from_tag = props:get_value(<<"From-Tag">>, Props)
             ,is_loopback = props:get_value(<<"Is-Loopback">>, Props)
             ,is_onhold = props:get_value(<<"Is-On-Hold">>, Props)
+            ,recording_status = props:get_value(<<"Recording-Status">>, Props)
             ,loopback_leg_name = props:get_value(<<"Loopback-Leg-Name">>, Props)
             ,loopback_other_leg = props:get_value(<<"Loopback-Other-Leg">>, Props)
             ,node = kz_term:to_atom(props:get_value(<<"Media-Node">>, Props), 'true')
@@ -472,6 +475,7 @@ jobj_to_updates(Node, UUID, JObj) ->
     CAHs = kz_json:get_json_value(<<"Custom-AUTH-Headers">>, JObj),
     OtherLeg = kz_json:get_ne_binary_value(<<"Other-Leg-Call-ID">>, JObj),
     Profile = kz_json:get_ne_binary_value(<<"Caller-Profile">>, JObj, ?DEFAULT_FS_PROFILE),
+    RecordingStatus = kz_json:get_json_value(<<"Recording-Status">>, JObj, kz_json:new()),
 
     props:filter_undefined([{#channel.uuid, UUID}
                            ,{#channel.destination, kz_json:get_ne_binary_value(<<"Caller-Destination-Number">>, JObj)}
@@ -520,6 +524,7 @@ jobj_to_updates(Node, UUID, JObj) ->
                            ,{#channel.ccvs, CCVs}
                            ,{#channel.cshs, CSHs}
                            ,{#channel.cahs, CAHs}
+                           ,{#channel.recording_status, RecordingStatus}
                            ,{#channel.from, kzd_freeswitch:from(JObj)}
                            ,{#channel.to, kzd_freeswitch:to(JObj)}
                            ,{#channel.switch_url, switch_url(Node, JObj, Profile)}

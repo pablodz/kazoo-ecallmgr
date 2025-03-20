@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2024, 2600Hz
+%%% @copyright (C) 2011-2025, 2600Hz
 %%% @doc Execute conference commands
 %%%
 %%% This Source Code Form is subject to the terms of the Mozilla Public
@@ -154,11 +154,23 @@ conference_interaction_id(JObj) ->
     end.
 
 -spec recording_data(kz_term:ne_binary(),  kz_json:object()) -> kz_term:ne_binary().
-recording_data(AccountId, _ConfId) ->
+recording_data(AccountId, ConfId) ->
     {Year, Month, _} = erlang:date(),
     MediaDocId = ?MATCH_MODB_PREFIX(kz_term:to_binary(Year), kz_date:pad_month(Month), kz_binary:rand_hex(16)),
-    Recorder = kapps_call_recording:media_recorder(kz_json:new(), AccountId),
+    AccountDb = kzs_util:format_account_db(AccountId),
+    {RecordingUrl, ConfName} =
+        case kz_datamgr:open_cache_doc(AccountDb, ConfId) of
+            {'ok', Doc} ->
+                {kz_json:get_ne_binary_value(<<"recording_url">>, Doc)
+                ,kz_json:get_ne_binary_value(<<"name">>, Doc)
+                };
+            {'error', _Error} ->
+                {'undefined', 'undefined'}
+        end,
+    Recorder = kapps_call_recording:media_recorder(kz_json:from_list([{<<"url">>, RecordingUrl}]), AccountId),
     Prop = [{<<"Recorder">>, Recorder}
+           ,{<<"url">>, RecordingUrl}
            ,{<<"ID">>, MediaDocId}
+           ,{<<"Conference-Name">>, ConfName}
            ],
     base64:encode(term_to_binary(kz_json:from_list(Prop))).

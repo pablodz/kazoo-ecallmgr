@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2024, 2600Hz
+%%% @copyright (C) 2010-2025, 2600Hz
 %%% @doc Execute call commands
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -1681,12 +1681,13 @@ stream(UUID, JObj) ->
 -spec stream(kz_term:ne_binary(), kz_term:ne_binary(), kz_json:object()) -> fs_app().
 stream(_UUID, <<"start">>, JObj) ->
     StreamURL = kz_json:get_ne_binary_value(<<"Stream-URL">>, JObj),
+    AudioCodec = kz_json:get_ne_binary_value(<<"Audio-Codec">>, JObj, <<"L16">>),
     AudioTracks = kz_json:get_ne_binary_value(<<"Audio-Tracks">>, JObj, <<"inbound">>),
     AudioMix = kz_json:get_ne_binary_value(<<"Audio-Mix">>, JObj, <<"mono">>),
     SampleRate = kz_json:get_ne_binary_value(<<"Sample-Rate">>, JObj, <<"8k">>),
     Metadata = stream_metadata(JObj),
 
-    StreamArgs = [StreamURL, AudioTracks, AudioMix, SampleRate, Metadata],
+    StreamArgs = [StreamURL, AudioCodec, AudioTracks, AudioMix, SampleRate, Metadata],
 
     {<<"kz_audio_fork_start">>, kz_binary:join(StreamArgs, <<" ">>)};
 stream(_UUID, Action, JObj) ->

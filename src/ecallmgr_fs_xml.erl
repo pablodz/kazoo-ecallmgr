@@ -1867,8 +1867,12 @@ call_forward_dial_string(CallForward) ->
     Vars = channel_vars(CallForward),
     list_to_binary(["[^^!", kz_binary:join(Vars, <<"!">>), "]loopback/", URI]).
 
+filter_call_fwd_prop({<<"Call-Forward-", _/binary>>, _}) -> true;
+filter_call_fwd_prop({Key, _}) ->
+    lists:member(Key, ?CALLFWD_FILTER).
+
 filter_call_fwd_props(Props) ->
-    lists:filter(fun({K,_V}) -> lists:member(K, ?CALLFWD_FILTER) end, Props).
+    lists:filter(fun filter_call_fwd_prop/1, Props).
 
 failover_el(Endpoint) ->
     case failover_properties(Endpoint) of

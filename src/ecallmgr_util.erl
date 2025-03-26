@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2023, 2600Hz
+%%% @copyright (C) 2010-2025, 2600Hz
 %%% @doc Various utilities specific to ecallmgr. More general utilities go
 %%% in kazoo_util.erl
 %%%
@@ -691,11 +691,11 @@ maybe_sanitize_fs_value(<<"Export-Variables">>, Val) ->
 maybe_sanitize_fs_value(<<"Require-Fail-On-Single-Reject">>, <<Val/binary>>) ->
     Val;
 maybe_sanitize_fs_value(<<"Require-Fail-On-Single-Reject">>, Val) when is_list(Val) ->
-    kz_binary:join(Val, <<",">>);
+    kz_binary:join(Val, <<"^">>);
 maybe_sanitize_fs_value(<<"Fail-On-Single-Reject">>, <<Val/binary>>) ->
     Val;
 maybe_sanitize_fs_value(<<"Fail-On-Single-Reject">>, Val) when is_list(Val) ->
-    kz_binary:join(Val, <<",">>);
+    kz_binary:join(Val, <<"^">>);
 maybe_sanitize_fs_value(<<"Failover-Reasons">>, <<Val/binary>>) ->
     Val;
 maybe_sanitize_fs_value(<<"Failover-Reasons">>, Val) when is_list(Val) ->

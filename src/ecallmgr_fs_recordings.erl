@@ -33,17 +33,23 @@ init() ->
     'ok'.
 
 -spec handle_record_stop(map()) -> any().
-handle_record_stop(#{node := Node, call_id := UUID, payload := JObj}) ->
+handle_record_stop(#{node := Node, call_id := UUID, payload := Event}) ->
     kz_log:put_callid(UUID),
-    IsLocal = handling_locally(JObj),
-    MediaRecorder = kz_recording:recorder(JObj),
-    maybe_store_recording(IsLocal, MediaRecorder, JObj, UUID, Node).
+    IsLocal = handling_locally(Event),
+    MediaRecorder = kz_recording:recorder(Event),
+    maybe_store_recording(IsLocal, MediaRecorder, Event, UUID, Node).
 
 -spec handle_recording_event(map()) -> any().
-handle_recording_event(#{node := _Node, call_id := UUID, payload := JObj}) ->
+handle_recording_event(#{node := _Node, call_id := UUID, payload := Event}) ->
     kz_log:put_callid(UUID),
-    RecordingID = filename:rootname(kz_recording:name(JObj)),
-    ecallmgr_fs_channels:update_recording_status(UUID, RecordingID, kz_call_event:event_name(JObj)).
+    case kz_recording:name(Event) of
+        Name when is_binary(Name) ->
+            RecordingID = filename:rootname(Name),
+            ecallmgr_fs_channels:update_recording_status(UUID, RecordingID, kz_call_event:event_name(Event));
+        _ ->
+            lager:debug("not a call recording event, ignoring"),
+            'ok'
+    end.
 
 -spec update_state(any(), kz_term:ne_binary()) -> any().
 update_state(_, <<"RECORD_START">>) -> 'recording';

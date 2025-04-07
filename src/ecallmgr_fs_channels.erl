@@ -1133,7 +1133,7 @@ set_channel_recording_status(UUID, RecordingID, RecordingEvent) ->
             NewStatus = kz_json:set_value(RecordingID, NewRecordingState, CurrentStatus),
             WasUpdated = ets:update_element(?CHANNELS_TBL, UUID, {#channel.recording_status, NewStatus}),
             maybe_log_updates(WasUpdated, UUID, [{#channel.recording_status, NewStatus}]);
-        _ -> lager:error("could no update recording status of channel ~s", [UUID])
+        _ -> lager:error("could not update recording status of channel ~s", [UUID])
     end.
 
 do_channel_insert(Action, Channel) ->

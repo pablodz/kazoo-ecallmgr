@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2023, 2600Hz
+%%% @copyright (C) 2012-2025, 2600Hz
 %%% @doc
 %%% This Source Code Form is subject to the terms of the Mozilla Public
 %%% License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -289,7 +289,9 @@ trusted_acls(Node) ->
 
 -spec collect_trusted_acls(pid(), atom() | kz_term:ne_binary()) -> 'ok'.
 collect_trusted_acls(Collector, Node) ->
+    lager:debug("fetching trusted ACLs for node ~s", [Node]),
     ACLs = trusted_acls(Node),
+    lager:debug("ACLs fetch, delivering to ~p", [Collector]),
     Collector ! ?ACL_RESULT_MERGE(ACLs),
     'ok'.
 
@@ -328,16 +330,27 @@ is_allowed({_K, JObj}) ->
 -spec sip_auth_ips(pid()) -> 'ok'.
 sip_auth_ips(Collector) ->
     ViewOptions = [],
+    StartTime = kz_time:start_time(),
     case kz_datamgr:get_results(?KZ_SIP_DB, <<"credentials/lookup_by_ip">>, ViewOptions) of
         {'error', _R} ->
             throw(io_lib:format("unable to get view results for auth-by-ip devices: ~s", [_R]));
         {'ok', JObjs} ->
-            {RawIPs, RawHosts} = lists:foldl(fun needs_resolving/2, {[], []}, JObjs),
-
-            _ = report_sip_auth_ips(Collector, RawIPs),
-
-            _ = report_sip_auth_hosts(Collector, RawHosts)
+            handle_sip_auth_results(Collector, StartTime, JObjs)
     end.
+
+handle_sip_auth_results(Collector, StartTime, JObjs) ->
+    {{RawIPs, IPCount}
+    ,{RawHosts, HostCount}
+    } = lists:foldl(fun needs_resolving/2
+                   ,{{[], 0}, {[], 0}}
+                   ,JObjs
+                   ),
+    lager:debug("found ~p IPs and ~p hosts", [IPCount, HostCount]),
+
+    _ = report_sip_auth_ips(Collector, RawIPs),
+
+    _ = report_sip_auth_hosts(Collector, RawHosts),
+    lager:debug("finished SIP auth results in ~pms", [kz_time:elapsed_ms(StartTime)]).
 
 report_sip_auth_ips(Collector, RawIPs) ->
     _ = [handle_sip_auth_result(Collector, JObj, IPs)
@@ -354,35 +367,54 @@ report_sip_auth_hosts(Collector, RawHosts) ->
                                        )
                || {Host, JObj} <- RawHosts
               ],
+    lager:debug("started sip auth host resolvers: ~p", [[P || {P, _} <- PidRefs]]),
     wait_for_pid_refs(PidRefs).
 
--spec needs_resolving(kz_json:object(), {list(), list()}) -> {list(), list()}.
-needs_resolving(JObj, {IPs, ToResolve}) ->
-    IP = kz_json:get_value(<<"key">>, JObj),
+-type needs_acc() :: {{kz_term:ne_binaries(), non_neg_integer()} %% IPs
+                     ,{kz_term:ne_binaries(), non_neg_integer()} %% Hostnames
+                     }.
+-spec needs_resolving(kz_json:object(), needs_acc()) -> needs_acc().
+needs_resolving(JObj, {{IPs, IPCount}, {ToResolve, HostCount}}) ->
+    IP = kz_json:get_ne_binary_value(<<"key">>, JObj),
     case kz_network_utils:is_ipv4(IP) of
-        'true' -> {[{[IP], JObj}|IPs], ToResolve};
-        'false' -> {IPs, [{IP, JObj} | ToResolve]}
+        'true' -> {{[{[IP], JObj}|IPs], IPCount+1}, {ToResolve, HostCount}};
+        'false' -> {{IPs, IPCount}, {[{IP, JObj} | ToResolve], HostCount+1}}
     end.
 
 -spec wait_for_pid_refs(kz_term:pid_refs()) -> 'ok'.
-wait_for_pid_refs(PidRefs) ->
-    wait_for_pid_refs(PidRefs, ?REQUEST_TIMEOUT).
+wait_for_pid_refs([]) ->
+    lager:info("no workers started");
+wait_for_pid_refs([_|_]=PidRefs) ->
+    wait_for_pid_refs(PidRefs, ?REQUEST_TIMEOUT, 0).
 
--spec wait_for_pid_refs(kz_term:pid_refs(), timeout()) -> 'ok'.
-wait_for_pid_refs([], _Timeout) -> 'ok';
-wait_for_pid_refs(_PidRefs, Timeout) when Timeout < 0 -> 'ok';
-wait_for_pid_refs(PidRefs, Timeout) ->
+-spec wait_for_pid_refs(kz_term:pid_refs(), timeout(), non_neg_integer()) -> 'ok'.
+wait_for_pid_refs([], _Timeout, _Total) ->
+    lager:debug("handled ~p workers", [_Total]);
+wait_for_pid_refs(_PidRefs, Timeout, _Total) when Timeout < 0 ->
+    lager:debug("processed ~p workers and timed out on ~p left", [_Total, length(_PidRefs)]);
+wait_for_pid_refs(PidRefs, Timeout, Total) ->
     Start = kz_time:start_time(),
     receive
-        {'DOWN', Ref, 'process', Pid, _Reason} ->
-            case lists:keytake(Pid, 1, PidRefs) of
-                'false' -> wait_for_pid_refs(PidRefs, kz_time:decr_timeout(Timeout, Start));
-                {'value', {Pid, Ref}, NewPidRefs} ->
-                    wait_for_pid_refs(NewPidRefs, kz_time:decr_timeout(Timeout, Start))
-            end
+        {'DOWN', Ref, 'process', Pid, Reason} ->
+            handle_down_pid_ref(PidRefs, Timeout, Total, Start, Pid, Ref, Reason)
     after Timeout ->
-            lager:info("timed out waiting for pid refs: ~p", [PidRefs])
+            lager:info("timed out after processing ~p workers; still waiting on ~p workers"
+                      ,[Total, length(PidRefs)]
+                      ),
+            lager:debug("workers left: ~p", [PidRefs])
     end.
+
+handle_down_pid_ref(PidRefs, Timeout, Total, Start, Pid, Ref, Reason) ->
+    case lists:keytake(Pid, 1, PidRefs) of
+        'false' ->
+            wait_for_pid_refs(PidRefs, kz_time:decr_timeout(Timeout, Start), Total);
+        {'value', {Pid, Ref}, NewPidRefs} ->
+            maybe_log_down_reason(Pid, Reason),
+            wait_for_pid_refs(NewPidRefs, kz_time:decr_timeout(Timeout, Start), Total+1)
+    end.
+
+maybe_log_down_reason(_Pid, 'normal') -> 'ok';
+maybe_log_down_reason(Pid, Reason) -> lager:info("worker pid ~p died: ~p", [Pid, Reason]).
 
 -spec resolve_hostname(pid(), {kz_term:ne_binary(), kz_term:api_integer()}, kzd_resources:doc(), acl_builder_fun()) -> 'ok'.
 resolve_hostname(Collector, {ResolveMe, Port}, Resource, ACLBuilderFun) ->
@@ -403,11 +435,12 @@ resolve_hostname(Collector, {ResolveMe, Port}, Resource, ACLBuilderFun) ->
 resolve_hostname(Collector, ResolveMe, Resource, ACLBuilderFun, Host, Port) ->
     case kz_network_utils:is_ipv4(Host) of
         'true' ->
-            maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun, Port);
+            %% Host is a raw IPv4
+            ACLBuilderFun(Collector, Resource, [{Host, Port}]);
         'false' ->
             case kz_network_utils:resolve(Host, ecallmgr_util:get_resolve_options()) of
                 [] ->
-                    lager:debug("no IPs returned, checking for raw IP"),
+                    lager:debug("no IPs resolved for host ~s, checking for raw IP", [Host]),
                     maybe_capture_ip(Collector, ResolveMe, Resource, ACLBuilderFun, Port);
                 IPs ->
                     ACLBuilderFun(Collector, Resource, [{IP, Port} || IP <- IPs]),
@@ -440,6 +473,8 @@ local_resources(Collector) ->
     case kz_datamgr:get_results(?KZ_SIP_DB, <<"resources/listing_active_by_weight">>, ViewOptions) of
         {'error', _R} ->
             throw(io_lib:format("unable to get view results for local active resources: ~s", [_R]));
+        {'ok', []} ->
+            lager:info("no local resources in ~s", [?KZ_SIP_DB]);
         {'ok', JObjs} ->
             handle_resource_results(Collector, JObjs)
     end.
@@ -451,21 +486,28 @@ offnet_resources(Collector) ->
         {'error', _R} ->
             throw(io_lib:format("unable to get view results for offnet active resources : ~s", [_R]));
         {'ok', ViewResources} ->
+            lager:debug("fetch offnet resources"),
             handle_resource_results(Collector, ViewResources)
     end.
 
 -spec handle_resource_results(pid(), kz_json:objects()) -> 'ok'.
 handle_resource_results(Collector, ViewResources) ->
-    _ = [handle_resource_result(Collector, ViewResource) || ViewResource <- ViewResources],
-    'ok'.
+    PidRefs = [kz_process:spawn_monitor(fun handle_resource_view_result/2
+                                       ,[Collector, ViewResource]
+                                       )
+               || ViewResource <- ViewResources
+              ],
+    wait_for_pid_refs(PidRefs),
+    lager:debug("handled ~p resources", [length(ViewResources)]).
 
--spec handle_resource_result(pid(), kz_json:object()) -> 'ok'.
-handle_resource_result(Collector, ViewResource) ->
+-spec handle_resource_view_result(pid(), kz_json:object()) -> 'ok'.
+handle_resource_view_result(Collector, ViewResource) ->
     Resource = kz_json:get_json_value(<<"doc">>, ViewResource),
 
-    InboundPidRefs = resource_inbound_ips(Collector, Resource),
     ServerPidRefs = resource_server_ips(Collector, Resource),
-    wait_for_pid_refs(InboundPidRefs ++ ServerPidRefs).
+    resource_inbound_ips(Collector, Resource), %% direct IPs sent to Collector
+
+    wait_for_pid_refs(ServerPidRefs).
 
 %% IPs could be [IP] | [{IP, Port}]
 -spec handle_resource_result(pid(), kzd_resources:doc(), kz_term:ne_binaries() | kz_term:proplist()) -> 'ok'.
@@ -475,29 +517,48 @@ handle_resource_result(Collector, Resource, IPs) ->
     AccountId = kz_doc:account_id(Resource, Master),
     add_trusted_objects(Collector, AccountId, AuthorizingId, <<"resource">>, IPs).
 
--spec resource_inbound_ips(pid(), kzd_resources:doc()) -> kz_term:pid_refs().
+-spec resource_inbound_ips(pid(), kzd_resources:doc()) -> 'ok'.
 resource_inbound_ips(Collector, Resource) ->
-    [kz_process:spawn_monitor(fun resolve_hostname/4, [Collector
-                                                      ,{IP, 'undefined'}
-                                                      ,Resource
-                                                      ,fun handle_resource_result/3
-                                                      ])
-     || IP <- kz_json:get_list_value(<<"inbound_ips">>, Resource, [])
-    ].
+    lists:foreach(fun(InboundIP) ->
+                          handle_resource_result(Collector, Resource, [{InboundIP, 'undefined'}])
+                  end
+                 ,kz_json:get_list_value(<<"inbound_ips">>, Resource, [])
+                 ).
 
 -spec resource_server_ips(pid(), kzd_resources:doc()) -> kz_term:pid_refs().
 resource_server_ips(Collector, Resource) ->
-    [kz_process:spawn_monitor(fun resolve_hostname/4, [Collector
-                                                      ,{kz_json:get_ne_binary_value(<<"server">>, Gateway)
-                                                       ,kz_json:get_integer_value(<<"port">>, Gateway)
-                                                       }
-                                                      ,Resource
-                                                      ,fun handle_resource_result/3
-                                                      ])
-     || Gateway <- kzd_resources:gateways(Resource, []),
-        kz_json:get_ne_binary_value(<<"endpoint_type">>, Gateway) =:= <<"sip">>,
-        kz_json:is_true(<<"enabled">>, Gateway, 'false')
-    ].
+    lists:foldl(fun(Gateway, Acc) -> maybe_collect_ips_and_hosts(Collector, Resource, Gateway, Acc) end
+               ,[]
+               ,kzd_resources:gateways(Resource, [])
+               ).
+
+maybe_collect_ips_and_hosts(Collector, Resource, Gateway, Acc) ->
+    case kz_json:get_ne_binary_value(<<"endpoint_type">>, Gateway) =:= <<"sip">>
+        andalso kz_json:is_true(<<"enabled">>, Gateway, 'false')
+    of
+        'false' -> Acc;
+        'true' ->
+            collect_ips_and_hosts(Collector, Resource, Gateway, Acc)
+    end.
+
+collect_ips_and_hosts(Collector, Resource, Gateway, Acc) ->
+    Server = kz_json:get_ne_binary_value(<<"server">>, Gateway),
+    Port = kz_json:get_integer_value(<<"port">>, Gateway),
+
+    case kz_network_utils:is_ip(Server) of
+        'true' ->
+            handle_resource_result(Collector, Resource, [{Server, Port}]),
+            Acc;
+        'false' ->
+            PidRef = kz_process:spawn_monitor(fun resolve_hostname/4
+                                             ,[Collector
+                                              ,{Server, Port}
+                                              ,Resource
+                                              ,fun handle_resource_result/3
+                                              ]
+                                             ),
+            [PidRef | Acc]
+    end.
 
 -spec add_trusted_objects(pid(), kz_term:api_binary(), kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binaries() | kz_term:proplist()) -> 'ok'.
 add_trusted_objects(Collector, AccountId, AuthorizingId, AuthorizingType, IPs) ->

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2023, 2600Hz
+%%% @copyright (C) 2010-2025, 2600Hz
 %%% @doc monitors usurp_control
 %%%
 %%%
@@ -125,10 +125,13 @@ code_change(_OldVsn, State, _Extra) ->
 
 -spec handle_query(kz_json:object(), kz_term:proplist()) -> 'ok'.
 handle_query(JObj, _Props) ->
+    StartTime = kz_time:start_time(),
+
     ServerId = kz_api:server_id(JObj),
     Reply = [{<<"Trusted">>, ecallmgr_fs_acls:edge()}
             ,{<<"Msg-ID">>, kz_api:msg_id(JObj)}
             | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
             ],
-    lager:debug("sending trust reply to ~s", [ServerId]),
-    kapi_trusted:publish_reply(ServerId, Reply).
+    ElapsedMs = kz_time:elapsed_ms(StartTime),
+    kapi_trusted:publish_reply(ServerId, Reply),
+    lager:debug("sent trust reply to ~s after ~pms", [ServerId, ElapsedMs]).

@@ -401,6 +401,8 @@
                               ,{<<"RTP-Disable-Hold">>, <<"rtp_disable_hold">>}
                               ,{<<"Call-Forward-Diversions">>, <<"sip_diversions">>}
                               ,{<<"Presence-Aliases">>, <<"presence_aliases">>}
+                              ,{<<"Pickup-Forbidden">>, <<"intercept_forbidden">>}
+                              ,{<<"Pickup-Hangup-On-Forbidden">>, <<"intercept_hangup_on_forbidden">>}
                               ]).
 
 %% Call and Channel Vars that have a special transform value instead of the

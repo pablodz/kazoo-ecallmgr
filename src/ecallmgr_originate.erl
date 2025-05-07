@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2023, 2600Hz
+%%% @copyright (C) 2012-2025, 2600Hz
 %%% @doc
 %%% @author Karl Anderson
 %%% @author James Aimonetti
@@ -535,10 +535,21 @@ maybe_fix_fs_auto_answer_bug(Export) ->
 -spec maybe_fix_caller_id(kz_term:strings(), kz_json:object()) -> string().
 maybe_fix_caller_id(Export, JObj) ->
     Fix = [
-           {lists:member("origination_callee_id_name", Export), kz_json:get_value(<<"Outbound-Callee-ID-Name">>, JObj), "origination_caller_id_name"}
-          ,{lists:member("origination_callee_id_number", Export), kz_json:get_value(<<"Outbound-Callee-ID-Number">>, JObj), "origination_caller_id_number"}
+           {lists:member("origination_callee_id_name", Export)
+           ,kz_json:get_value(<<"Outbound-Callee-ID-Name">>, JObj)
+           ,"origination_caller_id_name"
+           }
+          ,{lists:member("origination_callee_id_number", Export)
+           ,kz_json:get_value(<<"Outbound-Callee-ID-Number">>, JObj)
+           ,"origination_caller_id_number"
+           }
           ],
-    string:join([ "^set:" ++ Key ++ "=" ++ erlang:binary_to_list(Value) || {IsTrue, Value, Key} <- Fix, IsTrue ], ":").
+    string:join(["^set:" ++ Key ++ "=" ++ erlang:binary_to_list(ecallmgr_util:fs_arg_encode(Value))
+                 || {IsTrue, Value, Key} <- Fix,
+                    IsTrue
+                ]
+               ,":"
+               ).
 
 -spec publish_error(kz_term:ne_binary(), kz_term:api_binary(), kz_json:object(), kz_term:api_binary()) -> 'ok'.
 publish_error(_, _, _, 'undefined') -> 'ok';

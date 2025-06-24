@@ -842,9 +842,19 @@ sip_headers_fold(K, V, Vars) ->
                           ])).
 -define(EXPANDABLE_MACROS, kapps_config:get_json(?APP_NAME, <<"expandable_macros">>, ?DEFAULT_EXPANDABLE_MACROS)).
 
+-spec expandable_macros() -> kz_json:object().
+expandable_macros() ->
+    Routines = [fun add_cluster_id_macro/1],
+    kz_json:exec(Routines, kz_json:merge(?DEFAULT_EXPANDABLE_MACROS, ?EXPANDABLE_MACROS)).
+
+-spec add_cluster_id_macro(kz_json:object()) -> kz_json:object().
+add_cluster_id_macro(JObj) ->
+    kz_json:set_value(<<"{cluster_id}">>, kzd_cluster:id(), JObj).
+
 -spec maybe_expand_macro(kz_term:ne_binary()) -> kz_term:ne_binary().
-maybe_expand_macro(HeaderValue) ->
-    kz_json:get_ne_binary_value(HeaderValue, ?EXPANDABLE_MACROS, HeaderValue).
+maybe_expand_macro(<<"{", _/binary>> = HeaderValue) ->
+    kz_json:get_ne_binary_value(HeaderValue, expandable_macros(), HeaderValue);
+maybe_expand_macro(HeaderValue) -> HeaderValue.
 
 -spec diversion_headers_fold(kz_term:ne_binaries(), iolist()) -> iolist().
 diversion_headers_fold(Vs, Vars0) ->

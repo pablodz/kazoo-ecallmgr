@@ -94,3 +94,7 @@ This means that if any SIP device from the resulting endpoint list has an active
 ### "Normal" call forwarded endpoints
 
 If a user or ring group has "normal" call-forwarded endpoints included, since these endpoints don't maintain a registration (since they typically are forwarded to another DID), then they aren't ever "offline" from KAZOO's perspective. Bear this in mind when failover endpoints aren't ringing when SIP endpoints are unregistered.
+
+### Cluster-ID in SIP Headers with Custom Header Names
+
+Kazoo can automatically insert the cluster id into your SIP messages using any header name you choose. Simply set your desired header name with the value `{cluster_id}` in the custom SIP headers configuration.

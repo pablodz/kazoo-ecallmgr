@@ -99,9 +99,19 @@ init([#{payload := JObj
                          ,controller_q = ControllerQ
                          ,queue = Queue
                          ,originate_uuid = OriginateUUID
-                         ,start_control_process = kz_json:is_true(<<"Start-Control-Process">>, JObj, 'true')
+                         ,start_control_process = should_start_control_process(JObj)
                          }}
     end.
+
+default_action_start_control_process(<<"transfer">>) -> false;
+default_action_start_control_process(_Action) -> true.
+
+default_start_control_process(JObj) ->
+    default_action_start_control_process(application_name(JObj)).
+
+should_start_control_process(JObj) ->
+    Default = default_start_control_process(JObj),
+    kz_json:is_true(<<"Start-Control-Process">>, JObj, Default).
 
 fs_node_to_use(JObj, Node) ->
     case kz_json:get_binary_value(<<"Existing-Call-ID">>, JObj) of
@@ -143,11 +153,10 @@ handle_cast('originate_action', #state{originate_req=JObj
                                       ,node=Node
                                       }=State) ->
     gen_server:cast(self(), 'build_originate'),
-    ApplicationName = kz_json:get_value(<<"Application-Name">>, JObj),
-    Action = get_originate_action(ApplicationName, JObj, Node),
+    Action = get_originate_action(JObj, Node),
     lager:debug("originate action: ~s", [Action]),
-    {'noreply', State#state{action=Action
-                           ,app=ApplicationName
+    {'noreply', State#state{app = application_name(JObj)
+                           ,action = Action
                            }
     ,'hibernate'
     };
@@ -326,6 +335,14 @@ cache_fax_file(File, Node) ->
         {'cache_fax_file', Reply} -> Reply
     end.
 
+-spec application_name(kz_json:object()) -> kz_term:ne_binary().
+application_name(JObj) ->
+    kz_json:get_ne_binary_value(<<"Application-Name">>, JObj).
+
+-spec get_originate_action(kz_json:object(), node()) -> kz_term:ne_binary().
+get_originate_action(JObj, Node) ->
+    get_originate_action(application_name(JObj), JObj, Node).
+
 -spec get_originate_action(kz_term:ne_binary(), kz_json:object(), node()) -> kz_term:ne_binary().
 get_originate_action(<<"fax">>, JObj, Node) ->
     lager:debug("got originate with action fax"),
@@ -356,12 +373,8 @@ get_transfer_action(_JObj, 'undefined') -> <<"error">>;
 get_transfer_action(JObj, Route) ->
     Context = ?DEFAULT_FREESWITCH_CONTEXT,
     UnsetVars = get_unset_vars(JObj),
-    list_to_binary(
-      ["'m:^:", UnsetVars
-      ," transfer:", Route
-      ," XML ", Context, "' inline"
-      ]
-     ).
+    TransferAction = UnsetVars ++ ["^transfer:", Route, " XML ", Context],
+    list_to_binary(["'m:^:", TransferAction, "' inline"]).
 
 -spec get_extension_action(kz_json:object()) -> kz_term:ne_binary().
 get_extension_action(JObj) ->
@@ -389,11 +402,8 @@ get_bridge_action(JObj) ->
         {'error', _} -> <<"error">>;
         {'ok', Channel} ->
             UnsetVars = get_unset_vars(JObj),
-            list_to_binary(
-              ["'m:^:", UnsetVars
-              ,"bridge:", Channel, "' inline"
-              ]
-             )
+            BridgeAction = UnsetVars ++ ["^bridge:", Channel],
+            list_to_binary(["'m:^:", BridgeAction, "' inline"])
     end.
 
 -spec get_eavesdrop_action(kz_json:object()) -> kz_term:ne_binary().
@@ -506,7 +516,6 @@ get_unset_vars(JObj) ->
             ,maybe_fix_group_confirm(Export)
             ,maybe_fix_fs_auto_answer_bug(Export)
             ,maybe_fix_caller_id(Export, JObj)
-            ,"^"
             ]
     end.
 

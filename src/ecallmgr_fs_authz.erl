@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2023, 2600Hz
+%%% @copyright (C) 2011-2025, 2600Hz
 %%% @doc Make a request for authorization, and answer queries about the CallID
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -125,13 +125,26 @@ is_authz_enabled(Data, CallId, Node) ->
 -spec is_global_resource(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> authz_reply().
 is_global_resource(Data, CallId, Node) ->
     case kzd_freeswitch:is_consuming_global_resource(Data, 'true')
-        orelse kapps_config:is_true(?APP_NAME, <<"authz_local_resources">>, 'false')
+        orelse should_authz_local_resource(Data)
     of
         'true' -> is_consuming_resource(Data, CallId, Node);
         'false' ->
             lager:debug("channel is authorized because it is a local resource"),
             allow_call(Data)
     end.
+
+-spec should_authz_local_resource(kzd_freeswitch:data()) -> boolean().
+should_authz_local_resource(Data) ->
+    LegacyAuthzLocal = kapps_config:is_true(?APP_NAME, <<"authz_local_resources">>, 'false'),
+    SkipModules = kapps_config:get_ne_binaries(?APP_NAME, <<"authz_skip_modules">>, default_skip_authz_modules(LegacyAuthzLocal)),
+    case kz_json:get_ne_binary_value(<<"Authz-Number-Module">>, kzd_freeswitch:ccvs(Data)) of
+        'undefined' -> LegacyAuthzLocal;
+        Mod -> not lists:member(Mod, SkipModules)
+    end.
+
+-spec default_skip_authz_modules(boolean()) -> kz_term:ne_binaries().
+default_skip_authz_modules('true') -> [];
+default_skip_authz_modules('false') -> [<<"knm_local">>].
 
 -spec is_consuming_resource(kzd_freeswitch:data(), kz_term:ne_binary(), atom()) -> authz_reply().
 is_consuming_resource(Data, CallId, Node) ->
@@ -391,7 +404,7 @@ maybe_update_callee_id(JObj, Acc) ->
             ConvertedRate = kz_term:to_binary(kz_currency:units_to_dollars(kz_term:to_number(Rate))),
             [{<<"ignore_display_updates">>, <<"false">>}
             ,{<<"effective_callee_id_name">>, <<"$", ConvertedRate/binary
-                                                ," per min ${effective_callee_id_name}"
+                                               ," per min ${effective_callee_id_name}"
                                               >>
              }
             ,{<<"Rate">>, Rate}

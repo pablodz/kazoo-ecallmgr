@@ -40,8 +40,15 @@
         },
         "authz_local_resources": {
             "default": false,
-            "description": "ecallmgr authz local resources",
+            "description": "Legacy, do not use this on new systems, look at `auth_skip_modules` and also consider using more refine config for account or reseller limited in `number_manager.local`. This specifies if system should perform authz of channel if it is using a local resource or not.",
             "type": "boolean"
+        },
+        "authz_skip_modules": {
+            "description": "List of Number Manager modules to skip authz, module name must be prefix with `knm_`. Default is `knm_local`. This skip modules only works if channel has Authz-Number-Module CCVs header, if it exists it will be used to check if it member of skip modules or not, if not exists it fallback to `authz_local_resource`.",
+            "items": {
+                "type": "string"
+            },
+            "type": "array"
         },
         "balance_crawler_cycle_ms": {
             "default": 60000,
@@ -395,6 +402,16 @@
             "default": false,
             "description": "ecallmgr use vlc",
             "type": "boolean"
+        },
+        "{Direction}_rate_required": {
+            "default": false,
+            "description": "ecallmgr {Direction} rate required",
+            "type": "boolean"
+        },
+        "{Direction}_rate_resp_timeout": {
+            "default": 10000,
+            "description": "ecallmgr {Direction} rate resp timeout",
+            "type": "integer"
         }
     },
     "type": "object"

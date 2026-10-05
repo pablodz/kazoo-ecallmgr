@@ -57,6 +57,10 @@
 
 -export([async_api/3]).
 
+-ifdef(TEST).
+-export([api_result/2]).
+-endif.
+
 -export([contact_api/0]).
 
 -include("ecallmgr.hrl").
@@ -135,6 +139,7 @@ fetch_reply(#{node := Node, section := Section, fetch_id := FetchID, reply := Re
     gen_server:cast({'mod_kazoo', Node}, {'fetch_reply', Section, FetchID, Reply}).
 
 api_result(Result, 'undefined') -> Result;
+api_result('error', Reason) when is_atom(Reason) -> {'error', Reason};
 api_result(Result, Bin) ->
     case kz_binary:strip_left(kz_binary:strip_right(Bin, <<"\n">>), $\s) of
         <<>> when Result =:= 'error' -> {'error', 'failed'};
